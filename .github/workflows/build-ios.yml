@@ -29,7 +29,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Install MAUI iOS workload
-        run: dotnet workload install maui-ios
+        run: dotnet workload install maui-ios --skip-manifest-update
 
       - name: Restore dependencies
         run: dotnet restore DailyFantasyIOS.csproj
