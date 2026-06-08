@@ -32,25 +32,28 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore DailyFantasyIOS.csproj
 
-      - name: Build unsigned IPA
+      - name: Build unsigned app
         run: |
           dotnet publish DailyFantasyIOS.csproj \
             -f net10.0-ios \
             -c Release \
             -p:RuntimeIdentifier=ios-arm64 \
-            -p:ArchiveOnBuild=true \
             -p:EnableCodeSigning=false \
             -p:CodesignKey="" \
             -p:CodesignProvision="" \
             -p:CodesignRequireProvisioningProfile=false
 
-      - name: Find IPA
-        run: find . -name "*.ipa" | head -20
+      - name: Package IPA
+        run: |
+          APP=$(find . -name "*.app" -path "*/ios-arm64/*" | grep -v simulator | head -1)
+          echo "Found app: $APP"
+          mkdir -p Payload
+          cp -r "$APP" Payload/
+          zip -r DailyFantasyIOS.ipa Payload/
+          echo "IPA created: $(ls -lh DailyFantasyIOS.ipa)"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: DailyFantasyIOS-unsigned
-          path: |
-            **/*.ipa
-          if-no-files-found: warn
+          path: DailyFantasyIOS.ipa
