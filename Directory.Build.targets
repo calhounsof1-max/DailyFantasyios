@@ -1,0 +1,6 @@
+<Project>
+  <!-- Exclude stale generated files that may remain in the OneDrive obj folder -->
+  <ItemGroup>
+    <Compile Remove="obj\**\*.cs" />
+  </ItemGroup>
+</Project>

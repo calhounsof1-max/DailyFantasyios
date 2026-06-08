@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DailyFantasyMAUI.ArchivePage"
+             Title="Archives"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F0F4F8">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- Header -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="14,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="0" Text="← BACK" FontSize="12" FontAttributes="Bold"
+                    BackgroundColor="#2D3D50" TextColor="White"
+                    Padding="12,0" HeightRequest="34" CornerRadius="17"
+                    Clicked="BtnBack_Clicked"/>
+            <Label Grid.Column="1" Text="Set Archives" TextColor="White"
+                   FontSize="16" FontAttributes="Bold"
+                   HorizontalOptions="Center" VerticalOptions="Center"/>
+        </Grid>
+
+        <!-- Archive list -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout x:Name="archiveList" Spacing="0" Padding="12,12,12,20"/>
+        </ScrollView>
+
+        <!-- Empty state -->
+        <Label Grid.Row="1" x:Name="lblEmpty"
+               Text="No archives yet.&#10;&#10;Tap the Archive button on the main screen&#10;to save your current sets."
+               FontSize="15" TextColor="#9CA3AF"
+               HorizontalOptions="Center" VerticalOptions="Center"
+               HorizontalTextAlignment="Center"
+               IsVisible="False"/>
+
+    </Grid>
+</ContentPage>

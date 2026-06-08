@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DailyFantasyMAUI.GeneratePage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#0D1117">
+
+    <Grid RowDefinitions="Auto,*,Auto" x:Name="rootGrid">
+
+        <!-- Header -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="10,10"
+              ColumnDefinitions="Auto,*">
+            <Button Grid.Column="0" Text="←" FontSize="16" TextColor="White"
+                    BackgroundColor="Transparent" Padding="6,0"
+                    HeightRequest="36" MinimumWidthRequest="36"
+                    Clicked="BtnBack_Clicked"/>
+            <Label Grid.Column="1" Text="Generate Numbers"
+                   TextColor="White" FontSize="14" FontAttributes="Bold"
+                   VerticalOptions="Center" HorizontalOptions="Center"/>
+        </Grid>
+
+        <!-- Scrollable content -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="14,14" Spacing="16">
+
+                <!-- Game selector -->
+                <Label Text="SELECT GAME" FontSize="10" FontAttributes="Bold"
+                       TextColor="#9CA3AF" CharacterSpacing="1.5"
+                       HorizontalOptions="Center"/>
+                <HorizontalStackLayout x:Name="stkGames" Spacing="6"
+                                       HorizontalOptions="Center"/>
+
+                <!-- Divider -->
+                <BoxView HeightRequest="1" BackgroundColor="#1E2733"/>
+
+                <!-- Count control -->
+                <Grid ColumnDefinitions="*,44,56,44,*" ColumnSpacing="6"
+                      HorizontalOptions="Center">
+                    <Label Grid.Column="0" Text="Generate" FontSize="15"
+                           TextColor="#D1D5DB" VerticalOptions="Center"
+                           HorizontalOptions="End"/>
+                    <Button Grid.Column="1" Text="−" FontSize="20" FontAttributes="Bold"
+                            BackgroundColor="#2D3D50" TextColor="White"
+                            HeightRequest="44" CornerRadius="22" Padding="0"
+                            Clicked="BtnMinus_Clicked"/>
+                    <Label Grid.Column="2" x:Name="lblCount" Text="5"
+                           FontSize="26" FontAttributes="Bold"
+                           TextColor="White" HorizontalTextAlignment="Center"
+                           VerticalOptions="Center"/>
+                    <Button Grid.Column="3" Text="+" FontSize="20" FontAttributes="Bold"
+                            BackgroundColor="#2D3D50" TextColor="White"
+                            HeightRequest="44" CornerRadius="22" Padding="0"
+                            Clicked="BtnPlus_Clicked"/>
+                    <Label Grid.Column="4" Text="rows" FontSize="15"
+                           TextColor="#D1D5DB" VerticalOptions="Center"/>
+                </Grid>
+
+                <!-- Generate button -->
+                <Button x:Name="btnGenerate" Text="⚡  GENERATE"
+                        FontSize="15" FontAttributes="Bold"
+                        BackgroundColor="#FF8F00" TextColor="White"
+                        HeightRequest="50" CornerRadius="25"
+                        Clicked="BtnGenerate_Clicked"/>
+
+                <!-- Activity + status -->
+                <ActivityIndicator x:Name="spinner" IsRunning="False" IsVisible="False"
+                                   Color="#FF8F00" HorizontalOptions="Center"
+                                   WidthRequest="32" HeightRequest="32"/>
+                <Label x:Name="lblStatus" Text="" FontSize="12"
+                       TextColor="#8B9DC3" HorizontalOptions="Center"
+                       HorizontalTextAlignment="Center"/>
+
+                <!-- Results -->
+                <VerticalStackLayout x:Name="resultsStack" Spacing="4"/>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Save bar (shown after generating) -->
+        <Grid Grid.Row="2" x:Name="saveBar" BackgroundColor="#1E2733"
+              Padding="14,10" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8"
+              IsVisible="False">
+            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                <Label Text="SAVE TO SET" FontSize="10" FontAttributes="Bold"
+                       TextColor="#9CA3AF" CharacterSpacing="1"/>
+                <Picker x:Name="pickerSet" Title="Choose set…"
+                        FontSize="13" TextColor="White" TitleColor="#6B7280"/>
+            </VerticalStackLayout>
+            <Button Grid.Column="1" Text="🗑 Clear"
+                    FontSize="13" FontAttributes="Bold"
+                    BackgroundColor="#7B1111" TextColor="White"
+                    HeightRequest="54" WidthRequest="80" CornerRadius="10"
+                    VerticalOptions="End"
+                    Clicked="BtnClearAll_Clicked"/>
+            <Button Grid.Column="2" Text="Save ↗"
+                    FontSize="14" FontAttributes="Bold"
+                    BackgroundColor="#2E7D32" TextColor="White"
+                    HeightRequest="54" WidthRequest="90" CornerRadius="10"
+                    VerticalOptions="End"
+                    Clicked="BtnSave_Clicked"/>
+        </Grid>
+
+        <!-- Edit row overlay -->
+        <Grid Grid.Row="0" Grid.RowSpan="3" x:Name="editOverlay"
+              BackgroundColor="#C0000000" IsVisible="False">
+            <Border BackgroundColor="#1E2733" Padding="20"
+                    VerticalOptions="Center" HorizontalOptions="Fill"
+                    Margin="16,0" StrokeThickness="0"
+                    StrokeShape="RoundRectangle 16">
+                <VerticalStackLayout Spacing="14">
+                    <Label x:Name="editRowTitle" Text="Edit Row"
+                           FontSize="16" FontAttributes="Bold"
+                           TextColor="White" HorizontalOptions="Center"/>
+                    <HorizontalStackLayout x:Name="editEntryRow" Spacing="6"
+                                           HorizontalOptions="Center"/>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,4,0,0">
+                        <Button Grid.Column="0" Text="Cancel"
+                                BackgroundColor="#37474F" TextColor="White"
+                                CornerRadius="20" HeightRequest="44"
+                                Clicked="BtnEditRowCancel_Clicked"/>
+                        <Button Grid.Column="1" Text="Apply"
+                                BackgroundColor="#2E7D32" TextColor="White"
+                                CornerRadius="20" HeightRequest="44"
+                                Clicked="BtnEditRowApply_Clicked"/>
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+
+    </Grid>
+</ContentPage>

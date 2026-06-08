@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DailyFantasyMAUI.WinnerPage"
+             Title="Check Winning Numbers"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F0F4F8">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto,1">
+        <Grid.GestureRecognizers>
+            <PanGestureRecognizer PanUpdated="OnPagePan"/>
+        </Grid.GestureRecognizers>
+
+        <!-- Row 0: Nav header -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="14,10"
+              ColumnDefinitions="Auto,*,Auto">
+            <Button Grid.Column="0" Text="← HOME" FontSize="12" FontAttributes="Bold"
+                    BackgroundColor="#FF8F00" TextColor="White" Padding="10,0"
+                    HeightRequest="34" CornerRadius="17" Clicked="BtnGoHome_Clicked"/>
+            <Label Grid.Column="1" Text="Fantasy 5" TextColor="White" FontSize="14"
+                   FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center"/>
+            <Button Grid.Column="2" Text="SL →" FontSize="12" FontAttributes="Bold"
+                    BackgroundColor="#7B1FA2" TextColor="White" Padding="10,0"
+                    HeightRequest="34" CornerRadius="17" Clicked="BtnGoSL_Clicked"/>
+        </Grid>
+
+        <!-- Row 5: Status bar -->
+        <Label Grid.Row="5" x:Name="lblStatus"
+               Text="Ready"
+               BackgroundColor="#1E2733" TextColor="#8B9DC3"
+               FontSize="12" Padding="14,5" LineBreakMode="TailTruncation">
+            <Label.GestureRecognizers>
+                <TapGestureRecognizer Tapped="StatusBar_Tapped"/>
+            </Label.GestureRecognizers>
+        </Label>
+
+        <!-- Hidden WebView -->
+        <WebView x:Name="fetchView" Grid.Row="6" HeightRequest="1" WidthRequest="1"
+                 Opacity="0" InputTransparent="True"/>
+
+        <!-- Row 1: Draw banner card -->
+        <Border Grid.Row="1" BackgroundColor="White" StrokeThickness="0"
+                StrokeShape="RoundRectangle 0" Margin="0">
+            <VerticalStackLayout Padding="14,10" Spacing="6">
+                <DatePicker x:Name="drawDatePicker" FontSize="13" TextColor="#374151"
+                            Format="ddd MMM d, yyyy" HeightRequest="44"
+                            DateSelected="DrawDatePicker_DateSelected"/>
+                <Label x:Name="lblDrawDate" Text="Fetching latest draw..."
+                       FontSize="12" TextColor="#6B7A90" HorizontalOptions="Center"/>
+                <HorizontalStackLayout Spacing="8" HorizontalOptions="Center">
+                    <Border x:Name="W1" BackgroundColor="#2E7D32" StrokeThickness="0"
+                            StrokeShape="RoundRectangle 10" WidthRequest="50" HeightRequest="50">
+                        <Label x:Name="lblW1" Text="?" FontSize="22" FontAttributes="Bold"
+                               TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <Border x:Name="W2" BackgroundColor="#2E7D32" StrokeThickness="0"
+                            StrokeShape="RoundRectangle 10" WidthRequest="50" HeightRequest="50">
+                        <Label x:Name="lblW2" Text="?" FontSize="22" FontAttributes="Bold"
+                               TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <Border x:Name="W3" BackgroundColor="#2E7D32" StrokeThickness="0"
+                            StrokeShape="RoundRectangle 10" WidthRequest="50" HeightRequest="50">
+                        <Label x:Name="lblW3" Text="?" FontSize="22" FontAttributes="Bold"
+                               TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <Border x:Name="W4" BackgroundColor="#2E7D32" StrokeThickness="0"
+                            StrokeShape="RoundRectangle 10" WidthRequest="50" HeightRequest="50">
+                        <Label x:Name="lblW4" Text="?" FontSize="22" FontAttributes="Bold"
+                               TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <Border x:Name="W5" BackgroundColor="#2E7D32" StrokeThickness="0"
+                            StrokeShape="RoundRectangle 10" WidthRequest="50" HeightRequest="50">
+                        <Label x:Name="lblW5" Text="?" FontSize="22" FontAttributes="Bold"
+                               TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <ActivityIndicator x:Name="spinner" IsRunning="False" IsVisible="False"
+                                       Color="#2E7D32" WidthRequest="32" HeightRequest="32"
+                                       VerticalOptions="Center"/>
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Row 2: Saved Numbers picker -->
+        <Grid Grid.Row="2" BackgroundColor="White" Padding="12,6"
+              ColumnDefinitions="Auto,*">
+            <Grid.Triggers>
+                <Trigger TargetType="Grid" Property="IsEnabled" Value="True"/>
+            </Grid.Triggers>
+            <BoxView Grid.Column="0" BackgroundColor="#F9A825" WidthRequest="4" VerticalOptions="Fill" Margin="0,4,10,4"/>
+            <Grid Grid.Column="1" ColumnDefinitions="Auto,*" VerticalOptions="Center">
+                <Label Grid.Column="0" Text="Saved Numbers" FontSize="13" FontAttributes="Bold"
+                       TextColor="#374151" VerticalOptions="Center" Margin="0,0,8,0"/>
+                <Picker Grid.Column="1" x:Name="slotPicker" FontSize="13"
+                        BackgroundColor="#F8F9FA" HeightRequest="36"
+                        SelectedIndexChanged="SlotPicker_Changed"/>
+            </Grid>
+        </Grid>
+
+        <!-- Row 3: 10 number rows -->
+        <ScrollView Grid.Row="3" BackgroundColor="#F0F4F8">
+            <VerticalStackLayout x:Name="rowsContainer" Padding="10,8" Spacing="5"/>
+        </ScrollView>
+
+        <!-- Row 4: Bottom buttons -->
+        <Grid Grid.Row="4" ColumnDefinitions="*,*,*,*,*" ColumnSpacing="6"
+              Padding="10,8" BackgroundColor="#1E2733">
+            <Button Grid.Column="0" Text="CHECK" FontSize="12" FontAttributes="Bold"
+                    BackgroundColor="#F9A825" TextColor="White" HeightRequest="42"
+                    CornerRadius="21" Padding="4,0" Clicked="BtnCheck_Clicked"/>
+            <Button Grid.Column="1" Text="CLEAR" FontSize="12"
+                    BackgroundColor="#FF7043" TextColor="White" HeightRequest="42"
+                    CornerRadius="21" Padding="4,0" Clicked="BtnClearAll_Clicked"/>
+            <Button Grid.Column="2" Text="REFRESH" FontSize="12"
+                    BackgroundColor="#00897B" TextColor="White" HeightRequest="42"
+                    CornerRadius="21" Padding="4,0" Clicked="BtnRefresh_Clicked"/>
+            <Button Grid.Column="3" Text="SAVE" FontSize="12"
+                    BackgroundColor="#2E7D32" TextColor="White" HeightRequest="42"
+                    CornerRadius="21" Padding="4,0" Clicked="BtnSave_Clicked"/>
+            <Button Grid.Column="4" Text="CLR SETS" FontSize="11"
+                    BackgroundColor="#B71C1C" TextColor="White" HeightRequest="42"
+                    CornerRadius="21" Padding="4,0" Clicked="BtnClearSets_Clicked"/>
+        </Grid>
+
+    </Grid>
+
+</ContentPage>

@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:conv="clr-namespace:DailyFantasyMAUI.Converters"
+             xmlns:model="clr-namespace:DailyFantasyMAUI.Model"
+             x:Class="DailyFantasyMAUI.MainPage"
+             Title="Lottery"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F0F4F8">
+
+    <ContentPage.Resources>
+        <conv:BoolToColorConverter x:Key="BoolToColor"/>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto">
+        <Grid.GestureRecognizers>
+            <PanGestureRecognizer PanUpdated="OnPagePan"/>
+        </Grid.GestureRecognizers>
+
+        <!-- Row 0: Header -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="14,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Label Grid.Column="0" Text="Daily Fantasy" TextColor="White"
+                   FontSize="12" VerticalOptions="Center" LineBreakMode="NoWrap"/>
+            <Button Grid.Column="1" x:Name="btnNavDropdown"
+                    Text="Games ▾" FontSize="13" FontAttributes="Bold"
+                    BackgroundColor="#2D3D50" TextColor="White"
+                    Padding="14,0" HeightRequest="34" CornerRadius="17"
+                    Clicked="BtnNavDropdown_Clicked"/>
+            <Border Grid.Column="2" BackgroundColor="#2D3D50" StrokeThickness="0"
+                    StrokeShape="RoundRectangle 14" Padding="4,2" Margin="8,0,0,0" VerticalOptions="Center">
+                <HorizontalStackLayout Spacing="2" VerticalOptions="Center">
+                    <Button x:Name="btnModeF5" Text="F5" FontSize="11" FontAttributes="Bold"
+                            BackgroundColor="#FF8F00" TextColor="White" Padding="8,0"
+                            HeightRequest="28" CornerRadius="14" Clicked="BtnModeF5_Clicked"/>
+                    <Button x:Name="btnModeSL" Text="SL" FontSize="11" FontAttributes="Bold"
+                            BackgroundColor="#3D3D5C" TextColor="#8B9DC3" Padding="8,0"
+                            HeightRequest="28" CornerRadius="14" Clicked="BtnModeSL_Clicked"/>
+                    <Button x:Name="btnModeD3" Text="D3" FontSize="11" FontAttributes="Bold"
+                            BackgroundColor="#3D3D5C" TextColor="#8B9DC3" Padding="8,0"
+                            HeightRequest="28" CornerRadius="14" Clicked="BtnModeD3_Clicked"/>
+                </HorizontalStackLayout>
+            </Border>
+        </Grid>
+
+        <!-- Row 1: Last draw — white card with red left accent -->
+        <Grid Grid.Row="1" BackgroundColor="White" ColumnDefinitions="4,*">
+            <BoxView Grid.Column="0" BackgroundColor="#1E2733"/>
+            <Label Grid.Column="1" x:Name="txtLastDraw"
+                   Text="{Binding LastNumberHit}"
+                   Padding="12,8" FontSize="13" TextColor="#374151" LineBreakMode="WordWrap"/>
+        </Grid>
+
+        <!-- Row 2: Number boxes 1–5 -->
+        <Grid Grid.Row="2" Margin="10,10,10,3" ColumnSpacing="5"
+              ColumnDefinitions="*,*,*,*,*">
+            <Entry Grid.Column="0" x:Name="Box1" Text="1" Keyboard="Numeric"
+                   TextColor="Black" BackgroundColor="White"
+                   FontSize="20" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="50"/>
+            <Entry Grid.Column="1" x:Name="Box2" Text="2" Keyboard="Numeric"
+                   TextColor="Black" BackgroundColor="White"
+                   FontSize="20" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="50"/>
+            <Entry Grid.Column="2" x:Name="Box3" Text="3" Keyboard="Numeric"
+                   TextColor="Black" BackgroundColor="White"
+                   FontSize="20" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="50"/>
+            <Entry Grid.Column="3" x:Name="Box4" Text="4" Keyboard="Numeric"
+                   TextColor="Black" BackgroundColor="White"
+                   FontSize="20" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="50"/>
+            <Entry Grid.Column="4" x:Name="Box5" Text="5" Keyboard="Numeric"
+                   TextColor="Black" BackgroundColor="White"
+                   FontSize="20" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="50"/>
+        </Grid>
+
+        <!-- Row 3: Number boxes 6–10 -->
+        <Grid Grid.Row="3" Margin="10,3,10,3" ColumnSpacing="5"
+              ColumnDefinitions="*,*,*,*,*">
+            <Entry Grid.Column="0" x:Name="Box6" Text="6" Keyboard="Numeric"
+                   TextColor="Black" BackgroundColor="White"
+                   FontSize="20" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="50"/>
+            <Entry Grid.Column="1" x:Name="Box7" Text="7" Keyboard="Numeric"
+                   TextColor="Black" BackgroundColor="White"
+                   FontSize="20" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="50"/>
+            <Entry Grid.Column="2" x:Name="Box8" Text="8" Keyboard="Numeric"
+                   TextColor="Black" BackgroundColor="White"
+                   FontSize="20" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="50"/>
+            <Entry Grid.Column="3" x:Name="Box9" Text="9" Keyboard="Numeric"
+                   TextColor="Black" BackgroundColor="White"
+                   FontSize="20" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="50"/>
+            <Entry Grid.Column="4" x:Name="Box10" Text="10" Keyboard="Numeric"
+                   TextColor="Black" BackgroundColor="White"
+                   FontSize="20" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="50"/>
+        </Grid>
+
+        <!-- Row 4: Number boxes 11–12 -->
+        <Grid Grid.Row="4" Margin="10,3,10,0" ColumnSpacing="5"
+              ColumnDefinitions="*,*,*,*,*">
+            <Entry Grid.Column="0" x:Name="Box11" Text="11" Keyboard="Numeric"
+                   TextColor="Black" BackgroundColor="White"
+                   FontSize="20" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="50"/>
+            <Entry Grid.Column="1" x:Name="Box12" Text="12" Keyboard="Numeric"
+                   TextColor="Black" BackgroundColor="White"
+                   FontSize="20" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="50"/>
+        </Grid>
+
+        <!-- Row 5: Pick / From / Combos / Count -->
+        <Grid Grid.Row="5" Margin="10,10,10,0" ColumnSpacing="10"
+              ColumnDefinitions="*,*,Auto,Auto">
+            <VerticalStackLayout Grid.Column="0" Spacing="3">
+                <Label Text="PICK" FontSize="10" TextColor="#9CA3AF"
+                       FontAttributes="Bold" CharacterSpacing="1"/>
+                <Border BackgroundColor="White" StrokeThickness="1.5" Stroke="#DDE3EE"
+                        StrokeShape="RoundRectangle 8" HeightRequest="48">
+                    <Entry x:Name="MaxNum" Text="5" Keyboard="Numeric"
+                           FontSize="20" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                           TextColor="Black" BackgroundColor="Transparent"
+                           TextChanged="MaxNum_TextChanged"/>
+                </Border>
+            </VerticalStackLayout>
+            <VerticalStackLayout Grid.Column="1" Spacing="3">
+                <Label Text="FROM" FontSize="10" TextColor="#9CA3AF"
+                       FontAttributes="Bold" CharacterSpacing="1"/>
+                <Border BackgroundColor="White" StrokeThickness="1.5" Stroke="#DDE3EE"
+                        StrokeShape="RoundRectangle 8" HeightRequest="48">
+                    <Entry x:Name="HowMany" Text="39" Keyboard="Numeric"
+                           FontSize="20" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                           TextColor="Black" BackgroundColor="Transparent"
+                           TextChanged="HowMany_TextChanged"/>
+                </Border>
+            </VerticalStackLayout>
+            <VerticalStackLayout Grid.Column="2" VerticalOptions="End" Spacing="1">
+                <Label Text="COMBOS" FontSize="9" TextColor="#9CA3AF"
+                       FontAttributes="Bold" CharacterSpacing="0.5" HorizontalOptions="Center"/>
+                <Label x:Name="posComb"
+                       Text="{Binding PossibleCombinations, StringFormat='{0:N0}'}"
+                       FontSize="15" FontAttributes="Bold"
+                       TextColor="#3949AB" HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+            <VerticalStackLayout Grid.Column="3" VerticalOptions="End" Spacing="1">
+                <Label Text="COUNT" FontSize="9" TextColor="#9CA3AF"
+                       FontAttributes="Bold" CharacterSpacing="0.5" HorizontalOptions="Center"/>
+                <Label x:Name="lblCount"
+                       Text="{Binding NumberInList}"
+                       FontSize="15" FontAttributes="Bold"
+                       TextColor="#E53935" HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+        </Grid>
+
+        <!-- Row 6: Action buttons -->
+        <Grid Grid.Row="6" Margin="10,8,10,8" ColumnSpacing="4"
+              ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto">
+            <Button Grid.Column="0" Text="&lt;&lt;" FontSize="11" Padding="6,0"
+                    BackgroundColor="#78909C" TextColor="White" HeightRequest="34"
+                    Clicked="BtnShiftLeft_Clicked" CornerRadius="17" IsVisible="False"/>
+            <Button Grid.Column="1" Text="&gt;&gt;" FontSize="11" Padding="6,0"
+                    BackgroundColor="#78909C" TextColor="White" HeightRequest="34"
+                    Clicked="BtnShiftRight_Clicked" CornerRadius="17" IsVisible="False"/>
+            <Button Grid.Column="2" Text="CLR" FontSize="11" Padding="8,0"
+                    BackgroundColor="#FF7043" TextColor="White" HeightRequest="34"
+                    Clicked="BtnClear_Clicked" CornerRadius="17"/>
+            <Grid Grid.Column="3" ColumnDefinitions="Auto,*">
+                <CheckBox x:Name="chkBoxPerms" Grid.Column="0" Color="#1565C0"
+                          VerticalOptions="Center" Margin="2,0,0,0"/>
+                <Button Grid.Column="1" Text="Combos" FontSize="11"
+                        BackgroundColor="#3949AB" TextColor="White" HeightRequest="34"
+                        Clicked="BtnProcess_Clicked" CornerRadius="17"/>
+            </Grid>
+            <Button Grid.Column="4" Text="Draws" FontSize="11" Padding="8,0"
+                    BackgroundColor="#00897B" TextColor="White" HeightRequest="34"
+                    Clicked="BtnDraws_Clicked" CornerRadius="17"/>
+            <Picker x:Name="cmbRecurrence" Grid.Column="5" WidthRequest="46" HeightRequest="34"
+                    BackgroundColor="White" FontSize="10" SelectedIndexChanged="Recurrence_Changed">
+                <Picker.Items>
+                    <x:String>2</x:String>
+                    <x:String>3</x:String>
+                    <x:String>4</x:String>
+                    <x:String>5</x:String>
+                </Picker.Items>
+            </Picker>
+            <Button Grid.Column="6" Text="Match" FontSize="11" Padding="8,0"
+                    BackgroundColor="#E53935" TextColor="White" HeightRequest="34"
+                    Clicked="BtnRecurrence_Clicked" CornerRadius="17"/>
+        </Grid>
+
+        <!-- Row 7: Lists -->
+        <Grid Grid.Row="7" BackgroundColor="White">
+
+            <!-- History list -->
+            <CollectionView x:Name="lstHistory"
+                            IsVisible="{Binding ShowHistory}"
+                            ItemsSource="{Binding Picks}"
+                            SelectionMode="Single" SelectionChanged="History_SelectionChanged">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="16,10" BackgroundColor="White">
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup Name="CommonStates">
+                                    <VisualState Name="Normal">
+                                        <VisualState.Setters>
+                                            <Setter Property="BackgroundColor" Value="White"/>
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState Name="Selected">
+                                        <VisualState.Setters>
+                                            <Setter Property="BackgroundColor" Value="#C5CAE9"/>
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <Label Text="{Binding .}" FontFamily="Monospace" FontSize="17"
+                                   TextColor="#1E2A3A" BackgroundColor="Transparent"/>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <!-- Recurrence results -->
+            <CollectionView x:Name="lstRecurrence"
+                            IsVisible="{Binding ShowRecurrence}"
+                            ItemsSource="{Binding RecurrenceResults}"
+                            SelectionMode="Single" SelectionChanged="Recurrence_SelectionChanged">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="model:ModelDaily">
+                        <Grid Padding="16,10" BackgroundColor="White">
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup Name="CommonStates">
+                                    <VisualState Name="Normal">
+                                        <VisualState.Setters>
+                                            <Setter Property="BackgroundColor" Value="White"/>
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState Name="Selected">
+                                        <VisualState.Setters>
+                                            <Setter Property="BackgroundColor" Value="#C8E6C9"/>
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <Label Text="{Binding Display}" FontFamily="Monospace"
+                                   FontSize="16" TextColor="#1B5E20"/>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <!-- Combinations list -->
+            <CollectionView x:Name="lstCombos"
+                            IsVisible="{Binding ShowCombos}"
+                            ItemsSource="{Binding Combinations}"
+                            SelectionMode="Single" SelectionChanged="Combos_SelectionChanged">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="16,9" BackgroundColor="White">
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup Name="CommonStates">
+                                    <VisualState Name="Normal">
+                                        <VisualState.Setters>
+                                            <Setter Property="BackgroundColor" Value="White"/>
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState Name="Selected">
+                                        <VisualState.Setters>
+                                            <Setter Property="BackgroundColor" Value="#E1BEE7"/>
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <Label Text="{Binding .}" FontFamily="Monospace"
+                                   FontSize="16" TextColor="#4A148C"/>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </Grid>
+
+        <!-- Row 8: Status bar -->
+        <Label Grid.Row="8" x:Name="lblStatus"
+               Text="{Binding StatusMessage}"
+               BackgroundColor="#1E2733" TextColor="#8B9DC3"
+               FontSize="12" Padding="14,5" LineBreakMode="TailTruncation">
+            <Label.GestureRecognizers>
+                <TapGestureRecognizer Tapped="StatusBar_Tapped"/>
+            </Label.GestureRecognizers>
+        </Label>
+
+        <!-- Row 9: Bottom bar -->
+        <Grid Grid.Row="9" ColumnDefinitions="*,*,*,*" HeightRequest="46" BackgroundColor="#1E2733">
+            <Button Grid.Column="0" Text="Results" FontSize="12"
+                    BackgroundColor="#2E7D32" TextColor="White"
+                    Clicked="BtnResults_Clicked"/>
+            <Button Grid.Column="1" Text="☰ More" FontSize="12"
+                    BackgroundColor="#37474F" TextColor="White"
+                    Clicked="BtnMore_Clicked"/>
+            <Button Grid.Column="2" Text="📷 Scan" FontSize="12"
+                    BackgroundColor="#1565C0" TextColor="White"
+                    Clicked="BtnScan_Clicked"/>
+            <Button Grid.Column="3" Text="🎲 Generate" FontSize="11"
+                    BackgroundColor="#5D4037" TextColor="White"
+                    Clicked="BtnGenerateNumbers_Clicked"/>
+        </Grid>
+
+        <!-- Row 10: Insert combos to Winner page (visible only on Combos tab) -->
+        <Button Grid.Row="10" x:Name="btnInsertToWinner"
+                Text="Insert Combos → F5 Winner"
+                FontSize="13" BackgroundColor="#E65100" TextColor="White"
+                HeightRequest="44" Margin="10,4,10,8" CornerRadius="22"
+                IsVisible="{Binding ShowCombos}"
+                Clicked="BtnInsertToWinner_Clicked"/>
+
+        <!-- Loading overlay -->
+        <Grid Grid.Row="0" Grid.RowSpan="11" x:Name="loadingOverlay"
+              BackgroundColor="#C0000000" IsVisible="{Binding IsLoading}">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="18">
+                <ActivityIndicator IsRunning="True" Color="White" WidthRequest="60" HeightRequest="60"/>
+                <Label Text="Loading draw data..." TextColor="White" FontSize="16"
+                       HorizontalOptions="Center" FontAttributes="Bold"/>
+            </VerticalStackLayout>
+        </Grid>
+
+        <!-- Reorder overlay -->
+        <Grid Grid.Row="0" Grid.RowSpan="11" x:Name="reorderOverlay"
+              BackgroundColor="#C0000000" IsVisible="False">
+            <Frame BackgroundColor="White" CornerRadius="20" Padding="24"
+                   VerticalOptions="Center" HorizontalOptions="Center" WidthRequest="320"
+                   HasShadow="True">
+                <VerticalStackLayout Spacing="16">
+                    <Label Text="Reorder Numbers" FontSize="17" FontAttributes="Bold"
+                           HorizontalOptions="Center" TextColor="#1E2733"/>
+                    <Label Text="Tap a number, then tap another to swap"
+                           FontSize="12" HorizontalOptions="Center" TextColor="#9CA3AF"/>
+                    <HorizontalStackLayout x:Name="reorderNumbers"
+                                          HorizontalOptions="Center" Spacing="8"/>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <Button Grid.Column="0" Text="Cancel" BackgroundColor="#78909C"
+                                TextColor="White" CornerRadius="20" HeightRequest="44"
+                                Clicked="ReorderCancel_Clicked"/>
+                        <Button Grid.Column="1" Text="Apply" BackgroundColor="#3949AB"
+                                TextColor="White" CornerRadius="20" HeightRequest="44"
+                                Clicked="ReorderApply_Clicked"/>
+                    </Grid>
+                </VerticalStackLayout>
+            </Frame>
+        </Grid>
+
+    </Grid>
+</ContentPage>

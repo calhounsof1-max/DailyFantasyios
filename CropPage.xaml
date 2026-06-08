@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DailyFantasyMAUI.CropPage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#000000">
+    <Grid RowDefinitions="*,Auto">
+
+        <!-- Photo + crop overlay (AspectFit shows full ticket) -->
+        <Grid Grid.Row="0">
+            <Image x:Name="imgPhoto" Aspect="AspectFit" BackgroundColor="Black"/>
+            <GraphicsView x:Name="gvCrop"/>
+        </Grid>
+
+        <!-- Bottom bar -->
+        <VerticalStackLayout Grid.Row="1" Padding="16,10" BackgroundColor="#1E2733" Spacing="8">
+            <Label Text="Drag yellow lines to frame the number rows"
+                   TextColor="#9CA3AF" HorizontalOptions="Center" FontSize="13"/>
+            <Button x:Name="btnScan" Text="Scan This Area"
+                    Clicked="BtnScan_Clicked"
+                    BackgroundColor="#2563EB" TextColor="White"
+                    CornerRadius="12" HeightRequest="50" Margin="0,0,0,4"/>
+        </VerticalStackLayout>
+
+    </Grid>
+</ContentPage>

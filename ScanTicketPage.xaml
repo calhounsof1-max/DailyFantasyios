@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DailyFantasyMAUI.ScanTicketPage"
+             Title="Scan Ticket"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="Black">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- Header -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="10,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="0" Text="←" FontSize="16" TextColor="White"
+                    BackgroundColor="Transparent" Padding="6,0"
+                    HeightRequest="36" MinimumWidthRequest="36"
+                    Clicked="BtnBack_Clicked"/>
+            <Label Grid.Column="1" Text="Read Lottery Ticket"
+                   TextColor="White" FontSize="14" FontAttributes="Bold"
+                   VerticalOptions="Center" HorizontalOptions="Center"/>
+            <Picker Grid.Column="2" x:Name="pickerGame"
+                    Title="Game" FontSize="12" TextColor="White"
+                    TitleColor="#8B9DC3"
+                    SelectedIndexChanged="Game_Changed"
+                    MinimumWidthRequest="80"/>
+        </Grid>
+
+        <!-- Center panel -->
+        <Grid Grid.Row="1" BackgroundColor="#0D1117">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Fill"
+                                 Spacing="24" Padding="32,0">
+                <Label Text="📋" FontSize="64" HorizontalOptions="Center"/>
+                <Label Text="Tap the button below, then photograph your ticket"
+                       TextColor="#9CA3AF" FontSize="14"
+                       HorizontalTextAlignment="Center"
+                       HorizontalOptions="Center"/>
+                <Button x:Name="btnCapture"
+                        Text="📷  Read Numbers"
+                        FontSize="17" FontAttributes="Bold"
+                        BackgroundColor="#1565C0" TextColor="White"
+                        HeightRequest="58" CornerRadius="12"
+                        HorizontalOptions="Fill"
+                        Clicked="BtnCapture_Clicked"/>
+            </VerticalStackLayout>
+        </Grid>
+
+        <!-- Bottom panel -->
+        <ScrollView Grid.Row="2" BackgroundColor="#1E2733" MaximumHeightRequest="300">
+            <VerticalStackLayout Padding="14,10" Spacing="8">
+
+                <!-- Status -->
+                <Label x:Name="lblStatus"
+                       Text="Frame ticket numbers above, then tap Read Numbers"
+                       TextColor="#8B9DC3" FontSize="12"
+                       HorizontalOptions="Center" LineBreakMode="WordWrap"
+                       HorizontalTextAlignment="Center"/>
+
+                <!-- OCR Preview -->
+                <Button x:Name="btnToggleOcr" Text="Show Scanned Image"
+                        FontSize="11" TextColor="#1565C0" BackgroundColor="Transparent"
+                        Padding="0" HeightRequest="24" IsVisible="False"
+                        Clicked="BtnToggleOcr_Clicked"/>
+                <Frame x:Name="frmOcrPreview" IsVisible="False" Padding="0" 
+                       BorderColor="#1565C0" BackgroundColor="Black"
+                       HorizontalOptions="Center" Margin="0,4">
+                    <Image x:Name="imgOcrPreview" Aspect="AspectFit" HeightRequest="180"/>
+                </Frame>
+
+                <!-- Multi-entry list (e.g. Daily 3 with 5 plays) -->
+                <VerticalStackLayout x:Name="stkMultiEntries" IsVisible="False" Spacing="4"/>
+
+                <!-- Edit hint -->
+                <Label x:Name="lblEditHint"
+                       Text="Check numbers — tap a box to correct."
+                       FontSize="11" TextColor="#6B7280"
+                       HorizontalOptions="Center" IsVisible="False"/>
+
+                <!-- Set / Row pickers -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label Text="Insert into Set:" FontSize="12"
+                               TextColor="#9CA3AF" FontAttributes="Bold"/>
+                        <Picker x:Name="pickerSet" Title="Set #"
+                                FontSize="13" TextColor="White" TitleColor="#6B7280"/>
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                        <Label Text="Starting Row:" FontSize="12"
+                               TextColor="#9CA3AF" FontAttributes="Bold"/>
+                        <Picker x:Name="pickerRow" Title="Row #"
+                                FontSize="13" TextColor="White" TitleColor="#6B7280"/>
+                    </VerticalStackLayout>
+                </Grid>
+
+                <!-- Insert button -->
+                <Button x:Name="btnInsert"
+                        Text="Insert into Set"
+                        FontSize="14" FontAttributes="Bold"
+                        BackgroundColor="#2E7D32" TextColor="White"
+                        HeightRequest="46" CornerRadius="10"
+                        IsEnabled="False"
+                        Clicked="BtnInsert_Clicked"/>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Loading overlay -->
+        <Grid Grid.Row="0" Grid.RowSpan="3"
+              x:Name="loadingOverlay" IsVisible="False"
+              BackgroundColor="#A0000000">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White"
+                                   WidthRequest="48" HeightRequest="48"/>
+                <Label x:Name="lblLoading" Text="Reading numbers…" TextColor="White" FontSize="14"
+                       HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+        </Grid>
+
+    </Grid>
+</ContentPage>
