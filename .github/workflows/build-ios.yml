@@ -16,11 +16,9 @@ jobs:
       - name: Show available Xcode versions
         run: ls /Applications/ | grep Xcode
 
-      - name: Select latest Xcode
+      - name: Select Xcode 26.0
         run: |
-          XCODE=$(ls /Applications/ | grep "^Xcode" | sort -V | tail -1)
-          echo "Using $XCODE"
-          sudo xcode-select -s /Applications/$XCODE/Contents/Developer
+          sudo xcode-select -s /Applications/Xcode_26.0.app/Contents/Developer
           xcodebuild -version
 
       - name: Setup .NET 10
