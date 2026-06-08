@@ -7,11 +7,21 @@ on:
 
 jobs:
   build-ios:
-    runs-on: macos-16
+    runs-on: macos-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Show available Xcode versions
+        run: ls /Applications/ | grep Xcode
+
+      - name: Select latest Xcode
+        run: |
+          XCODE=$(ls /Applications/ | grep "^Xcode" | sort -V | tail -1)
+          echo "Using $XCODE"
+          sudo xcode-select -s /Applications/$XCODE/Contents/Developer
+          xcodebuild -version
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
