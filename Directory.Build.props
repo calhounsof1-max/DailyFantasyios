@@ -1,5 +1,5 @@
 <Project>
-  <PropertyGroup>
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <!-- Keep obj outside OneDrive to avoid sync locks during build -->
     <BaseIntermediateOutputPath>C:\Temp\DFIos\obj\</BaseIntermediateOutputPath>
   </PropertyGroup>
