@@ -36,6 +36,17 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore DailyFantasyIOS.csproj
 
+      - name: Patch iOS SDK Xcode version requirement
+        run: |
+          XCODE_VER=$(xcodebuild -version | head -1 | awk '{print $2}')
+          echo "Installed Xcode: $XCODE_VER"
+          find $HOME/.dotnet/packs -name "*.targets" -o -name "*.props" 2>/dev/null \
+            | xargs grep -l "RequiredXcodeVersion" 2>/dev/null \
+            | while read f; do
+                echo "Patching $f"
+                sed -i '' "s|<RequiredXcodeVersion>[0-9.]*</RequiredXcodeVersion>|<RequiredXcodeVersion>${XCODE_VER}</RequiredXcodeVersion>|g" "$f"
+              done
+
       - name: Build unsigned app
         run: |
           dotnet publish DailyFantasyIOS.csproj \
@@ -45,9 +56,7 @@ jobs:
             -p:EnableCodeSigning=false \
             -p:CodesignKey="" \
             -p:CodesignProvision="" \
-            -p:CodesignRequireProvisioningProfile=false \
-            -p:RequiredXcodeVersion=${{ env.XCODE_VERSION }} \
-            -p:MinimumXcodeVersion=${{ env.XCODE_VERSION }}
+            -p:CodesignRequireProvisioningProfile=false
 
       - name: Package IPA
         run: |
