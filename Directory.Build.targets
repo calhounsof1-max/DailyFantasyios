@@ -4,8 +4,8 @@
     <Compile Remove="obj\**\*.cs" />
   </ItemGroup>
 
-  <!-- Override MAUI SDK targets that re-enable trimming/AOT for iOS on Windows -->
-  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+  <!-- On Windows (no Mac), disable trimming/AOT to allow building without a Mac connection -->
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows')) AND $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
     <PublishTrimmed>false</PublishTrimmed>
     <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
     <EnableAotAnalyzer>false</EnableAotAnalyzer>
