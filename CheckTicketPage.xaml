@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DailyFantasyMAUI.CheckTicketPage"
+             Title="Check-A-Ticket"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#1E2733">
+
+    <Grid RowDefinitions="Auto,Auto,*">
+
+        <!-- Header -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="10,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="0" Text="◀" FontSize="16" BackgroundColor="Transparent"
+                    TextColor="White" Padding="4,0" HeightRequest="34" WidthRequest="40"
+                    Clicked="BtnBack_Clicked"/>
+            <Label Grid.Column="1" Text="Check-A-Ticket" TextColor="White"
+                   FontSize="15" FontAttributes="Bold" VerticalOptions="Center"
+                   HorizontalOptions="Center"/>
+            <Button Grid.Column="2" Text="⟳" FontSize="18" BackgroundColor="Transparent"
+                    TextColor="White" Padding="4,0" HeightRequest="34" WidthRequest="40"
+                    Clicked="BtnReload_Clicked"/>
+        </Grid>
+
+        <!-- Progress bar -->
+        <ProgressBar Grid.Row="1" x:Name="progressBar" Progress="0"
+                     ProgressColor="#FF8F00" BackgroundColor="#2D3D50"
+                     HeightRequest="3"/>
+
+        <!-- WebView -->
+        <WebView Grid.Row="2" x:Name="webView"
+                 Navigating="WebView_Navigating"
+                 Navigated="WebView_Navigated"/>
+
+    </Grid>
+</ContentPage>

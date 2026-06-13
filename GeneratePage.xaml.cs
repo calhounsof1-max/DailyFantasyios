@@ -919,6 +919,7 @@ public partial class GeneratePage : ContentPage
                 BackgroundColor = Color.FromArgb("#2D3D50"),
                 TextColor = Colors.White,
             };
+            AttachMaxClamp(entry, game.MainMax);
             entry.Focused += SelectAllOnFocus;
             _editRowEntries.Add(entry);
             editEntryRow.Children.Add(entry);
@@ -941,6 +942,7 @@ public partial class GeneratePage : ContentPage
                 HorizontalTextAlignment = TextAlignment.Center,
                 BackgroundColor = Color.FromArgb("#3B0000"), TextColor = Colors.White,
             };
+            AttachMaxClamp(spEntry, game.SpecialMax);
             spEntry.Focused += SelectAllOnFocus;
             _editRowEntries.Add(spEntry);
             editEntryRow.Children.Add(spEntry);
@@ -964,6 +966,15 @@ public partial class GeneratePage : ContentPage
 
         editRowTitle.Text = $"Edit Row {idx + 1}";
         editOverlay.IsVisible = true;
+    }
+
+    static void AttachMaxClamp(Entry entry, int max)
+    {
+        entry.TextChanged += (s, e) =>
+        {
+            if (int.TryParse(e.NewTextValue, out int v) && v > max)
+                ((Entry)s!).Text = e.OldTextValue ?? "";
+        };
     }
 
     static void SelectAllOnFocus(object? sender, FocusEventArgs e)

@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:zxing="clr-namespace:ZXing.Net.Maui.Controls;assembly=ZXing.Net.MAUI.Controls"
+             x:Class="DailyFantasyMAUI.BarcodeScanPage"
+             Title="Scan Ticket"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#1E2733">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- Header -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="10,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="0" Text="◀" FontSize="16" BackgroundColor="Transparent"
+                    TextColor="White" Padding="4,0" HeightRequest="34" WidthRequest="40"
+                    Clicked="BtnBack_Clicked"/>
+            <Label Grid.Column="1" Text="Scan Ticket" TextColor="White"
+                   FontSize="15" FontAttributes="Bold" VerticalOptions="Center"
+                   HorizontalOptions="Center"/>
+            <Button Grid.Column="2" x:Name="btnRescan" Text="Rescan" FontSize="12"
+                    BackgroundColor="#2D3D50" TextColor="White" Padding="12,0"
+                    HeightRequest="34" CornerRadius="17" IsVisible="False"
+                    Clicked="BtnRescan_Clicked"/>
+        </Grid>
+
+        <!-- Body -->
+        <Grid Grid.Row="1">
+
+            <!-- Camera scanner (visible while scanning) -->
+            <Grid x:Name="scannerPanel" IsVisible="True">
+                <zxing:CameraBarcodeReaderView x:Name="barcodeView"
+                    BarcodesDetected="BarcodeView_BarcodesDetected"/>
+                <!-- Scan guide overlay -->
+                <Border BackgroundColor="#00000000" StrokeThickness="3"
+                        VerticalOptions="Center" HorizontalOptions="Center"
+                        WidthRequest="260" HeightRequest="120">
+                    <Border.Stroke>
+                        <SolidColorBrush Color="#FF8F00"/>
+                    </Border.Stroke>
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8"/>
+                    </Border.StrokeShape>
+                    <Grid BackgroundColor="#00000000"/>
+                </Border>
+                <Label Text="Point camera at ticket barcode"
+                       TextColor="White" FontSize="13"
+                       HorizontalOptions="Center" VerticalOptions="End"
+                       Margin="0,0,0,32"/>
+            </Grid>
+
+            <!-- Results panel (visible after scan) -->
+            <ScrollView x:Name="resultsPanel" IsVisible="False" BackgroundColor="#F0F4F8">
+                <VerticalStackLayout Spacing="12" Padding="14,14,14,14">
+
+                    <!-- Raw barcode -->
+                    <Frame BackgroundColor="White" CornerRadius="12" BorderColor="#E5E7EB"
+                           Padding="14,10" HasShadow="False">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="SCANNED DATA" FontSize="10" FontAttributes="Bold"
+                                   TextColor="#9CA3AF" CharacterSpacing="1"/>
+                            <Label x:Name="lblRawValue" Text="" FontFamily="Monospace"
+                                   FontSize="12" TextColor="#374151" LineBreakMode="CharacterWrap"/>
+                            <Label x:Name="lblBarcodeFormat" Text="" FontSize="11" TextColor="#9CA3AF"/>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- Select game -->
+                    <Frame BackgroundColor="White" CornerRadius="12" BorderColor="#E5E7EB"
+                           Padding="14,10" HasShadow="False">
+                        <VerticalStackLayout Spacing="6">
+                            <Label Text="SELECT GAME" FontSize="10" FontAttributes="Bold"
+                                   TextColor="#9CA3AF" CharacterSpacing="1"/>
+                            <Picker x:Name="pickerGame" FontSize="14" TextColor="#1E2733"
+                                    SelectedIndexChanged="GamePicker_Changed"/>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- Numbers entry rows -->
+                    <Frame BackgroundColor="White" CornerRadius="12" BorderColor="#E5E7EB"
+                           Padding="14,12" HasShadow="False">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="NUMBERS ON TICKET" FontSize="10" FontAttributes="Bold"
+                                   TextColor="#9CA3AF" CharacterSpacing="1"/>
+                            <VerticalStackLayout x:Name="stkNumberEntries" Spacing="6"/>
+                            <Label x:Name="lblEditNote" Text="Enter each play row (A, B, C…) — tap any box to edit."
+                                   FontSize="11" TextColor="#9CA3AF"/>
+                            <Button x:Name="btnAddRow" Text="+ Add Row" FontSize="12"
+                                    BackgroundColor="#374151" TextColor="White"
+                                    CornerRadius="6" Padding="10,4" HeightRequest="34"
+                                    HorizontalOptions="Start"
+                                    Clicked="BtnAddRow_Clicked"/>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                    <!-- Check button -->
+                    <Button x:Name="btnCheck" Text="CHECK TICKET" FontSize="14"
+                            FontAttributes="Bold" BackgroundColor="#2E7D32" TextColor="White"
+                            HeightRequest="50" CornerRadius="25" Clicked="BtnCheck_Clicked"/>
+
+                    <!-- Result card -->
+                    <Frame x:Name="resultCard" BackgroundColor="White" CornerRadius="12"
+                           BorderColor="#E5E7EB" Padding="14,12" HasShadow="False"
+                           IsVisible="False">
+                        <VerticalStackLayout Spacing="6">
+                            <Label x:Name="lblResultGame" Text="" FontSize="14"
+                                   FontAttributes="Bold" TextColor="#1E2733"/>
+                            <Label x:Name="lblResultDraw" Text="" FontSize="11" TextColor="#6B7280"/>
+                            <Label x:Name="lblResultOutcome" Text="" FontSize="18"
+                                   FontAttributes="Bold" TextColor="#1B5E20"/>
+                            <Label x:Name="lblResultPrize" Text="" FontSize="13" TextColor="#6B7280"/>
+                            <!-- Dynamic per-draw results -->
+                            <VerticalStackLayout x:Name="stkDrawResults" Spacing="3"/>
+                        </VerticalStackLayout>
+                    </Frame>
+
+                </VerticalStackLayout>
+            </ScrollView>
+
+        </Grid>
+
+        <!-- Status bar -->
+        <Label Grid.Row="2" x:Name="lblStatus" Text="Align barcode within the frame"
+               BackgroundColor="#1E2733" TextColor="#8B9DC3"
+               FontSize="12" Padding="14,5" LineBreakMode="TailTruncation"/>
+
+    </Grid>
+</ContentPage>

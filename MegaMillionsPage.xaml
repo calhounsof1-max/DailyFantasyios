@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="DailyFantasyMAUI.WinnerPage"
-             Title="Check Winning Numbers"
+             x:Class="DailyFantasyMAUI.MegaMillionsPage"
+             Title="Mega Millions"
              Shell.NavBarIsVisible="False"
              BackgroundColor="#F0F4F8">
 
@@ -13,15 +13,18 @@
 
         <!-- Row 0: Nav header -->
         <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="14,10"
-              ColumnDefinitions="Auto,*,Auto">
-            <Button Grid.Column="0" x:Name="btnBack" Text="← HOME" FontSize="12" FontAttributes="Bold"
-                    BackgroundColor="#FF8F00" TextColor="White" Padding="10,0"
-                    HeightRequest="34" CornerRadius="17" Clicked="BtnGoHome_Clicked"/>
-            <Label Grid.Column="1" Text="Fantasy 5" TextColor="White" FontSize="14"
+              ColumnDefinitions="Auto,*,Auto,Auto">
+            <Button Grid.Column="0" x:Name="btnBack" Text="← PB" FontSize="12" FontAttributes="Bold"
+                    BackgroundColor="#C62828" TextColor="White" Padding="10,0"
+                    HeightRequest="34" CornerRadius="17" Clicked="BtnGoBack_Clicked"/>
+            <Label Grid.Column="1" Text="Mega Millions" TextColor="White" FontSize="14"
                    FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center"/>
-            <Button Grid.Column="2" Text="SL →" FontSize="12" FontAttributes="Bold"
-                    BackgroundColor="#7B1FA2" TextColor="White" Padding="10,0"
-                    HeightRequest="34" CornerRadius="17" Clicked="BtnGoSL_Clicked"/>
+            <Button Grid.Column="2" Text="⌂" FontSize="14" FontAttributes="Bold"
+                    BackgroundColor="#2D3D50" TextColor="White" Padding="10,0"
+                    HeightRequest="34" CornerRadius="17" Clicked="BtnGoHome_Clicked" Margin="0,0,6,0"/>
+            <Button Grid.Column="3" Text="D3 →" FontSize="12" FontAttributes="Bold"
+                    BackgroundColor="#1565C0" TextColor="White" Padding="10,0"
+                    HeightRequest="34" CornerRadius="17" Clicked="BtnGoD3_Clicked"/>
         </Grid>
 
         <!-- Row 5: Status bar -->
@@ -47,34 +50,40 @@
                             DateSelected="DrawDatePicker_DateSelected"/>
                 <Label x:Name="lblDrawDate" Text="Fetching latest draw..."
                        FontSize="12" TextColor="#6B7A90" HorizontalOptions="Center"/>
-                <HorizontalStackLayout Spacing="8" HorizontalOptions="Center">
-                    <Border x:Name="W1" BackgroundColor="#2E7D32" StrokeThickness="0"
-                            StrokeShape="RoundRectangle 10" WidthRequest="50" HeightRequest="50">
-                        <Label x:Name="lblW1" Text="?" FontSize="22" FontAttributes="Bold"
+                <HorizontalStackLayout Spacing="6" HorizontalOptions="Center">
+                    <Border x:Name="W1" BackgroundColor="#F57F17" StrokeThickness="0"
+                            StrokeShape="RoundRectangle 10" WidthRequest="46" HeightRequest="46">
+                        <Label x:Name="lblW1" Text="?" FontSize="20" FontAttributes="Bold"
                                TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
-                    <Border x:Name="W2" BackgroundColor="#2E7D32" StrokeThickness="0"
-                            StrokeShape="RoundRectangle 10" WidthRequest="50" HeightRequest="50">
-                        <Label x:Name="lblW2" Text="?" FontSize="22" FontAttributes="Bold"
+                    <Border x:Name="W2" BackgroundColor="#F57F17" StrokeThickness="0"
+                            StrokeShape="RoundRectangle 10" WidthRequest="46" HeightRequest="46">
+                        <Label x:Name="lblW2" Text="?" FontSize="20" FontAttributes="Bold"
                                TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
-                    <Border x:Name="W3" BackgroundColor="#2E7D32" StrokeThickness="0"
-                            StrokeShape="RoundRectangle 10" WidthRequest="50" HeightRequest="50">
-                        <Label x:Name="lblW3" Text="?" FontSize="22" FontAttributes="Bold"
+                    <Border x:Name="W3" BackgroundColor="#F57F17" StrokeThickness="0"
+                            StrokeShape="RoundRectangle 10" WidthRequest="46" HeightRequest="46">
+                        <Label x:Name="lblW3" Text="?" FontSize="20" FontAttributes="Bold"
                                TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
-                    <Border x:Name="W4" BackgroundColor="#2E7D32" StrokeThickness="0"
-                            StrokeShape="RoundRectangle 10" WidthRequest="50" HeightRequest="50">
-                        <Label x:Name="lblW4" Text="?" FontSize="22" FontAttributes="Bold"
+                    <Border x:Name="W4" BackgroundColor="#F57F17" StrokeThickness="0"
+                            StrokeShape="RoundRectangle 10" WidthRequest="46" HeightRequest="46">
+                        <Label x:Name="lblW4" Text="?" FontSize="20" FontAttributes="Bold"
                                TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
-                    <Border x:Name="W5" BackgroundColor="#2E7D32" StrokeThickness="0"
-                            StrokeShape="RoundRectangle 10" WidthRequest="50" HeightRequest="50">
-                        <Label x:Name="lblW5" Text="?" FontSize="22" FontAttributes="Bold"
+                    <Border x:Name="W5" BackgroundColor="#F57F17" StrokeThickness="0"
+                            StrokeShape="RoundRectangle 10" WidthRequest="46" HeightRequest="46">
+                        <Label x:Name="lblW5" Text="?" FontSize="20" FontAttributes="Bold"
+                               TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+                    </Border>
+                    <Label Text="MB" FontSize="12" TextColor="#9CA3AF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Border x:Name="WMB" BackgroundColor="#1565C0" StrokeThickness="0"
+                            StrokeShape="RoundRectangle 10" WidthRequest="46" HeightRequest="46">
+                        <Label x:Name="lblWMB" Text="?" FontSize="20" FontAttributes="Bold"
                                TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <ActivityIndicator x:Name="spinner" IsRunning="False" IsVisible="False"
-                                       Color="#2E7D32" WidthRequest="32" HeightRequest="32"
+                                       Color="#F57F17" WidthRequest="28" HeightRequest="28"
                                        VerticalOptions="Center"/>
                 </HorizontalStackLayout>
             </VerticalStackLayout>
@@ -83,10 +92,7 @@
         <!-- Row 2: Saved Numbers picker -->
         <Grid Grid.Row="2" BackgroundColor="White" Padding="12,6"
               ColumnDefinitions="Auto,*">
-            <Grid.Triggers>
-                <Trigger TargetType="Grid" Property="IsEnabled" Value="True"/>
-            </Grid.Triggers>
-            <BoxView Grid.Column="0" BackgroundColor="#F9A825" WidthRequest="4" VerticalOptions="Fill" Margin="0,4,10,4"/>
+            <BoxView Grid.Column="0" BackgroundColor="#F57F17" WidthRequest="4" VerticalOptions="Fill" Margin="0,4,10,4"/>
             <Grid Grid.Column="1" ColumnDefinitions="Auto,*,Auto" VerticalOptions="Center">
                 <Label Grid.Column="0" Text="Saved Numbers" FontSize="13" FontAttributes="Bold"
                        TextColor="#374151" VerticalOptions="Center" Margin="0,0,8,0"/>
@@ -96,7 +102,7 @@
                 <VerticalStackLayout Grid.Column="2" HorizontalOptions="Center"
                                      VerticalOptions="Center" Spacing="0" Margin="6,0,2,0">
                     <Label Text="Excl" FontSize="9" TextColor="#666" HorizontalOptions="Center"/>
-                    <CheckBox x:Name="chkExcl" Color="#C62828" HorizontalOptions="Center"
+                    <CheckBox x:Name="chkExcl" Color="#F57F17" HorizontalOptions="Center"
                               CheckedChanged="ChkExcl_CheckedChanged" Margin="0,-4,0,0"/>
                 </VerticalStackLayout>
             </Grid>
@@ -117,16 +123,16 @@
                     BackgroundColor="#FF7043" TextColor="White" HeightRequest="42"
                     CornerRadius="21" Padding="4,0" Clicked="BtnClearAll_Clicked"/>
             <Button Grid.Column="2" Text="REFRESH" FontSize="12"
-                    BackgroundColor="#00897B" TextColor="White" HeightRequest="42"
+                    BackgroundColor="#F57F17" TextColor="White" HeightRequest="42"
                     CornerRadius="21" Padding="4,0" Clicked="BtnRefresh_Clicked"/>
             <Button Grid.Column="3" Text="SAVE" FontSize="12"
                     BackgroundColor="#2E7D32" TextColor="White" HeightRequest="42"
                     CornerRadius="21" Padding="4,0" Clicked="BtnSave_Clicked"/>
             <Button Grid.Column="4" Text="CLR SETS" FontSize="11"
-                    BackgroundColor="#B71C1C" TextColor="White" HeightRequest="42"
+                    BackgroundColor="#E65100" TextColor="White" HeightRequest="42"
                     CornerRadius="21" Padding="4,0" Clicked="BtnClearSets_Clicked"/>
             <Button Grid.Column="5" Text="🎲 QP" FontSize="11"
-                    BackgroundColor="#6A1B9A" TextColor="White" HeightRequest="42"
+                    BackgroundColor="#1565C0" TextColor="White" HeightRequest="42"
                     CornerRadius="21" Padding="10,0" Clicked="BtnQuickPick_Clicked"/>
             <Button Grid.Column="6" x:Name="btnVoice" Text="🎤" FontSize="18"
                     BackgroundColor="#0277BD" TextColor="White" HeightRequest="42"

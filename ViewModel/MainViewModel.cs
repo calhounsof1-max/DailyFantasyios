@@ -10,6 +10,8 @@ namespace DailyFantasyMAUI.ViewModel
     public class MainViewModel : INotifyPropertyChanged
     {
         private ObservableCollection<ModelDaily> _dataFantasy = new();
+        private ObservableCollection<ModelDaily> _dataSuperLotto = new();
+        private ObservableCollection<ModelDaily> _dataDaily3 = new();
         private ObservableCollection<string> _picks = new();
         private ObservableCollection<string> _combinations = new();
         private ObservableCollection<ModelDaily> _recurrenceResults = new();
@@ -27,6 +29,8 @@ namespace DailyFantasyMAUI.ViewModel
         readonly ComboCalc _calc = new();
 
         public ObservableCollection<ModelDaily> DataFantasy { get => _dataFantasy; set { _dataFantasy = value; OnPropertyChanged(); } }
+        public ObservableCollection<ModelDaily> DataSuperLotto { get => _dataSuperLotto; set { _dataSuperLotto = value; OnPropertyChanged(); } }
+        public ObservableCollection<ModelDaily> DataDaily3 { get => _dataDaily3; set { _dataDaily3 = value; OnPropertyChanged(); } }
         public ObservableCollection<string> Picks { get => _picks; set { _picks = value; OnPropertyChanged(); } }
         public ObservableCollection<string> Combinations { get => _combinations; set { _combinations = value; OnPropertyChanged(); } }
         public ObservableCollection<ModelDaily> RecurrenceResults { get => _recurrenceResults; set { _recurrenceResults = value; OnPropertyChanged(); } }
@@ -46,14 +50,16 @@ namespace DailyFantasyMAUI.ViewModel
         public async Task LoadDataAsync()
         {
             IsLoading = true;
-            StatusMessage = "Checking for new draws...";
-            await GetDataEntry.UpdateF5CsvAsync();
-            await GetDataEntry.UpdateSLCsvAsync();
             StatusMessage = "Loading draw history...";
+
+            // Load from bundled/local files immediately — no network wait
             await LoadFromFileAsync();
+            await LoadSLFromFileAsync();
+            await LoadD3FromFileAsync();
+
             if (_dataFantasy.Count > 0)
             {
-                var latest = _dataFantasy[0]; // newest-first
+                var latest = _dataFantasy[0];
                 LastNumberHit = $"[{latest.DrawDate}] {latest.N1}, {latest.N2}, {latest.N3}, {latest.N4}, {latest.N5}";
             }
             else
@@ -61,7 +67,67 @@ namespace DailyFantasyMAUI.ViewModel
                 LastNumberHit = "No draw data available";
             }
             IsLoading = false;
-            StatusMessage = $"Complete — {_dataFantasy.Count} draws loaded";
+            StatusMessage = $"Ready — {_dataFantasy.Count} F5 · {_dataSuperLotto.Count} SL · {_dataDaily3.Count} D3 draws";
+
+            // Update CSVs from API in background — don't block the UI
+            _ = UpdateAllCsvsInBackgroundAsync();
+        }
+
+        private async Task UpdateAllCsvsInBackgroundAsync()
+        {
+            try
+            {
+                await Task.Run(async () =>
+                {
+                    await GetDataEntry.UpdateF5CsvAsync();
+                    await GetDataEntry.UpdateSLCsvAsync();
+                    await GetDataEntry.UpdateD3CsvAsync();
+                });
+
+                // Reload collections on the main thread after update
+                await MainThread.InvokeOnMainThreadAsync(async () =>
+                {
+                    await LoadFromFileAsync();
+                    await LoadSLFromFileAsync();
+                    await LoadD3FromFileAsync();
+                    if (_dataFantasy.Count > 0)
+                    {
+                        var latest = _dataFantasy[0];
+                        LastNumberHit = $"[{latest.DrawDate}] {latest.N1}, {latest.N2}, {latest.N3}, {latest.N4}, {latest.N5}";
+                    }
+                    StatusMessage = $"Updated — {_dataFantasy.Count} F5 · {_dataSuperLotto.Count} SL · {_dataDaily3.Count} D3 draws";
+                });
+            }
+            catch { }
+        }
+
+        public async Task RefreshAllDataAsync()
+        {
+            IsLoading = true;
+            StatusMessage = "Refreshing all data from CA Lottery...";
+            try
+            {
+                await GetDataEntry.UpdateF5CsvAsync();
+                await GetDataEntry.UpdateSLCsvAsync();
+                await GetDataEntry.UpdateD3CsvAsync();
+                await LoadFromFileAsync();
+                await LoadSLFromFileAsync();
+                await LoadD3FromFileAsync();
+                if (_dataFantasy.Count > 0)
+                {
+                    var latest = _dataFantasy[0];
+                    LastNumberHit = $"[{latest.DrawDate}] {latest.N1}, {latest.N2}, {latest.N3}, {latest.N4}, {latest.N5}";
+                }
+                StatusMessage = $"Refreshed — {_dataFantasy.Count} F5 · {_dataSuperLotto.Count} SL · {_dataDaily3.Count} D3 draws";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = "Refresh error: " + ex.Message;
+            }
+            finally
+            {
+                IsLoading = false;
+            }
         }
 
         private async Task LoadFromFileAsync()
@@ -83,6 +149,58 @@ namespace DailyFantasyMAUI.ViewModel
                         Month      = month,
                         Year       = year,
                         N1 = nums[0], N2 = nums[1], N3 = nums[2], N4 = nums[3], N5 = nums[4]
+                    });
+                }
+            }
+            catch { }
+        }
+
+        private async Task LoadSLFromFileAsync()
+        {
+            try
+            {
+                var draws = await GetDataEntry.LoadSLCsvDraws();
+                _dataSuperLotto.Clear();
+                foreach (var (drawDate, drawNum, mainNums, mega, _) in draws)
+                {
+                    var parts = drawDate.Split(' ');
+                    string month = parts.Length >= 2 ? parts[1] : "";
+                    string year  = parts.Length >= 1 ? parts[^1] : "";
+                    _dataSuperLotto.Add(new ModelDaily
+                    {
+                        DrawNumber = drawNum > 0 ? drawNum.ToString() : "",
+                        DrawDate   = drawDate,
+                        Month      = month,
+                        Year       = year,
+                        N1 = mainNums[0], N2 = mainNums[1], N3 = mainNums[2],
+                        N4 = mainNums[3], N5 = mainNums[4],
+                        N6 = mega
+                    });
+                }
+            }
+            catch { }
+        }
+
+        private async Task LoadD3FromFileAsync()
+        {
+            try
+            {
+                var draws = await GetDataEntry.LoadD3CsvDraws();
+                _dataDaily3.Clear();
+                foreach (var (drawDate, drawNum, nums, drawTime) in draws)
+                {
+                    var parts = drawDate.Split(' ');
+                    string month = parts.Length >= 2 ? parts[1] : "";
+                    string year  = parts.Length >= 1 ? parts[^1] : "";
+                    string label = string.IsNullOrEmpty(drawTime) ? drawDate : $"{drawDate} ({drawTime})";
+                    _dataDaily3.Add(new ModelDaily
+                    {
+                        DrawNumber   = drawNum > 0 ? drawNum.ToString() : "",
+                        DrawDate     = label,
+                        Month        = month,
+                        Year         = year,
+                        N1 = nums[0], N2 = nums[1], N3 = nums[2],
+                        DisplayCount = 3
                     });
                 }
             }
@@ -204,6 +322,20 @@ namespace DailyFantasyMAUI.ViewModel
         public void SearchRecurrence(string numbers, string matchCount)
         {
             var results = MatchParsing.ExactRecurrence(numbers, _dataFantasy, matchCount).ToList();
+            RecurrenceResults = new ObservableCollection<ModelDaily>(results);
+            NumberInList = results.Count;
+        }
+
+        public void SearchRecurrenceD3(string numbers, string matchCount)
+        {
+            var results = MatchParsing.ExactRecurrenceD3(numbers, _dataDaily3, matchCount).ToList();
+            RecurrenceResults = new ObservableCollection<ModelDaily>(results);
+            NumberInList = results.Count;
+        }
+
+        public void SearchRecurrenceSL(string numbers, string matchCount)
+        {
+            var results = MatchParsing.ExactRecurrenceSL(numbers, _dataSuperLotto, matchCount).ToList();
             RecurrenceResults = new ObservableCollection<ModelDaily>(results);
             NumberInList = results.Count;
         }

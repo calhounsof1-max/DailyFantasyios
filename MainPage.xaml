@@ -164,9 +164,9 @@
         <!-- Row 6: Action buttons -->
         <Grid Grid.Row="6" Margin="10,8,10,8" ColumnSpacing="4"
               ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto">
-            <Button Grid.Column="0" Text="&lt;&lt;" FontSize="11" Padding="6,0"
-                    BackgroundColor="#78909C" TextColor="White" HeightRequest="34"
-                    Clicked="BtnShiftLeft_Clicked" CornerRadius="17" IsVisible="False"/>
+            <Button Grid.Column="0" Text="🎲 QP" FontSize="11" Padding="6,0"
+                    BackgroundColor="#6A1B9A" TextColor="White" HeightRequest="34"
+                    Clicked="BtnQuickPick_Clicked" CornerRadius="17"/>
             <Button Grid.Column="1" Text="&gt;&gt;" FontSize="11" Padding="6,0"
                     BackgroundColor="#78909C" TextColor="White" HeightRequest="34"
                     Clicked="BtnShiftRight_Clicked" CornerRadius="17" IsVisible="False"/>
@@ -252,7 +252,8 @@
                                 </VisualStateGroup>
                             </VisualStateManager.VisualStateGroups>
                             <Label Text="{Binding Display}" FontFamily="Monospace"
-                                   FontSize="16" TextColor="#1B5E20"/>
+                                   FontSize="13" TextColor="#1B5E20"
+                                   LineBreakMode="NoWrap"/>
                         </Grid>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
@@ -299,19 +300,22 @@
         </Label>
 
         <!-- Row 9: Bottom bar -->
-        <Grid Grid.Row="9" ColumnDefinitions="*,*,*,*" HeightRequest="46" BackgroundColor="#1E2733">
+        <Grid Grid.Row="9" ColumnDefinitions="*,*,*,*,*" HeightRequest="46" BackgroundColor="#1E2733">
             <Button Grid.Column="0" Text="Results" FontSize="12"
                     BackgroundColor="#2E7D32" TextColor="White"
                     Clicked="BtnResults_Clicked"/>
             <Button Grid.Column="1" Text="☰ More" FontSize="12"
                     BackgroundColor="#37474F" TextColor="White"
                     Clicked="BtnMore_Clicked"/>
-            <Button Grid.Column="2" Text="📷 Scan" FontSize="12"
+            <Button Grid.Column="2" Text="💾 Save" FontSize="11"
                     BackgroundColor="#1565C0" TextColor="White"
-                    Clicked="BtnScan_Clicked"/>
+                    Clicked="BtnSave_Clicked"/>
             <Button Grid.Column="3" Text="🎲 Generate" FontSize="11"
                     BackgroundColor="#5D4037" TextColor="White"
                     Clicked="BtnGenerateNumbers_Clicked"/>
+            <Button Grid.Column="4" Text="💰 Jackpot" FontSize="11"
+                    BackgroundColor="#FF8F00" TextColor="White"
+                    Clicked="BtnJackpot_Clicked"/>
         </Grid>
 
         <!-- Row 10: Insert combos to Winner page (visible only on Combos tab) -->

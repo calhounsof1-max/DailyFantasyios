@@ -1,8 +1,8 @@
-#if IOS
-using Vision;
-using CoreGraphics;
-using Foundation;
-using UIKit;
+#if ANDROID
+using Android.Graphics;
+using Xamarin.Google.MLKit.Vision.Common;
+using MlText = Xamarin.Google.MLKit.Vision.Text;
+using Xamarin.Google.MLKit.Vision.Text.Latin;
 #endif
 using System.Text.RegularExpressions;
 
@@ -380,7 +380,7 @@ public partial class ScanSlipPage : ContentPage
             if (isTicket)
             {
                 lblLoading.Text = "Reading ticket numbers…";
-#if IOS
+#if ANDROID
                 detected = await OcrTicketNumbers(croppedPath);
 #else
                 detected = [];
@@ -389,7 +389,7 @@ public partial class ScanSlipPage : ContentPage
             else
             {
                 lblLoading.Text = "Detecting filled bubbles…";
-#if IOS
+#if ANDROID
                 detected = await DetectFilledBubbles(croppedPath);
 #else
                 detected = [];
@@ -430,43 +430,24 @@ public partial class ScanSlipPage : ContentPage
 
     // ── Ticket OCR ─────────────────────────────────────────────────────────────
 
-#if IOS
+#if ANDROID
     async Task<HashSet<int>> OcrTicketNumbers(string imagePath)
     {
         try
         {
-            var image = UIImage.FromFile(imagePath);
-            if (image == null) return [];
+            var file = new Java.IO.File(imagePath);
+            var inputImage = InputImage.FromFilePath(Android.App.Application.Context, Android.Net.Uri.FromFile(file)!);
+            var recognizer = MlText.TextRecognition.GetClient(TextRecognizerOptions.DefaultOptions);
+            var tcs = new TaskCompletionSource<MlText.Text>();
+            var mlTask = recognizer.Process(inputImage);
+            mlTask.AddOnSuccessListener(new MlSuccess<MlText.Text>(tcs));
+            mlTask.AddOnFailureListener(new MlFailure<MlText.Text>(tcs));
+            var result = await tcs.Task;
 
-            var tcs = new TaskCompletionSource<List<string>>();
-            var textList = new List<string>();
-
-            var request = new VNRecognizeTextRequest((req, err) =>
-            {
-                if (err != null) { tcs.TrySetResult(textList); return; }
-                var observations = req.GetResults<VNRecognizedTextObservation>();
-                if (observations == null) { tcs.TrySetResult(textList); return; }
-                foreach (var obs in observations)
-                {
-                    var candidate = obs.TopCandidates(1).FirstOrDefault();
-                    if (candidate != null) textList.Add(candidate.String ?? "");
-                }
-                tcs.TrySetResult(textList);
-            });
-            request.RecognitionLevel = VNRequestTextRecognitionLevel.Accurate;
-            request.RecognitionLanguages = new[] { "en-US" };
-            request.UsesLanguageCorrection = false;
-
-            await Task.Run(() =>
-            {
-                using var cgImage = image.CGImage;
-                if (cgImage == null) { tcs.TrySetResult(textList); return; }
-                var handler = new VNImageRequestHandler(cgImage, new NSDictionary());
-                handler.Perform(new VNRequest[] { request }, out _);
-            });
-
-            var lines = await tcs.Task;
-            var allText = string.Join(" ", lines);
+            var allText = string.Join(" ", result.TextBlocks
+                .SelectMany(b => b.Lines)
+                .OrderBy(l => l.BoundingBox?.Top ?? 0)
+                .Select(l => l.Text ?? ""));
 
             var nums = new HashSet<int>();
             foreach (Match m in Regex.Matches(allText, @"\d+"))
@@ -483,7 +464,7 @@ public partial class ScanSlipPage : ContentPage
 
     // ── Bubble detection ───────────────────────────────────────────────────────
 
-#if IOS
+#if ANDROID
     async Task<HashSet<int>> DetectFilledBubbles(string imagePath)
     {
         int detectCols = Game.DetectCols;
@@ -493,45 +474,31 @@ public partial class ScanSlipPage : ContentPage
 
         return await Task.Run(() =>
         {
-            var uiImage = UIImage.FromFile(imagePath);
-            if (uiImage?.CGImage == null) return new HashSet<int>();
+            var bmp = BitmapFactory.DecodeFile(imagePath);
+            if (bmp == null) return [];
 
-            int w = (int)uiImage.Size.Width;
-            int h = (int)uiImage.Size.Height;
-
-            // Render to ARGB byte array via CGBitmapContext
-            var colorSpace = CGColorSpace.CreateDeviceRGB();
-            var bitmapData = new byte[w * h * 4];
-            using var context = new CGBitmapContext(bitmapData, w, h, 8, w * 4, colorSpace, CGBitmapFlags.PremultipliedLast);
-            context.DrawImage(new CGRect(0, 0, w, h), uiImage.CGImage);
+            int w = bmp.Width, h = bmp.Height;
+            var pixels = new int[w * h];
+            bmp.GetPixels(pixels, 0, w, 0, 0, w, h);
+            bmp.Recycle();
 
             var gray = new float[w * h];
-            for (int i = 0; i < w * h; i++)
+            for (int i = 0; i < pixels.Length; i++)
             {
-                float r = bitmapData[i * 4];
-                float g2 = bitmapData[i * 4 + 1];
-                float b2 = bitmapData[i * 4 + 2];
-                gray[i] = 0.21f * r + 0.72f * g2 + 0.07f * b2;
+                int px = pixels[i];
+                gray[i] = 0.21f * ((px >> 16) & 0xFF) + 0.72f * ((px >> 8) & 0xFF) + 0.07f * (px & 0xFF);
             }
 
-            // Save debug image
             try
             {
-                UIGraphics.BeginImageContextWithOptions(new CGSize(w, h), false, 1.0f);
-                var dbgCtx = UIGraphics.GetCurrentContext();
-                if (dbgCtx != null)
-                {
-                    var dbgData = new byte[w * h * 4];
-                    for (int i = 0; i < w * h; i++)
-                    {
-                        byte v = (byte)gray[i];
-                        dbgData[i * 4] = v; dbgData[i * 4 + 1] = v;
-                        dbgData[i * 4 + 2] = v; dbgData[i * 4 + 3] = 255;
-                    }
-                    var dbgPath = System.IO.Path.Combine(FileSystem.CacheDirectory, "slip_debug.jpg");
-                    // skip debug image save on iOS for brevity
-                }
-                UIGraphics.EndImageContext();
+                var dbgBmp = Android.Graphics.Bitmap.CreateBitmap(w, h, Android.Graphics.Bitmap.Config.Argb8888!);
+                var dbgPx = new int[w * h];
+                for (int i = 0; i < gray.Length; i++)
+                { int v = (int)gray[i]; dbgPx[i] = unchecked((int)0xFF000000) | (v << 16) | (v << 8) | v; }
+                dbgBmp.SetPixels(dbgPx, 0, w, 0, 0, w, h);
+                using var fs = System.IO.File.Create(System.IO.Path.Combine(FileSystem.CacheDirectory, "slip_debug.jpg"));
+                dbgBmp.Compress(Android.Graphics.Bitmap.CompressFormat.Jpeg, 85, fs);
+                dbgBmp.Recycle();
             }
             catch { }
 

@@ -1,6 +1,8 @@
 <Project>
-  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+  <PropertyGroup>
     <!-- Keep obj outside OneDrive to avoid sync locks during build -->
-    <BaseIntermediateOutputPath>C:\Temp\DFIos\obj\</BaseIntermediateOutputPath>
+    <BaseIntermediateOutputPath>C:\Temp\DFMaui\obj\</BaseIntermediateOutputPath>
+    <!-- Embed assemblies so adb install works without fast deployment -->
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
   </PropertyGroup>
 </Project>

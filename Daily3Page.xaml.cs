@@ -7,8 +7,8 @@ public partial class Daily3Page : ContentPage
     const int Rows = 10;
     const int Cols = 3;
 
-    readonly Label[] _wLabels;   // midday winning numbers
-    readonly Label[] _eLabels;   // evening winning numbers
+    readonly Label[] _wLabels;  // midday
+    readonly Label[] _eLabels;  // evening
 
     readonly Entry[,] _entries = new Entry[Rows, Cols];
     readonly Label[]  _results = new Label[Rows];
@@ -17,20 +17,27 @@ public partial class Daily3Page : ContentPage
     readonly Label[]    _permLabels = new Label[Rows];
     string[] _betTypes = Enumerable.Repeat("S", Rows).ToArray();
     static readonly string[] BetCycle = ["S", "B", "S&B"];
-    int _activeSlot = -1;
+    int  _activeSlot = -1;
     bool _suppressPickerEvent = false;
+    bool _suppressExcl = false;
     bool _loading = false;
+    readonly Dictionary<int, (string entries, string betTypes)> _slotCache = new();
+    View? _highlightedView;
 
-    // Grouped by date: each entry = (dateLabel, midday[], evening[])
-    List<(string DateLabel, int[]? Midday, int[]? Evening)> _drawsByDate = new();
+    List<(string DateLabel, int[] Midday, int[] Evening)> _draws = new();
     bool _drawsLoaded = false;
 
-    int[]? _middayNums;
-    int[]? _eveningNums;
+    int[]? _winMidday;
+    int[]? _winEvening;
     bool _isPanning = false;
+    bool _voiceOn = false;
+    bool _voiceSettingText = false;
+    int  _voiceRow = 0, _voiceCol = 0;
+    Entry? _voiceTarget = null;
+    Color _voiceTargetOldColor = Colors.White;
 
-    // "pb" = came via carousel from Powerball; "main" = navigated directly from MainPage
-    internal static string ComingFrom { get; set; } = "pb";
+    // "mm" = came via carousel from MegaMillions; "main" = navigated directly
+    internal static string ComingFrom { get; set; } = "mm";
 
     public Daily3Page()
     {
@@ -82,15 +89,15 @@ public partial class Daily3Page : ContentPage
 
     protected override bool OnBackButtonPressed()
     {
-        _ = GoBackWithSlide();
+        _ = GoBack();
         return true;
     }
 
     private async Task GoBack()
     {
-        if (ComingFrom == "pb")
-            AppShell.PowerballPageInstance.PrePosition(false);
-        else // "main"
+        if (ComingFrom == "mm")
+            AppShell.MegaMillionsPageInstance.PrePosition(false);
+        else
         {
             double w = DeviceDisplay.MainDisplayInfo.Width / DeviceDisplay.MainDisplayInfo.Density;
             Shell.Current.CurrentPage.TranslationX = -w;
@@ -98,13 +105,14 @@ public partial class Daily3Page : ContentPage
         await Shell.Current.GoToAsync("..", false);
     }
 
-    private async Task GoBackWithSlide()
+    private async void BtnGoBack_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;
         await GoBack();
     }
 
-    private async void BtnGoBack_Clicked(object sender, EventArgs e) => await GoBackWithSlide();
+    private async void BtnGoHome_Clicked(object sender, EventArgs e) =>
+        await Shell.Current.Navigation.PopToRootAsync(false);
 
     private async void BtnGoD4_Clicked(object sender, EventArgs e)
     {
@@ -123,10 +131,22 @@ public partial class Daily3Page : ContentPage
     protected override void OnAppearing()
     {
         this.TranslateTo(0, 0, 220, Easing.CubicOut);
-        if (ComingFrom == "main")
+        base.OnAppearing();
+
+        if (ComingFrom == "results")
+        {
+            btnBack.Text = "← RESULTS";
+            btnBack.BackgroundColor = Color.FromArgb("#FF8F00");
+        }
+        else if (ComingFrom == "main")
         {
             btnBack.Text = "← HOME";
             btnBack.BackgroundColor = Color.FromArgb("#FF8F00");
+        }
+        else if (ComingFrom == "mm")
+        {
+            btnBack.Text = "← MM";
+            btnBack.BackgroundColor = Color.FromArgb("#F57F17");
         }
         else
         {
@@ -134,38 +154,53 @@ public partial class Daily3Page : ContentPage
             btnBack.BackgroundColor = Color.FromArgb("#C62828");
         }
 
-        base.OnAppearing();
         _ = LoadAllDraws();
         Dispatcher.Dispatch(() =>
         {
-            _activeSlot = Preferences.Get("d3_active_slot", -1);
-            if (_activeSlot < 0)
+            int pendingRow = -1;
+            if (PendingHighlight.HasPending && PendingHighlight.Game == "D3")
             {
-                var current = Preferences.Get("d3_entries", "");
-                if (!string.IsNullOrEmpty(current))
+                _activeSlot = PendingHighlight.Slot;
+                pendingRow  = PendingHighlight.Row;
+                PendingHighlight.Clear();
+                Preferences.Set("d3_active_slot", _activeSlot);
+                FillFromSlot(_activeSlot);
+            }
+            else
+            {
+                _activeSlot = Preferences.Get("d3_active_slot", -1);
+                if (_activeSlot < 0)
                 {
-                    for (int i = 0; i < 10; i++)
+                    var current = Preferences.Get("d3_entries", "");
+                    if (!string.IsNullOrEmpty(current))
                     {
-                        if (SlotHasData(i) && Preferences.Get(SetKey(i), "") == current)
+                        for (int i = 0; i < 10; i++)
                         {
-                            _activeSlot = i;
-                            break;
+                            if (SlotHasData(i) && Preferences.Get(SetKey(i), "") == current)
+                            {
+                                _activeSlot = i;
+                                break;
+                            }
                         }
                     }
+                    if (_activeSlot < 0) _activeSlot = 0;
                 }
-                if (_activeSlot < 0) _activeSlot = 0;
+                if (SlotHasData(_activeSlot))
+                    FillFromSlot(_activeSlot);
+                else
+                    LoadEntries();
             }
-            if (SlotHasData(_activeSlot))
-                FillFromSlot(_activeSlot);
-            else
-                LoadEntries();
             UpdateSlotPicker();
+            if (pendingRow >= 0)
+                _ = HighlightRow(pendingRow);
         });
     }
 
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        if (_voiceOn) StopVoice();
+        if (_highlightedView != null) { _highlightedView.BackgroundColor = Colors.White; _highlightedView = null; }
         SaveEntries();
         if (_activeSlot >= 0)
             Preferences.Set("d3_active_slot", _activeSlot);
@@ -204,13 +239,16 @@ public partial class Daily3Page : ContentPage
             HighlightRows(n);
     }
 
-    private void LoadBetTypes(string key)
+    private void LoadBetTypes(string key) =>
+        LoadBetTypes_FromString(Preferences.Get(key, ""));
+
+    private void LoadBetTypes_FromString(string value)
     {
-        var parts = Preferences.Get(key, "").Split('|');
+        var parts = value.Split('|');
         for (int r = 0; r < Rows; r++)
         {
             var val = r < parts.Length ? parts[r] : "S";
-            if (val == "S+B") val = "S&B"; // normalize old saved format
+            if (val == "S+B") val = "S&B";
             _betTypes[r] = BetCycle.Contains(val) ? val : "S";
             UpdateBetBtn(r);
         }
@@ -218,8 +256,8 @@ public partial class Daily3Page : ContentPage
 
     // ── Saved Number slots ───────────────────────────────────────────────────
 
-    private string SetKey(int slot)  => $"d3_set_{slot}";
-    private string BetKey(int slot)  => $"d3_btypes_{slot}";
+    private string SetKey(int slot) => $"d3_set_{slot}";
+    private string BetKey(int slot) => $"d3_btypes_{slot}";
 
     private string GetCurrentEntryString()
     {
@@ -292,8 +330,28 @@ public partial class Daily3Page : ContentPage
     private bool SlotHasData(int slot) =>
         !string.IsNullOrEmpty(Preferences.Get(SetKey(slot), ""));
 
-    private string SlotLabel(int slot) =>
-        SlotHasData(slot) ? $"Set {slot + 1}  ✓" : $"Set {slot + 1}";
+    private string ExclKey(int slot) => $"excl_set_d3_{slot}";
+
+    private string SlotLabel(int slot)
+    {
+        bool excl = Preferences.Get(ExclKey(slot), false);
+        string mark = SlotHasData(slot) ? "  ✓" : "";
+        return excl ? $"Set {slot + 1}{mark} [X]" : $"Set {slot + 1}{mark}";
+    }
+
+    private void UpdateExclCheckbox()
+    {
+        _suppressExcl = true;
+        chkExcl.IsChecked = _activeSlot >= 0 && Preferences.Get(ExclKey(_activeSlot), false);
+        _suppressExcl = false;
+    }
+
+    private void ChkExcl_CheckedChanged(object sender, CheckedChangedEventArgs e)
+    {
+        if (_suppressExcl || _activeSlot < 0) return;
+        Preferences.Set(ExclKey(_activeSlot), e.Value);
+        UpdateSlotPicker();
+    }
 
     private void BuildSlotPicker()
     {
@@ -308,6 +366,7 @@ public partial class Daily3Page : ContentPage
             slotPicker.Items[i] = SlotLabel(i);
         slotPicker.SelectedIndex = _activeSlot;
         _suppressPickerEvent = false;
+        UpdateExclCheckbox();
     }
 
     private void SlotPicker_Changed(object sender, EventArgs e)
@@ -315,12 +374,54 @@ public partial class Daily3Page : ContentPage
         if (_suppressPickerEvent) return;
         int slot = slotPicker.SelectedIndex;
         if (slot < 0) return;
+        // Cache current slot before switching
+        if (_activeSlot >= 0)
+            _slotCache[_activeSlot] = (GetCurrentEntryString(), string.Join("|", _betTypes));
         _activeSlot = slot;
         Preferences.Set("d3_active_slot", slot);
         ClearAllEntries();
-        if (SlotHasData(slot))
+        if (_slotCache.TryGetValue(slot, out var cached))
+        {
+            _loading = true;
+            var vals = cached.entries.Split('|');
+            for (int r = 0; r < Rows; r++)
+                for (int c = 0; c < Cols; c++)
+                {
+                    int idx = r * Cols + c;
+                    _entries[r, c].Text = idx < vals.Length ? vals[idx] : "";
+                }
+            LoadBetTypes_FromString(cached.betTypes);
+            _loading = false;
+            CheckAll();
+        }
+        else if (SlotHasData(slot))
             FillFromSlot(slot);
         UpdateSlotPicker();
+    }
+
+    // ── Highlight a row (called after navigating from ResultsPage) ───────────
+
+    internal void ClearHighlight()
+    {
+        if (_highlightedView == null) return;
+        _highlightedView.BackgroundColor = Colors.White;
+        _highlightedView = null;
+    }
+
+    private async Task HighlightRow(int rowIndex)
+    {
+        if (rowIndex < 0 || rowIndex >= rowsContainer.Children.Count) return;
+        var wrapper = rowsContainer.Children[rowIndex] as Layout;
+        if (wrapper == null || wrapper.Children.Count < 1) return;
+        var rowView = wrapper.Children[0] as View;
+        if (rowView == null) return;
+        _highlightedView = rowView;
+        rowView.BackgroundColor = Color.FromArgb("#FFF176");
+        if (rowsContainer.Parent is ScrollView sv)
+            await sv.ScrollToAsync(wrapper, ScrollToPosition.MakeVisible, true);
+        await Task.Delay(2000);
+        rowView.BackgroundColor = Colors.White;
+        _highlightedView = null;
     }
 
     // ── Highlight rows ───────────────────────────────────────────────────────
@@ -335,35 +436,10 @@ public partial class Daily3Page : ContentPage
         }
     }
 
-    private void AllBetPicker_Changed(object sender, EventArgs e)
-    {
-        if (_suppressPickerEvent) return;
-        int idx = allBetPicker.SelectedIndex;
-        if (idx < 0) return;
-        string bt = BetCycle[idx];
-        string allBets = string.Join("|", Enumerable.Repeat(bt, Rows));
-        // Apply to current rows
-        for (int r = 0; r < Rows; r++)
-        {
-            _betTypes[r] = bt;
-            UpdateBetBtn(r);
-        }
-        // Apply to all saved slots that have data
-        for (int s = 0; s < 10; s++)
-        {
-            if (SlotHasData(s))
-                Preferences.Set(BetKey(s), allBets);
-        }
-        SaveEntries();
-        CheckAll();
-    }
-
     private void FromEntry_TextChanged(object sender, TextChangedEventArgs e)
     {
-        if (int.TryParse(fromEntry.Text, out int n))
-            HighlightRows(n);
-        else
-            HighlightRows(0);
+        if (int.TryParse(fromEntry.Text, out int n)) HighlightRows(n);
+        else HighlightRows(0);
     }
 
     // ── Build 10 input rows (3 boxes each) ───────────────────────────────────
@@ -395,7 +471,7 @@ public partial class Daily3Page : ContentPage
             {
                 Text = $"{r + 1,2}.",
                 FontSize = 11,
-                TextColor = Color.FromArgb("#FF7043"),
+                TextColor = Color.FromArgb("#1565C0"),
                 VerticalOptions = LayoutOptions.Center,
                 WidthRequest = 18,
             };
@@ -426,7 +502,7 @@ public partial class Daily3Page : ContentPage
                 entry.TextChanged += (_, _) =>
                 {
                     if (_loading) return;
-                    if (_entries[row_, col_].Text?.Length == 1)
+                    if (!_voiceSettingText && _entries[row_, col_].Text?.Length == 1)
                         AdvanceFocus(row_, col_);
                     SaveEntries();
                     CheckAll();
@@ -562,6 +638,27 @@ public partial class Daily3Page : ContentPage
         };
     }
 
+    private void AllBetPicker_Changed(object sender, EventArgs e)
+    {
+        if (_suppressPickerEvent) return;
+        int idx = allBetPicker.SelectedIndex;
+        if (idx < 0) return;
+        string bt = BetCycle[idx];
+        string allBets = string.Join("|", Enumerable.Repeat(bt, Rows));
+        for (int r = 0; r < Rows; r++)
+        {
+            _betTypes[r] = bt;
+            UpdateBetBtn(r);
+        }
+        for (int s = 0; s < 10; s++)
+        {
+            if (SlotHasData(s))
+                Preferences.Set(BetKey(s), allBets);
+        }
+        SaveEntries();
+        CheckAll();
+    }
+
     private void AdvanceFocus(int row, int col)
     {
         int nextCol = col + 1;
@@ -586,56 +683,24 @@ public partial class Daily3Page : ContentPage
 #endif
     }
 
-    // ── WebView-based fetch (bypasses server bot detection) ──────────────────
-
-    private Task<string?> FetchViaWebView(string url)
-    {
-        var tcs = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        EventHandler<WebNavigatedEventArgs>? handler = null;
-        handler = async (s, e) =>
-        {
-            fetchView.Navigated -= handler;
-            if (e.Result == WebNavigationResult.Success)
-            {
-                try
-                {
-                    var raw = await fetchView.EvaluateJavaScriptAsync(
-                        "(function(){var p=document.querySelector('pre');return p?p.textContent:(document.body.innerText||document.body.textContent||'');})()");
-                    // EvaluateJavaScriptAsync may wrap the string in quotes with escape chars
-                    if (raw != null && raw.Length > 1 && raw[0] == '"' && raw[^1] == '"')
-                        raw = System.Text.RegularExpressions.Regex.Unescape(raw[1..^1]);
-                    tcs.TrySetResult(raw);
-                }
-                catch { tcs.TrySetResult(null); }
-            }
-            else tcs.TrySetResult(null);
-        };
-        fetchView.Navigated += handler;
-        MainThread.BeginInvokeOnMainThread(() =>
-            fetchView.Source = new UrlWebViewSource { Url = url });
-        return tcs.Task.WaitAsync(TimeSpan.FromSeconds(45));
-    }
-
     // ── Load draws ───────────────────────────────────────────────────────────
 
     private async Task LoadAllDraws()
     {
-        // Re-fetch if today's midday hasn't been loaded yet (e.g. cached before 1pm draw)
         if (_drawsLoaded)
         {
-            bool hasTodayMidday = _drawsByDate.Any(d =>
-                DateTime.TryParse(d.DateLabel, out var dt) &&
-                dt.Date == DateTime.Today && d.Midday != null);
-            if (hasTodayMidday) return;
+            bool hasTodayDraw = _draws.Any(d =>
+                DateTime.TryParse(d.DateLabel, out var dt) && dt.Date == DateTime.Today);
+            if (hasTodayDraw) return;
             _drawsLoaded = false;
-            _drawsByDate.Clear();
+            _draws.Clear();
         }
 
         spinner.IsVisible = true;
         spinner.IsRunning = true;
-        lblDrawDate.Text = "Fetching Daily 3 draws from calottery.com...";
+        lblDrawDate.Text = "Fetching Daily 3 draws...";
 
-        var raw = await GetDataEntry.GetDaily3Draws(50);
+        var raw = await GetDataEntry.LoadD3CsvDraws();
 
         spinner.IsVisible = false;
         spinner.IsRunning = false;
@@ -643,44 +708,61 @@ public partial class Daily3Page : ContentPage
         if (raw.Count == 0)
         {
             string errMsg = string.IsNullOrEmpty(GetDataEntry.LastError)
-                ? "Daily3: Could not fetch — check internet connection"
+                ? "Daily3: Could not load draw history"
                 : $"Daily3: {GetDataEntry.LastError}";
             lblDrawDate.Text = errMsg;
             lblStatus.Text = errMsg;
-            _ = Logger.LogAsync(errMsg);
             return;
         }
 
-        // Group by date label; within same date, lower drawNum = midday, higher = evening
-        var groups = raw
-            .GroupBy(d => d.DrawDate)
+        // Group by date: each date may have Midday and/or Evening
+        var grouped = raw
+            .Select(d => (Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
+                          d.DrawDate, d.DrawNumber, d.Numbers, d.DrawTime))
+            .Where(d => d.Date != DateTime.MinValue)
+            .GroupBy(d => d.Date.Date)
+            .OrderByDescending(g => g.Key)
             .Select(g =>
             {
-                var ordered = g.OrderBy(d => d.DrawNumber).ToList();
-                int[]? midday  = ordered.Count >= 1 ? ordered[0].Numbers : null;
-                int[]? evening = ordered.Count >= 2 ? ordered[1].Numbers : null;
-                return (DateLabel: g.Key, Midday: midday, Evening: evening,
-                        Date: DateTime.TryParse(g.First().DrawDate, out var dt) ? dt : DateTime.MinValue);
+                var midday  = g.FirstOrDefault(x => x.DrawTime?.ToLower().Contains("midday") == true
+                                                  || x.DrawTime?.ToLower().Contains("mid") == true);
+                var evening = g.FirstOrDefault(x => x.DrawTime?.ToLower().Contains("evening") == true
+                                                  || x.DrawTime?.ToLower().Contains("eve") == true);
+
+                if (midday.Numbers == null && evening.Numbers == null)
+                {
+                    // No DrawTime info — use DrawNumber order: lower = midday, higher = evening
+                    var ordered = g.OrderBy(x => x.DrawNumber).ToList();
+                    midday  = ordered.Count >= 1 ? ordered[0] : default;
+                    evening = ordered.Count >= 2 ? ordered[1] : default;
+                }
+                else if (midday.Numbers == null && evening.Numbers != null)
+                {
+                    var other = g.FirstOrDefault(x => x.DrawTime != evening.DrawTime);
+                    if (other.Numbers != null) midday = other;
+                }
+                var dateLabel = g.Key.ToString("ddd MMM d, yyyy");
+                return (DateLabel: dateLabel,
+                        Midday:  midday.Numbers  ?? Array.Empty<int>(),
+                        Evening: evening.Numbers ?? Array.Empty<int>());
             })
-            .OrderByDescending(g => g.Date)
             .ToList();
 
-        _drawsByDate = groups.Select(g => (g.DateLabel, g.Midday, g.Evening)).ToList();
+        _draws = grouped;
         _drawsLoaded = true;
-
-        bool todayAvailable = groups.Any(g => g.Date.Date == DateTime.Today);
-        var defaultGroup = todayAvailable
-            ? groups.First()
-            : groups.FirstOrDefault(g => g.Date.Date < DateTime.Today);
 
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            var dates = groups.Select(g => g.Date.Date).ToList();
+            var dates = _draws
+                .Select(d => DateTime.TryParse(d.DateLabel, out var dt) ? dt.Date : DateTime.MinValue)
+                .Where(d => d != DateTime.MinValue)
+                .ToList();
+            if (dates.Count == 0) return;
             drawDatePicker.MinimumDate = dates.Last();
             drawDatePicker.MaximumDate = dates.First();
-            var targetDate = defaultGroup.Date != default ? defaultGroup.Date.Date : dates.First();
+            var targetDate = dates.First();
             if (drawDatePicker.Date == targetDate)
-                ShowDrawForDate(targetDate); // DateSelected won't fire if date unchanged
+                ShowDrawForDate(targetDate);
             else
                 drawDatePicker.Date = targetDate;
         });
@@ -688,37 +770,23 @@ public partial class Daily3Page : ContentPage
 
     private void ShowDrawForDate(DateTime date)
     {
-        // Find the most recent midday draw on or before the selected date
-        var middayMatch = _drawsByDate.FirstOrDefault(d =>
-            d.Midday != null &&
+        var match = _draws.FirstOrDefault(d =>
             DateTime.TryParse(d.DateLabel, out var dt) && dt.Date <= date.Date);
 
-        // Find the most recent evening draw on or before the selected date
-        var eveningMatch = _drawsByDate.FirstOrDefault(d =>
-            d.Evening != null &&
-            DateTime.TryParse(d.DateLabel, out var dt) && dt.Date <= date.Date);
+        if (match.DateLabel == null) return;
 
-        if (middayMatch.DateLabel == null && eveningMatch.DateLabel == null) return;
+        _winMidday  = match.Midday.Length  > 0 ? match.Midday  : null;
+        _winEvening = match.Evening.Length > 0 ? match.Evening : null;
 
-        _middayNums  = middayMatch.Midday;
-        _eveningNums = eveningMatch.Evening;
+        lblDrawDate.Text = match.DateLabel;
 
-        // Build date label: show separate dates if midday and evening are from different days
-        if (middayMatch.DateLabel != null && eveningMatch.DateLabel != null &&
-            middayMatch.DateLabel != eveningMatch.DateLabel)
-            lblDrawDate.Text = $"Mid: {middayMatch.DateLabel}  Eve: {eveningMatch.DateLabel}";
-        else
-            lblDrawDate.Text = middayMatch.DateLabel ?? eveningMatch.DateLabel ?? "";
-
-        // Midday row
         for (int i = 0; i < 3; i++)
-            _wLabels[i].Text = _middayNums != null ? _middayNums[i].ToString() : "?";
+        {
+            _wLabels[i].Text = _winMidday  != null ? _winMidday[i].ToString()  : "?";
+            _eLabels[i].Text = _winEvening != null ? _winEvening[i].ToString() : "-";
+        }
 
-        // Evening row
-        for (int i = 0; i < 3; i++)
-            _eLabels[i].Text = _eveningNums != null ? _eveningNums[i].ToString() : "-";
-
-        if (_results[0].Text != "") CheckAll();
+        CheckAll();
     }
 
     private void DrawDatePicker_DateSelected(object sender, DateChangedEventArgs e) =>
@@ -746,72 +814,45 @@ public partial class Daily3Page : ContentPage
                 continue;
             }
 
-            var sorted = userNums.OrderBy(x => x).ToArray();
-            string bt = _betTypes[r]; // "S", "B", or "S&B"
+            string bt = _betTypes[r];
+            string? win = CheckWin(userNums, _winMidday, bt);
+            if (win == null) win = CheckWin(userNums, _winEvening, bt);
 
-            // Determine raw draw match per session
-            string? dayWin = null;
-            if (_middayNums != null)
-            {
-                if (userNums.SequenceEqual(_middayNums))
-                    dayWin = "Straight";
-                else if (sorted.SequenceEqual(_middayNums.OrderBy(x => x)))
-                    dayWin = "Box";
-            }
-
-            string? ngtWin = null;
-            if (_eveningNums != null)
-            {
-                if (userNums.SequenceEqual(_eveningNums))
-                    ngtWin = "Straight";
-                else if (sorted.SequenceEqual(_eveningNums.OrderBy(x => x)))
-                    ngtWin = "Box";
-            }
-
-            // Apply bet type filter
-            if (bt == "S")
-            {
-                if (dayWin != "Straight") dayWin = null;
-                if (ngtWin != "Straight") ngtWin = null;
-            }
-            // "B" and "S&B": all matches count (straight also wins as box for "B")
-
-            bool anyWin = dayWin != null || ngtWin != null;
-            bool anyStr = bt != "B" && (dayWin == "Straight" || ngtWin == "Straight");
-
-            // Entry background
-            var bg = !anyWin ? Color.FromArgb("#FFCDD2")
-                   : anyStr  ? Color.FromArgb("#F9A825")
-                             : Color.FromArgb("#FFF9C4");
+            bool isStrWin = win == "Straight" || win == "S&B!";
+            var bg = win == null  ? Color.FromArgb("#FFCDD2")
+                   : isStrWin     ? Color.FromArgb("#F9A825")
+                                  : Color.FromArgb("#FFF9C4");
             for (int c = 0; c < Cols; c++)
                 _entries[r, c].BackgroundColor = bg;
 
-            // Result label
-            if (!anyWin)
+            if (win == null)
             {
                 _results[r].Text = "✗";
                 _results[r].TextColor = Color.FromArgb("#C62828");
             }
             else
             {
-                string WinLabel(string? w) =>
-                    w == null ? "" :
-                    bt == "S&B" && w == "Straight" ? "S&B!" :
-                    bt == "B" ? "Box" : w;
-
-                string text;
-                string dl = WinLabel(dayWin), nl = WinLabel(ngtWin);
-                if (dayWin != null && ngtWin != null)
-                    text = dl == nl ? $"D+N\n{dl}" : $"D:{dl}\nN:{nl}";
-                else if (dayWin != null)
-                    text = $"Day\n{dl}";
-                else
-                    text = $"Eve\n{nl}";
-
-                _results[r].Text = text;
-                _results[r].TextColor = anyStr ? Color.FromArgb("#1B5E20") : Color.FromArgb("#E65100");
+                _results[r].Text = win;
+                _results[r].TextColor = isStrWin
+                    ? Color.FromArgb("#1B5E20")
+                    : Color.FromArgb("#E65100");
             }
         }
+    }
+
+    static string? CheckWin(int[] user, int[]? win, string bt)
+    {
+        if (win == null || win.Length < 3) return null;
+        bool isStr = user.SequenceEqual(win);
+        bool isBox = !isStr && user.OrderBy(x => x).SequenceEqual(win.OrderBy(x => x));
+
+        return bt switch
+        {
+            "S"   => isStr ? "Straight" : null,
+            "B"   => (isStr || isBox) ? "Box" : null,
+            "S&B" => isStr ? "S&B!" : isBox ? "Box" : null,
+            _     => null,
+        };
     }
 
     private void BtnCheck_Clicked(object sender, EventArgs e) => CheckAll();
@@ -825,7 +866,7 @@ public partial class Daily3Page : ContentPage
     private async void BtnRefresh_Clicked(object sender, EventArgs e)
     {
         _drawsLoaded = false;
-        _drawsByDate.Clear();
+        _draws.Clear();
         await LoadAllDraws();
     }
 
@@ -837,6 +878,37 @@ public partial class Daily3Page : ContentPage
         lblStatus.Text = "Log copied to clipboard";
         await Task.Delay(1500);
         lblStatus.Text = orig;
+    }
+
+    private async void BtnQuickPick_Clicked(object sender, EventArgs e)
+    {
+        string? choice = await DisplayActionSheet("Quick Pick — How many empty rows?", "Cancel", null,
+            "1", "2", "3", "5", "10", "All");
+        if (choice == null || choice == "Cancel") return;
+        int max = choice == "All" ? Rows : int.TryParse(choice, out int n) ? n : 1;
+
+        var rng = Random.Shared;
+        int filled = 0;
+        for (int r = 0; r < Rows && filled < max; r++)
+        {
+            bool empty = true;
+            for (int c = 0; c < Cols; c++)
+                if (!string.IsNullOrEmpty(_entries[r, c].Text)) { empty = false; break; }
+            if (!empty) continue;
+
+            for (int c = 0; c < Cols; c++)
+                _entries[r, c].Text = rng.Next(0, 10).ToString();
+            filled++;
+        }
+
+        if (filled == 0)
+            lblStatus.Text = "No empty rows to fill";
+        else
+        {
+            CheckAll();
+            SaveEntries();
+            lblStatus.Text = $"Quick Pick: filled {filled} row{(filled == 1 ? "" : "s")}";
+        }
     }
 
     private async void BtnClearSets_Clicked(object sender, EventArgs e)
@@ -867,33 +939,138 @@ public partial class Daily3Page : ContentPage
         }
 
         UpdateSlotPicker();
-
         if (sender is Button btn)
         {
-            var orig = btn.Text;
-            var origColor = btn.BackgroundColor;
-            btn.Text = "Cleared";
-            btn.BackgroundColor = Color.FromArgb("#1B5E20");
+            var orig = btn.Text; var origColor = btn.BackgroundColor;
+            btn.Text = "Cleared"; btn.BackgroundColor = Color.FromArgb("#1B5E20");
             await Task.Delay(1200);
-            btn.Text = orig;
-            btn.BackgroundColor = origColor;
+            btn.Text = orig; btn.BackgroundColor = origColor;
+        }
+    }
+
+    private void BtnVoice_Clicked(object sender, EventArgs e)
+    {
+#if ANDROID
+        if (!Services.VoiceNumberService.IsAvailable) { lblStatus.Text = "Speech recognition not available"; return; }
+        if (_voiceOn) StopVoice(); else StartVoice();
+#endif
+    }
+
+    void StartVoice()
+    {
+        _voiceRow = 0; _voiceCol = 0;
+        VoiceSkipFilled();
+        if (_voiceRow >= Rows) { lblStatus.Text = "No empty cells"; return; }
+        _voiceOn = true;
+        btnVoice.BackgroundColor = Colors.Red;
+        SetVoiceTarget();
+#if ANDROID
+        Services.VoiceNumberService.StatusUpdate += OnVoiceStatus;
+        Services.VoiceNumberService.StartContinuous(OnVoiceNumbers);
+#endif
+    }
+
+    void StopVoice()
+    {
+        _voiceOn = false;
+        ClearVoiceTarget();
+#if ANDROID
+        Services.VoiceNumberService.StatusUpdate -= OnVoiceStatus;
+        Services.VoiceNumberService.Stop();
+#endif
+        btnVoice.BackgroundColor = Color.FromArgb("#0277BD");
+        lblStatus.Text = "Mic off";
+    }
+
+    void SetVoiceTarget()
+    {
+        if (_voiceTarget != null) _voiceTarget.BackgroundColor = _voiceTargetOldColor;
+        if (_voiceRow < Rows)
+        {
+            _voiceTarget = _entries[_voiceRow, _voiceCol];
+            _voiceTargetOldColor = _voiceTarget.BackgroundColor;
+            _voiceTarget.BackgroundColor = Color.FromArgb("#A5D6A7");
+        }
+    }
+
+    void ClearVoiceTarget()
+    {
+        if (_voiceTarget != null) _voiceTarget.BackgroundColor = _voiceTargetOldColor;
+        _voiceTarget = null;
+    }
+
+    void OnVoiceStatus(string msg) => MainThread.BeginInvokeOnMainThread(() => lblStatus.Text = msg);
+
+    void OnVoiceNumbers(List<int> nums)
+    {
+        if (!_voiceOn) return;
+        foreach (int n in nums)
+        {
+            if (_voiceRow >= Rows) { StopVoice(); return; }
+            if (n >= 0 && n <= 9)
+            {
+                _voiceSettingText = true;
+                _entries[_voiceRow, _voiceCol].Text = n.ToString();
+                _voiceSettingText = false;
+                _voiceCol++;
+                if (_voiceCol >= Cols) { _voiceCol = 0; _voiceRow++; }
+                VoiceSkipFilled();
+            }
+        }
+        CheckAll(); SaveEntries();
+        SetVoiceTarget(); // after CheckAll so green highlight isn't wiped
+        if (_voiceOn && _voiceRow < Rows)
+            lblStatus.Text = $"🔴 Listening | row {_voiceRow + 1} col {_voiceCol + 1}";
+    }
+
+    void VoiceSkipFilled()
+    {
+        while (_voiceRow < Rows && !string.IsNullOrEmpty(_entries[_voiceRow, _voiceCol].Text))
+        {
+            _voiceCol++;
+            if (_voiceCol >= Cols) { _voiceCol = 0; _voiceRow++; }
         }
     }
 
     private async void BtnSave_Clicked(object sender, EventArgs e)
     {
-        SaveEntries();
+        string? choice = await DisplayActionSheet("Save", "Cancel", null, "Save to Slot", "Save to MyFavorite");
+        if (choice == null || choice == "Cancel") return;
+        if (choice == "Save to MyFavorite")
+        {
+            SaveEntries();
+            await MyFavoritePage.SaveCurrentToMyFavoriteAsync(
+                "Daily 3", "d3_set_", _activeSlot < 0 ? 0 : _activeSlot,
+                GetCurrentEntryString(), string.Join("|", _betTypes));
+            return;
+        }
+        // Cache current slot then flush all cached slots
         if (_activeSlot >= 0)
-            SaveSet(_activeSlot);
+            _slotCache[_activeSlot] = (GetCurrentEntryString(), string.Join("|", _betTypes));
+        SaveEntries();
+        foreach (var (slot, (entries, betTypes)) in _slotCache)
+        {
+            bool isEmpty = entries.Replace("|", "").Trim().Length == 0;
+            if (isEmpty)
+            {
+                Preferences.Remove(SetKey(slot));
+                Preferences.Remove(BetKey(slot));
+            }
+            else
+            {
+                Preferences.Set(SetKey(slot), entries);
+                Preferences.Set(BetKey(slot), betTypes);
+            }
+        }
+        UpdateSlotPicker();
+        int savedCount = _slotCache.Count(kv => kv.Value.entries.Replace("|", "").Trim().Length > 0);
         if (sender is Button btn)
         {
-            var orig = btn.Text;
-            var origColor = btn.BackgroundColor;
-            btn.Text = _activeSlot >= 0 ? $"SET {_activeSlot + 1} ✓" : "SAVED";
+            var orig = btn.Text; var origColor = btn.BackgroundColor;
+            btn.Text = savedCount > 1 ? $"ALL {savedCount} ✓" : _activeSlot >= 0 ? $"SET {_activeSlot + 1} ✓" : "SAVED";
             btn.BackgroundColor = Color.FromArgb("#1B5E20");
             await Task.Delay(1200);
-            btn.Text = orig;
-            btn.BackgroundColor = origColor;
+            btn.Text = orig; btn.BackgroundColor = origColor;
         }
     }
 

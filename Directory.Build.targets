@@ -3,4 +3,12 @@
   <ItemGroup>
     <Compile Remove="obj\**\*.cs" />
   </ItemGroup>
+
+  <!-- Override MAUI SDK targets that re-enable trimming/AOT for iOS on Windows -->
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+    <PublishTrimmed>false</PublishTrimmed>
+    <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>false</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>false</EnableSingleFileAnalyzer>
+  </PropertyGroup>
 </Project>

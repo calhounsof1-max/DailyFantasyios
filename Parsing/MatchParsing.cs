@@ -8,19 +8,12 @@ namespace DailyFantasyMAUI.Parsing
         public static IEnumerable<ModelDaily> ExactRecurrence(string numbers, ObservableCollection<ModelDaily> data, string selectedCount)
         {
             var rc = new List<ModelDaily>();
-            var numSplit = numbers.Split(new char[] { '\r', '\n', ' ' }, StringSplitOptions.RemoveEmptyEntries);
 
             foreach (var nm in data)
             {
                 var currentNum = $"{nm.N1} {nm.N2} {nm.N3} {nm.N4} {nm.N5}";
-                for (int i = 0; i < numSplit.Length; i++)
-                {
-                    if (RecurrenceMatch(currentNum, numSplit[i], selectedCount))
-                    {
-                        rc.Add(nm);
-                        break;
-                    }
-                }
+                if (RecurrenceMatch(currentNum, numbers, selectedCount))
+                    rc.Add(nm);
             }
 
             return rc;
@@ -38,6 +31,56 @@ namespace DailyFantasyMAUI.Parsing
                     if (numSplit[i] == curSplit[j]) count++;
 
             return count == int.Parse(selectCount);
+        }
+
+        // Daily 3 recurrence: match user's 3 digits against 3-digit draws (any order, handles duplicates)
+        public static IEnumerable<ModelDaily> ExactRecurrenceD3(string numbers, ObservableCollection<ModelDaily> data, string selectedCount)
+        {
+            var rc = new List<ModelDaily>();
+            var userNums = numbers.Split(new char[] { '\r', '\n', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                                  .Where(s => !string.IsNullOrEmpty(s)).ToArray();
+            int target = int.Parse(selectedCount);
+
+            foreach (var nm in data)
+            {
+                var drawNums = new[] { nm.N1.ToString(), nm.N2.ToString(), nm.N3.ToString() };
+                // Multiset: count min occurrences of each digit so duplicates are handled correctly
+                var userCounts = userNums.GroupBy(n => n).ToDictionary(g => g.Key, g => g.Count());
+                var drawCounts = drawNums.GroupBy(n => n).ToDictionary(g => g.Key, g => g.Count());
+                int matchCount = userCounts.Sum(kv =>
+                    Math.Min(kv.Value, drawCounts.TryGetValue(kv.Key, out int dc) ? dc : 0));
+                if (matchCount == target)
+                    rc.Add(nm);
+            }
+
+            return rc;
+        }
+
+        // Super Lotto recurrence: match user's numbers against 6-number draws (N1–N5 main + N6 Mega)
+        public static IEnumerable<ModelDaily> ExactRecurrenceSL(string numbers, ObservableCollection<ModelDaily> data, string selectedCount)
+        {
+            var rc = new List<ModelDaily>();
+            var userNums = numbers.Split(new char[] { '\r', '\n', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                                  .Where(s => !string.IsNullOrEmpty(s))
+                                  .ToArray();
+            int target = int.Parse(selectedCount);
+
+            foreach (var nm in data)
+            {
+                // Build set of all draw numbers (main 1–5 + mega as N6)
+                var drawSet = new HashSet<string>
+                {
+                    nm.N1.ToString(), nm.N2.ToString(), nm.N3.ToString(),
+                    nm.N4.ToString(), nm.N5.ToString()
+                };
+                if (nm.N6 > 0) drawSet.Add(nm.N6.ToString());
+
+                int matchCount = userNums.Count(n => drawSet.Contains(n));
+                if (matchCount == target)
+                    rc.Add(nm);
+            }
+
+            return rc;
         }
 
         // Match a 5-number line against a draw

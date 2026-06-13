@@ -3,11 +3,11 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-#if IOS
-using Vision;
-using CoreGraphics;
-using Foundation;
-using UIKit;
+#if ANDROID
+using Android.Graphics;
+using Xamarin.Google.MLKit.Vision.Common;
+using MlText = Xamarin.Google.MLKit.Vision.Text;
+using Xamarin.Google.MLKit.Vision.Text.Latin;
 #endif
 
 namespace DailyFantasyMAUI;
@@ -170,7 +170,7 @@ public partial class ScanTicketPage : ContentPage
     async Task<List<List<int>>> ParsePlaysFromPhoto(string imagePath)
     {
         _debugInfo = "";
-#if IOS
+#if ANDROID
         try
         {
             // Pass 1: Natural Direct
@@ -205,137 +205,267 @@ public partial class ScanTicketPage : ContentPage
 #endif
     }
 
-#if IOS
-    async Task<List<(int top, int cy, int h, int left, string text)>> RunRecognizer(UIImage image)
+#if ANDROID
+    static Bitmap? PreprocessBitmap(string imagePath, int mode)
     {
-        var tcs = new TaskCompletionSource<List<(int top, int cy, int h, int left, string text)>>();
-        var results = new List<(int top, int cy, int h, int left, string text)>();
+        var bmp = BitmapFactory.DecodeFile(imagePath);
+        if (bmp == null) return null;
 
-        var request = new VNRecognizeTextRequest((req, err) =>
+        int w = bmp.Width, h = bmp.Height;
+
+        // Mode 2: color-aware pass — remove orange/colored elements (starburst, paper)
+        // by turning saturated pixels white, keeping only near-black ink (numbers + lines),
+        // then downscale so thin wavy lines vanish as sub-pixel noise.
+        if (mode >= 2)
         {
-            if (err != null) { tcs.TrySetResult(results); return; }
-            var observations = req.GetResults<VNRecognizedTextObservation>();
-            if (observations == null) { tcs.TrySetResult(results); return; }
+            var pixels = new int[w * h];
+            bmp.GetPixels(pixels, 0, w, 0, 0, w, h);
+            bmp.Recycle();
 
-            int imgH = (int)image.Size.Height;
-            int imgW = (int)image.Size.Width;
-            foreach (var obs in observations)
+            for (int i = 0; i < pixels.Length; i++)
             {
-                var candidate = obs.TopCandidates(1).FirstOrDefault();
-                if (candidate == null) continue;
-                // Vision uses normalized coords (0,0)=bottom-left; flip Y for top-down
-                var box = obs.BoundingBox;
-                int top  = (int)((1.0 - box.Y - box.Height) * imgH);
-                int bot  = (int)((1.0 - box.Y) * imgH);
-                int left = (int)(box.X * imgW);
-                int cy   = (top + bot) / 2;
-                int h    = bot - top;
-                results.Add((top, cy, h, left, candidate.String ?? ""));
+                int px = pixels[i];
+                int r = (px >> 16) & 0xFF;
+                int g = (px >> 8)  & 0xFF;
+                int b =  px        & 0xFF;
+                int maxC = Math.Max(r, Math.Max(g, b));
+                int minC = Math.Min(r, Math.Min(g, b));
+                int gray = (maxC - minC) > 30
+                    ? 255                                                   // colored → white
+                    : (int)(0.299 * r + 0.587 * g + 0.114 * b);            // near-gray → keep
+                pixels[i] = unchecked((int)0xFF000000) | (gray << 16) | (gray << 8) | gray;
             }
-            tcs.TrySetResult(results);
-        });
-        request.RecognitionLevel = VNRequestTextRecognitionLevel.Accurate;
-        request.RecognitionLanguages = new[] { "en-US" };
-        request.UsesLanguageCorrection = false;
 
-        await Task.Run(() =>
-        {
-            using var cgImage = image.CGImage;
-            if (cgImage == null) { tcs.TrySetResult(results); return; }
-            var handler = new VNImageRequestHandler(cgImage, new NSDictionary());
-            handler.Perform(new VNRequest[] { request }, out _);
-        });
+            var proc2 = Bitmap.CreateBitmap(w, h, Bitmap.Config.Argb8888!);
+            proc2.SetPixels(pixels, 0, w, 0, 0, w, h);
 
-        return await tcs.Task;
-    }
+            if (w > 400)
+            {
+                float s = 400f / w;
+                int sw = 400, sh = Math.Max(1, (int)(h * s));
+                var small2 = Bitmap.CreateScaledBitmap(proc2, sw, sh, true)!;
+                proc2.Recycle();
+                proc2 = small2;
+            }
 
-    async Task<List<(int top, int cy, int h, int left, string text)>?> GetOcrLinesMlKit(string imagePath, int mode)
-    {
-        UIImage? image = null;
-        if (mode == -1)
-        {
-            image = UIImage.FromFile(imagePath);
+            // Binarize after downscale: pure black numbers, pure white everything else
+            {
+                int pw = proc2.Width, ph = proc2.Height;
+                var th = new int[pw * ph];
+                proc2.GetPixels(th, 0, pw, 0, 0, pw, ph);
+                for (int i = 0; i < th.Length; i++)
+                {
+                    int g = (th[i] >> 16) & 0xFF;
+                    th[i] = g < 160 ? unchecked((int)0xFF000000) : unchecked((int)0xFFFFFFFF);
+                }
+                proc2.SetPixels(th, 0, pw, 0, 0, pw, ph);
+            }
+
+            try
+            {
+                string dbg2 = System.IO.Path.Combine(FileSystem.CacheDirectory, "ocr_debug.jpg");
+                using var fs2 = System.IO.File.Create(dbg2);
+                proc2.Compress(Bitmap.CompressFormat.Jpeg, 90, fs2);
+            }
+            catch { }
+            return proc2;
         }
-        else
+
+        float targetH = 400f;
+        float targetW = 2000f;
+        float scale = (h < (w * 0.4)) ? (targetH / h) : (targetW / Math.Max(w, h));
+
+        if (scale < 0.6f || scale > 1.4f)
         {
-            image = await Task.Run(() => PreprocessBitmap(imagePath, mode));
+            var scaled = Bitmap.CreateScaledBitmap(bmp, (int)(w * scale), (int)(h * scale), true)!;
+            bmp.Recycle();
+            bmp = scaled;
+            w = bmp.Width; h = bmp.Height;
         }
-        if (image == null) return null;
-        return await RunRecognizer(image);
+
+        var proc = Bitmap.CreateBitmap(w, h, Bitmap.Config.Argb8888!);
+        using (var canvas = new Android.Graphics.Canvas(proc))
+        {
+            using var paint = new Android.Graphics.Paint();
+            var cm = new Android.Graphics.ColorMatrix();
+            cm.SetSaturation(0);
+
+            if (mode == 1)
+            {
+                float contrast = 2.2f, brightness = 1.2f;
+                float translate = 128f * (1f - contrast) + (brightness - 1f) * 255f;
+                var matrix = new Android.Graphics.ColorMatrix(new float[]
+                    { contrast,0,0,0,translate, 0,contrast,0,0,translate, 0,0,contrast,0,translate, 0,0,0,1,0 });
+                cm.PostConcat(matrix);
+            }
+
+            paint.SetColorFilter(new Android.Graphics.ColorMatrixColorFilter(cm));
+            canvas.DrawBitmap(bmp, 0, 0, paint);
+        }
+        bmp.Recycle();
+
+        try
+        {
+            string dbg = System.IO.Path.Combine(FileSystem.CacheDirectory, "ocr_debug.jpg");
+            using var fs = System.IO.File.Create(dbg);
+            proc.Compress(Bitmap.CompressFormat.Jpeg, 90, fs);
+        }
+        catch { }
+        return proc;
     }
 
-    UIImage? PreprocessBitmap(string imagePath, int mode)
-    {
-        var image = UIImage.FromFile(imagePath);
-        if (image?.CGImage == null) return null;
-
-        int w = (int)image.Size.Width;
-        int h = (int)image.Size.Height;
-
-        // Simple grayscale + contrast for modes 0/1; color removal for mode 2
-        UIGraphics.BeginImageContextWithOptions(image.Size, false, 1.0f);
-        var ctx = UIGraphics.GetCurrentContext();
-        if (ctx == null) { UIGraphics.EndImageContext(); return image; }
-
-        image.Draw(CGPoint.Empty);
-        var result = UIGraphics.GetImageFromCurrentImageContext();
-        UIGraphics.EndImageContext();
-        return result ?? image;
-    }
-
+    // Pass 5: color-filter + binarize each strip inline at full resolution,
+    // then downscale width to 600px (strips stay ~50px tall — above MLKit's 32px minimum).
     async Task<List<List<int>>> ParsePlaysFromStrips(string imagePath)
     {
         int cols = Games[_gameIdx].Cols;
+        // Use 4 strips instead of 3: the crop often has dead space at top,
+        // so equal thirds miss row C. 4 strips gives more overlap coverage;
+        // we collect all strips with numbers and keep the best cols-count ones.
         int stripCount = cols > 3 ? 4 : 1;
         var plays = new List<List<int>>();
 
-        var image = UIImage.FromFile(imagePath);
-        if (image?.CGImage == null) return plays;
+        var strips = await Task.Run(() =>
+        {
+            var bmp = BitmapFactory.DecodeFile(imagePath);
+            if (bmp == null) return null;
+            int bw = bmp.Width, bh = bmp.Height;
 
-        int bw = (int)image.Size.Width;
-        int bh = (int)image.Size.Height;
+            var list = new List<Bitmap>();
+            for (int i = 0; i < stripCount; i++)
+            {
+                int y0 = i * bh / stripCount;
+                int sh = (i + 1) * bh / stripCount - y0;
+                // Use raw strip — no preprocessing. Let MLKit handle the full-color image.
+                // Strips at native resolution avoid scaling artifacts and keep number strokes intact.
+                list.Add(Bitmap.CreateBitmap(bmp, 0, y0, bw, sh)!);
+            }
+            bmp.Recycle();
+            return list;
+        });
+
+        if (strips == null) return plays;
 
         int minNeeded = cols > 3 ? 3 : 1;
         var dbg = new List<string>();
-
-        for (int i = 0; i < stripCount; i++)
+        foreach (var strip in strips)
         {
-            int y0 = i * bh / stripCount;
-            int sh = (i + 1) * bh / stripCount - y0;
-
-            UIGraphics.BeginImageContextWithOptions(new CGSize(bw, sh), false, 1.0f);
-            var ctx = UIGraphics.GetCurrentContext();
-            if (ctx == null) { UIGraphics.EndImageContext(); continue; }
-            image.Draw(new CGRect(0, -y0, bw, bh));
-            var strip = UIGraphics.GetImageFromCurrentImageContext();
-            UIGraphics.EndImageContext();
-
-            if (strip == null) { dbg.Add("_"); continue; }
-
-            var lines = await RunRecognizer(strip);
-            var text = string.Join(" ", lines.OrderBy(l => l.left).Select(l => l.text));
-            var nums = ExtractNums(text);
-            if (nums.Count >= minNeeded)
+            try
             {
-                var play = nums.Count > cols ? nums.GetRange(0, cols) : nums;
-                plays.Add(play);
-                dbg.Add($"[{string.Join(",", play)}]");
+                var img = InputImage.FromBitmap(strip, 0);
+                var lines = await RunRecognizer(img);
+                var text = string.Join(" ", lines.OrderBy(l => l.left).Select(l => l.text));
+                var nums = ExtractNums(text);
+                if (nums.Count >= minNeeded)
+                {
+                    var play = nums.Count > cols ? nums.GetRange(0, cols) : nums;
+                    plays.Add(play);
+                    dbg.Add($"[{string.Join(",", play)}]");
+                }
+                else
+                    dbg.Add(text.Length > 0 ? $"t:{text[..Math.Min(12, text.Length)]}" : "_");
             }
-            else
-                dbg.Add(text.Length > 0 ? $"t:{text[..Math.Min(12, text.Length)]}" : "_");
+            finally { strip.Recycle(); }
         }
 
+        // From 4 strips, keep up to 3 plays sorted by number count (most complete first),
+        // skipping near-duplicates (same first number = same row captured twice).
         int maxRows = cols > 3 ? 3 : 1;
         var deduped = plays
             .OrderByDescending(p => p.Count)
             .GroupBy(p => p[0])
             .Select(g => g.First())
             .Take(maxRows)
-            .OrderBy(p => plays.IndexOf(p))
+            .OrderBy(p => plays.IndexOf(p))   // restore original strip order
             .ToList();
 
         _debugInfo = $"fnd:strips rows:{deduped.Count} samples:\"{string.Join("|", dbg)}\"";
         return deduped;
+    }
+
+    // Pass 5: OCR each horizontal strip independently.
+    // Uses a large fake Y gap between strips so ProcessOcrLines never merges across strips.
+    async Task<List<(int top, int cy, int h, int left, string text)>?> GetOcrLinesSplit(string imagePath)
+    {
+        int cols = Games[_gameIdx].Cols;
+        int stripCount = cols > 3 ? 3 : 1;
+        var allLines = new List<(int top, int cy, int h, int left, string text)>();
+
+        var strips = await Task.Run(() =>
+        {
+            var bmp = BitmapFactory.DecodeFile(imagePath);
+            if (bmp == null) return null;
+            int bw = bmp.Width, bh = bmp.Height;
+            var list = new List<Bitmap>();
+            for (int i = 0; i < stripCount; i++)
+            {
+                int y0 = i * bh / stripCount;
+                int sh = (i + 1) * bh / stripCount - y0;
+                list.Add(Bitmap.CreateBitmap(bmp, 0, y0, bw, sh)!);
+            }
+            bmp.Recycle();
+            return list;
+        });
+
+        if (strips == null) return null;
+
+        // Use a large cy gap (10000) per strip so ProcessOcrLines always puts
+        // each strip in its own row bucket, never merging across strips.
+        const int CY_STRIDE = 10000;
+
+        for (int i = 0; i < strips.Count; i++)
+        {
+            try
+            {
+                var img = InputImage.FromBitmap(strips[i], 0);
+                var lines = await RunRecognizer(img);
+                foreach (var l in lines)
+                    allLines.Add((l.top + i * CY_STRIDE, l.cy + i * CY_STRIDE, l.h, l.left, l.text));
+            }
+            finally { strips[i].Recycle(); }
+        }
+
+        return allLines;
+    }
+
+    async Task<List<(int top, int cy, int h, int left, string text)>?> GetOcrLinesMlKit(string imagePath, int mode)
+    {
+        if (mode == -1) 
+        {
+            try {
+                var file = new Java.IO.File(imagePath);
+                var inputImage = InputImage.FromFilePath(Android.App.Application.Context, Android.Net.Uri.FromFile(file)!);
+                return await RunRecognizer(inputImage);
+            } catch { return null; }
+        }
+
+        Bitmap? bitmap = await Task.Run(() => PreprocessBitmap(imagePath, mode));
+        if (bitmap == null) return null;
+        try {
+            var inputImage = InputImage.FromBitmap(bitmap, 0);
+            return await RunRecognizer(inputImage);
+        } finally { bitmap.Recycle(); }
+    }
+
+    async Task<List<(int top, int cy, int h, int left, string text)>> RunRecognizer(InputImage image)
+    {
+        var recognizer = MlText.TextRecognition.GetClient(TextRecognizerOptions.DefaultOptions);
+        var tcs        = new TaskCompletionSource<MlText.Text>();
+        var mlTask     = recognizer.Process(image);
+        mlTask.AddOnSuccessListener(new MlSuccess<MlText.Text>(tcs));
+        mlTask.AddOnFailureListener(new MlFailure<MlText.Text>(tcs));
+        var result = await tcs.Task;
+
+        var lines = new List<(int top, int cy, int h, int left, string text)>();
+        if (result?.TextBlocks == null) return lines;
+        foreach (var block in result.TextBlocks)
+            foreach (var line in block.Lines)
+            {
+                var box = line.BoundingBox;
+                if (box == null) continue;
+                lines.Add((box.Top, (box.Top + box.Bottom) / 2, box.Bottom - box.Top, box.Left, line.Text ?? ""));
+            }
+        return lines;
     }
 
     List<List<int>> ProcessOcrLines(List<(int top, int cy, int h, int left, string text)> ocrLines)
@@ -354,7 +484,7 @@ public partial class ScanTicketPage : ContentPage
 
         var plays = new List<List<int>>();
         var dbgTxt = new List<string>();
-        int minNeeded = Games[_gameIdx].Cols > 3 ? 3 : 1;
+        int minNeeded = Games[_gameIdx].Cols > 3 ? 3 : 1; 
 
         foreach (var row in rows.OrderBy(r => r[0].cy))
         {
@@ -578,7 +708,7 @@ public partial class ScanTicketPage : ContentPage
         if (_initialized) return;
         _initialized = true;
 
-        var status = await Permissions.RequestAsync<Permissions.Camera>();
+        var status = await Permissions.RequestAsync<Permissions.Camera>();      
         if (status != PermissionStatus.Granted) { lblStatus.Text = "Camera permission required."; return; }
 
         string game = await DisplayActionSheet("Which ticket are you scanning?",
@@ -601,3 +731,20 @@ public partial class ScanTicketPage : ContentPage
     }
 
 }
+
+#if ANDROID
+sealed class MlSuccess<T>(TaskCompletionSource<T> tcs)
+    : Java.Lang.Object, Android.Gms.Tasks.IOnSuccessListener
+    where T : Java.Lang.Object
+{
+    public void OnSuccess(Java.Lang.Object? result) => tcs.TrySetResult((T)result!);
+}
+
+sealed class MlFailure<T>(TaskCompletionSource<T> tcs)
+    : Java.Lang.Object, Android.Gms.Tasks.IOnFailureListener
+    where T : Java.Lang.Object
+{
+    public void OnFailure(Java.Lang.Exception? e) =>
+        tcs.TrySetException(new Exception(e?.Message ?? "ML Kit error"));       
+}
+#endif

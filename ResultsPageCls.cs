@@ -22,6 +22,8 @@ public class DateResultData
     public int    SLMega     { get; set; }
     public int[]  PBMain     { get; set; } = Array.Empty<int>();
     public int    PBBall     { get; set; }
+    public int[]  MMMain     { get; set; } = Array.Empty<int>();
+    public int    MMBall     { get; set; }
     public int[]? D3Midday   { get; set; }
     public int[]? D3Evening  { get; set; }
     public int[]? D4Numbers  { get; set; }
@@ -39,6 +41,7 @@ public static class ResultsPageCls
     static List<(string DrawDate, int[] Numbers, DrawPrizeTier[] Prizes)>                          _f5 = new();
     static List<(string DrawDate, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)>      _sl = new();
     static List<(string DrawDate, int[] MainNumbers, int PBNumber,   DrawPrizeTier[] Prizes)>      _pb = new();
+    static List<(string DrawDate, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)>      _mm = new();
     static List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)>          _d3 = new();
     static List<(string DrawDate, int[] Numbers, DrawPrizeTier[] Prizes)>                          _d4 = new();
     static List<(string DrawDate, int[] Horses, string RaceTime, DrawPrizeTier[] Prizes)>          _dd = new();
@@ -46,7 +49,7 @@ public static class ResultsPageCls
 
     public static void ClearCache()
     {
-        _f5.Clear(); _sl.Clear(); _pb.Clear(); _d3.Clear(); _d4.Clear(); _dd.Clear();
+        _f5.Clear(); _sl.Clear(); _pb.Clear(); _mm.Clear(); _d3.Clear(); _d4.Clear(); _dd.Clear();
         _loaded = false;
     }
 
@@ -55,13 +58,15 @@ public static class ResultsPageCls
         var f5Task = GetDataEntry.GetPastDraws(30);
         var slTask = GetDataEntry.GetSuperLottoDraws(30);
         var pbTask = GetDataEntry.GetPowerballDraws(30);
+        var mmTask = GetDataEntry.GetMegaMillionsDraws(30);
         var d3Task = GetDataEntry.GetDaily3Draws(50);
         var d4Task = GetDataEntry.GetDaily4Draws(50);
         var ddTask = GetDataEntry.GetDailyDerbyDraws(50);
-        await Task.WhenAll(f5Task, slTask, pbTask, d3Task, d4Task, ddTask);
+        await Task.WhenAll(f5Task, slTask, pbTask, mmTask, d3Task, d4Task, ddTask);
         _f5 = f5Task.Result;
         _sl = slTask.Result;
         _pb = pbTask.Result;
+        _mm = mmTask.Result;
         _d3 = d3Task.Result;
         _d4 = d4Task.Result;
         _dd = ddTask.Result;
@@ -179,6 +184,45 @@ public static class ResultsPageCls
             (2, true)  => "~$7",
             (1, true)  => "~$4",
             (0, true)  => "~$4",
+            _          => ""
+        };
+    }
+
+    static string MMPrize(int main, bool mb, DrawPrizeTier[] prizes)
+    {
+        if (prizes.Length > 0)
+        {
+            int tier = (main, mb) switch
+            {
+                (5, true)  => 1,
+                (5, false) => 2,
+                (4, true)  => 3,
+                (4, false) => 4,
+                (3, true)  => 5,
+                (3, false) => 6,
+                (2, true)  => 7,
+                (1, true)  => 8,
+                (0, true)  => 9,
+                _          => 0
+            };
+            if (tier > 0)
+            {
+                var p = prizes.FirstOrDefault(x => x.Tier == tier);
+                if (p != null)
+                    return p.Amount > 0 ? FormatPrize(p.Amount) : (tier == 1 ? "JACKPOT" : "Free Ticket");
+            }
+        }
+        return (main, mb) switch
+        {
+            (5, true)  => "JACKPOT*",
+            (5, false) => "~$1,000,000",
+            (4, true)  => "~$10,000",
+            (4, false) => "~$500",
+            (3, true)  => "~$200",
+            (3, false) => "~$10",
+            (2, true)  => "~$10",
+            (1, true)  => "~$4",
+            (0, true)  => "~$2",
             _          => ""
         };
     }
@@ -332,6 +376,19 @@ public static class ResultsPageCls
         return $"${amount:N0}";
     }
 
+    // ── Check whether any sets are saved (and game is not excluded) ──────────
+
+    public static bool IsGameExcluded(string exclKey) =>
+        Preferences.Get($"excl_game_{exclKey}", false);
+
+    public static bool HasSets(string prefix) =>
+        !IsGameExcluded(prefix) &&
+        Enumerable.Range(0, 10).Any(s => !string.IsNullOrEmpty(Preferences.Get($"{prefix}_set_{s}", "")));
+
+    public static bool HasDDSets() =>
+        !IsGameExcluded("dd") &&
+        Enumerable.Range(0, 10).Any(s => !string.IsNullOrEmpty(Preferences.Get($"dd_set_{s}", "")));
+
     // ── Read non-empty sets from Preferences ─────────────────────────────────
 
     static List<(int slot, string[][] rows)> ReadSets(string prefix, int cols)
@@ -339,6 +396,7 @@ public static class ResultsPageCls
         var result = new List<(int, string[][])>();
         for (int s = 0; s < 10; s++)
         {
+            if (Preferences.Get($"excl_set_{prefix}_{s}", false)) continue;
             var data = Preferences.Get($"{prefix}_set_{s}", "");
             if (string.IsNullOrEmpty(data)) continue;
 
@@ -366,6 +424,7 @@ public static class ResultsPageCls
         var result = new List<(int, (int, int, int, string)[])>();
         for (int s = 0; s < 10; s++)
         {
+            if (Preferences.Get($"excl_set_dd_{s}", false)) continue;
             var data = Preferences.Get($"dd_set_{s}", "");
             if (string.IsNullOrEmpty(data)) continue;
 
@@ -453,6 +512,23 @@ public static class ResultsPageCls
             result.PBBall = pbDraw.PBNumber;
             if (string.IsNullOrEmpty(result.DateLabel))
                 result.DateLabel = pbDraw.DrawDate;
+        }
+
+        // ── Find MM draw on or before selected date ──────────────────────────
+        var mmDraw = _mm
+            .Select(d => (
+                Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
+                d.DrawDate, d.MainNumbers, d.MegaNumber, d.Prizes))
+            .Where(d => d.Date != DateTime.MinValue && d.Date.Date <= date.Date)
+            .OrderByDescending(d => d.Date)
+            .FirstOrDefault();
+
+        if (mmDraw.MainNumbers != null)
+        {
+            result.MMMain = mmDraw.MainNumbers;
+            result.MMBall = mmDraw.MegaNumber;
+            if (string.IsNullOrEmpty(result.DateLabel))
+                result.DateLabel = mmDraw.DrawDate;
         }
 
         // ── Find D3 draws on or before selected date ─────────────────────────
@@ -592,6 +668,41 @@ public static class ResultsPageCls
                     result.Winners.Add(new WinnerEntry
                     {
                         Game       = "PB",
+                        SetNumber  = slot + 1,
+                        RowNumber  = r + 1,
+                        Numbers    = numsDisplay,
+                        MatchLabel = matchLabel,
+                        Prize      = prize
+                    });
+                }
+            }
+        }
+
+        // ── Check MM sets ────────────────────────────────────────────────────
+        if (result.MMMain.Length == 5)
+        {
+            var mainSet = new HashSet<int>(result.MMMain);
+            var prizes  = mmDraw.Prizes ?? Array.Empty<DrawPrizeTier>();
+
+            foreach (var (slot, rows) in ReadSets("mm", 6))
+            {
+                for (int r = 0; r < Rows; r++)
+                {
+                    if (!RowAllFilled(rows[r])) continue;
+                    var nums        = rows[r].Select(int.Parse).ToArray();
+                    int mainMatches = nums.Take(5).Count(n => mainSet.Contains(n));
+                    bool mbMatch    = nums.Length == 6 && result.MMBall > 0 && nums[5] == result.MMBall;
+
+                    string prize = MMPrize(mainMatches, mbMatch, prizes);
+                    if (string.IsNullOrEmpty(prize)) continue;
+
+                    string matchLabel  = mbMatch ? $"{mainMatches}+MB" : $"{mainMatches}/5";
+                    string numsDisplay = string.Join("  ", nums.Take(5).Select(n => n.ToString("D2")))
+                                        + "  |MB:" + nums[5].ToString("D2");
+
+                    result.Winners.Add(new WinnerEntry
+                    {
+                        Game       = "MM",
                         SetNumber  = slot + 1,
                         RowNumber  = r + 1,
                         Numbers    = numsDisplay,

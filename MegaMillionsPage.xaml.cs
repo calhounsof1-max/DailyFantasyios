@@ -2,48 +2,54 @@ using DailyFantasyMAUI.Services;
 
 namespace DailyFantasyMAUI;
 
-public partial class WinnerPage : ContentPage
+public partial class MegaMillionsPage : ContentPage
 {
-    const int Rows = 10;
-    const int Cols = 5;
+    const int Rows      = 10;
+    const int MainCols  = 5;
+    const int MBCol     = 5;
+    const int TotalCols = 6;
+
+    // Mega Millions: 5 from 1-70, Mega Ball 1-24
+    const int MainMax = 70;
+    const int MBMax   = 24;
 
     readonly Border[] _wBorders;
     readonly Label[]  _wLabels;
 
-    // [row, col] entries and per-row result label
-    readonly Entry[,] _entries  = new Entry[Rows, Cols];
-    readonly Label[]  _results  = new Label[Rows];
-    int _activeSlot = -1;
+    readonly Entry[,] _entries = new Entry[Rows, TotalCols];
+    readonly Label[]  _results = new Label[Rows];
+    int  _activeSlot = -1;
     bool _suppressPickerEvent = false;
     bool _suppressExcl = false;
     readonly Dictionary<int, string> _slotCache = new();
     View? _highlightedView;
 
-    int[] _winningNumbers = Array.Empty<int>();
-    List<(DateTime Date, string Label, int[] Numbers)> _allDraws = new();
+    int[] _winningMainNums = Array.Empty<int>();
+    int   _winningMB       = 0;
+    List<(DateTime Date, string Label, int[] MainNumbers, int MBNumber)> _allDraws = new();
     bool _drawsLoaded = false;
-    bool _isPanning = false;
+    bool _isPanning   = false;
     bool _voiceOn = false;
     bool _voiceSettingText = false;
     int  _voiceRow = 0, _voiceCol = 0;
     Entry? _voiceTarget = null;
     Color _voiceTargetOldColor = Colors.White;
 
-    internal static string ComingFrom { get; set; } = "main";
+    // "pb" = came via carousel from Powerball; "main" = navigated directly
+    internal static string ComingFrom { get; set; } = "pb";
 
-    public WinnerPage()
+    public MegaMillionsPage()
     {
         InitializeComponent();
-
         _wBorders = new[] { W1, W2, W3, W4, W5 };
         _wLabels  = new[] { lblW1, lblW2, lblW3, lblW4, lblW5 };
-
         BuildRows();
         BuildSlotPicker();
     }
 
-    double _panLeft;  // most-negative TotalX this gesture
-    double _panRight; // most-positive TotalX this gesture
+    // ── Pan gesture ──────────────────────────────────────────────────────────
+
+    double _panLeft, _panRight;
 
     private async void OnPagePan(object? sender, PanUpdatedEventArgs e)
     {
@@ -59,20 +65,18 @@ public partial class WinnerPage : ContentPage
                 break;
             case GestureStatus.Completed:
             case GestureStatus.Canceled:
-                if (_panLeft < -40) // left → go to SL
+                if (_panLeft < -40)
                 {
                     _isPanning = true;
-                    SuperLottoPage.ComingFrom = "f5";
-                    AppShell.SuperLottoPageInstance.PrePosition(true);
-                    await Shell.Current.GoToAsync(nameof(SuperLottoPage), false);
+                    Daily3Page.ComingFrom = "mm";
+                    AppShell.Daily3PageInstance.PrePosition(true);
+                    await Shell.Current.GoToAsync(nameof(Daily3Page), false);
                     _isPanning = false;
                 }
-                else if (_panRight > 40) // right → go back to MainPage
+                else if (_panRight > 40)
                 {
                     _isPanning = true;
-                    double w = DeviceDisplay.MainDisplayInfo.Width / DeviceDisplay.MainDisplayInfo.Density;
-                    Shell.Current.CurrentPage.TranslationX = -w; // pre-position MainPage
-                    await Shell.Current.GoToAsync("..", false);
+                    await GoBackAsync();
                     _isPanning = false;
                 }
                 _panLeft = _panRight = 0;
@@ -82,26 +86,45 @@ public partial class WinnerPage : ContentPage
 
     protected override bool OnBackButtonPressed()
     {
-        _ = GoBackWithSlide();
-        return true; // prevent default Shell back (no animation)
+        _ = GoBackAsync();
+        return true;
     }
 
-    private async Task GoBackWithSlide()
+    private async Task GoBackAsync()
     {
-        if (_isPanning) return;
-        double w = DeviceDisplay.MainDisplayInfo.Width / DeviceDisplay.MainDisplayInfo.Density;
-        Shell.Current.CurrentPage.TranslationX = -w; // pre-position MainPage from left
+        if (ComingFrom == "pb" || ComingFrom == "main")
+        {
+            if (ComingFrom == "pb")
+                AppShell.PowerballPageInstance.PrePosition(false);
+            else
+            {
+                double w = DeviceDisplay.MainDisplayInfo.Width / DeviceDisplay.MainDisplayInfo.Density;
+                Shell.Current.CurrentPage.TranslationX = -w;
+            }
+        }
+        else
+        {
+            double w = DeviceDisplay.MainDisplayInfo.Width / DeviceDisplay.MainDisplayInfo.Density;
+            Shell.Current.CurrentPage.TranslationX = -w;
+        }
         await Shell.Current.GoToAsync("..", false);
     }
 
-    private async void BtnGoHome_Clicked(object sender, EventArgs e) => await GoBackWithSlide();
+    private async void BtnGoHome_Clicked(object sender, EventArgs e) =>
+        await Shell.Current.Navigation.PopToRootAsync(false);
 
-    private async void BtnGoSL_Clicked(object sender, EventArgs e)
+    private async void BtnGoBack_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;
-        SuperLottoPage.ComingFrom = "f5";
-        AppShell.SuperLottoPageInstance.PrePosition(true);
-        await Shell.Current.GoToAsync(nameof(SuperLottoPage), false);
+        await GoBackAsync();
+    }
+
+    private async void BtnGoD3_Clicked(object sender, EventArgs e)
+    {
+        if (_isPanning) return;
+        Daily3Page.ComingFrom = "mm";
+        AppShell.Daily3PageInstance.PrePosition(true);
+        await Shell.Current.GoToAsync(nameof(Daily3Page), false);
     }
 
     internal void PrePosition(bool fromRight)
@@ -112,30 +135,41 @@ public partial class WinnerPage : ContentPage
 
     protected override void OnAppearing()
     {
-        // TranslationX was pre-set by PrePosition before navigation — just animate in
         this.TranslateTo(0, 0, 220, Easing.CubicOut);
-
-        btnBack.Text = ComingFrom == "results" ? "← RESULTS" : "← HOME";
-
+        if (ComingFrom == "results")
+        {
+            btnBack.Text = "← RESULTS";
+            btnBack.BackgroundColor = Color.FromArgb("#FF8F00");
+        }
+        else if (ComingFrom == "main")
+        {
+            btnBack.Text = "← HOME";
+            btnBack.BackgroundColor = Color.FromArgb("#FF8F00");
+        }
+        else
+        {
+            btnBack.Text = "← PB";
+            btnBack.BackgroundColor = Color.FromArgb("#C62828");
+        }
         base.OnAppearing();
         _ = LoadAllDraws();
         Dispatcher.Dispatch(() =>
         {
             int pendingRow = -1;
-            if (PendingHighlight.HasPending && PendingHighlight.Game == "F5")
+            if (PendingHighlight.HasPending && PendingHighlight.Game == "MM")
             {
                 _activeSlot = PendingHighlight.Slot;
                 pendingRow  = PendingHighlight.Row;
                 PendingHighlight.Clear();
-                Preferences.Set("f5_active_slot", _activeSlot);
+                Preferences.Set("mm_active_slot", _activeSlot);
                 FillFromSlot(_activeSlot);
             }
             else
             {
-                _activeSlot = Preferences.Get("f5_active_slot", -1);
+                _activeSlot = Preferences.Get("mm_active_slot", -1);
                 if (_activeSlot < 0)
                 {
-                    var current = Preferences.Get("f5_entries", "");
+                    var current = Preferences.Get("mm_entries", "");
                     if (!string.IsNullOrEmpty(current))
                     {
                         for (int i = 0; i < 10; i++)
@@ -167,63 +201,67 @@ public partial class WinnerPage : ContentPage
         if (_highlightedView != null) { _highlightedView.BackgroundColor = Colors.White; _highlightedView = null; }
         SaveEntries();
         if (_activeSlot >= 0)
-            Preferences.Set("f5_active_slot", _activeSlot);
+            Preferences.Set("mm_active_slot", _activeSlot);
     }
+
+    // ── Entry persistence ────────────────────────────────────────────────────
 
     private void SaveEntries()
     {
-        var vals = new string[Rows * Cols];
+        var vals = new string[Rows * TotalCols];
         for (int r = 0; r < Rows; r++)
-            for (int c = 0; c < Cols; c++)
-                vals[r * Cols + c] = _entries[r, c].Text ?? "";
-        Preferences.Set("f5_entries", string.Join("|", vals));
+            for (int c = 0; c < TotalCols; c++)
+                vals[r * TotalCols + c] = _entries[r, c].Text ?? "";
+        Preferences.Set("mm_entries", string.Join("|", vals));
     }
 
     private void LoadEntries()
     {
-        var saved = Preferences.Get("f5_entries", "");
+        var saved = Preferences.Get("mm_entries", "");
         if (string.IsNullOrEmpty(saved)) return;
         var vals = saved.Split('|');
         for (int r = 0; r < Rows; r++)
-            for (int c = 0; c < Cols; c++)
+            for (int c = 0; c < TotalCols; c++)
             {
-                int idx = r * Cols + c;
-                if (idx < vals.Length)
-                    _entries[r, c].Text = vals[idx];
+                int idx = r * TotalCols + c;
+                if (idx < vals.Length) _entries[r, c].Text = vals[idx];
             }
     }
 
-    // ── Set slots (save/load 10 named sets) ─────────────────────────────────
+    // ── Set slots ────────────────────────────────────────────────────────────
 
-    private string SetKey(int slot) => $"f5_set_{slot}";
+    private string SetKey(int slot) => $"mm_set_{slot}";
 
     private string GetCurrentEntryString()
     {
-        var vals = new string[Rows * Cols];
+        var vals = new string[Rows * TotalCols];
         for (int r = 0; r < Rows; r++)
-            for (int c = 0; c < Cols; c++)
-                vals[r * Cols + c] = _entries[r, c].Text ?? "";
+            for (int c = 0; c < TotalCols; c++)
+                vals[r * TotalCols + c] = _entries[r, c].Text ?? "";
         return string.Join("|", vals);
     }
 
     private void ClearAllEntries()
     {
         for (int r = 0; r < Rows; r++)
-            for (int c = 0; c < Cols; c++)
-            {
-                _entries[r, c].Text = "";
-                _entries[r, c].BackgroundColor = Color.FromArgb("#F5F5F5");
-            }
+        {
+            for (int c = 0; c < MainCols; c++)
+                { _entries[r, c].Text = ""; _entries[r, c].BackgroundColor = Color.FromArgb("#FFF8E1"); }
+            _entries[r, MBCol].Text = "";
+            _entries[r, MBCol].BackgroundColor = Color.FromArgb("#E3F2FD");
+        }
         foreach (var lbl in _results) lbl.Text = "";
     }
 
     private void ClearRow(int r)
     {
-        for (int c = 0; c < Cols; c++)
+        for (int c = 0; c < MainCols; c++)
         {
             _entries[r, c].Text = "";
-            _entries[r, c].BackgroundColor = Color.FromArgb("#F5F5F5");
+            _entries[r, c].BackgroundColor = Color.FromArgb("#FFF8E1");
         }
+        _entries[r, MBCol].Text = "";
+        _entries[r, MBCol].BackgroundColor = Color.FromArgb("#E3F2FD");
         _results[r].Text = "";
         SaveEntries();
     }
@@ -232,10 +270,8 @@ public partial class WinnerPage : ContentPage
     {
         string data = GetCurrentEntryString();
         bool isEmpty = data.Replace("|", "").Trim().Length == 0;
-        if (isEmpty)
-            Preferences.Remove(SetKey(slot));   // saving empty clears the slot
-        else
-            Preferences.Set(SetKey(slot), data);
+        if (isEmpty) Preferences.Remove(SetKey(slot));
+        else         Preferences.Set(SetKey(slot), data);
         UpdateSlotPicker();
     }
 
@@ -245,9 +281,9 @@ public partial class WinnerPage : ContentPage
         if (string.IsNullOrEmpty(saved)) return;
         var vals = saved.Split('|');
         for (int r = 0; r < Rows; r++)
-            for (int c = 0; c < Cols; c++)
+            for (int c = 0; c < TotalCols; c++)
             {
-                int idx = r * Cols + c;
+                int idx = r * TotalCols + c;
                 _entries[r, c].Text = idx < vals.Length ? vals[idx] : "";
             }
         CheckAll();
@@ -256,22 +292,13 @@ public partial class WinnerPage : ContentPage
     private bool SlotHasData(int slot) =>
         !string.IsNullOrEmpty(Preferences.Get(SetKey(slot), ""));
 
-    private bool IsCurrentSaved()
-    {
-        string current = GetCurrentEntryString();
-        if (current.Replace("|", "").Trim().Length == 0) return true;
-        for (int i = 0; i < 10; i++)
-            if (Preferences.Get(SetKey(i), "") == current) return true;
-        return false;
-    }
-
     private void BuildSlotPicker()
     {
         for (int i = 0; i < 10; i++)
             slotPicker.Items.Add(SlotLabel(i));
     }
 
-    private string ExclKey(int slot) => $"excl_set_f5_{slot}";
+    private string ExclKey(int slot) => $"excl_set_mm_{slot}";
 
     private string SlotLabel(int slot)
     {
@@ -313,21 +340,20 @@ public partial class WinnerPage : ContentPage
         if (_activeSlot >= 0)
             _slotCache[_activeSlot] = GetCurrentEntryString();
         _activeSlot = slot;
-        Preferences.Set("f5_active_slot", slot);
+        Preferences.Set("mm_active_slot", slot);
         ClearAllEntries();
         if (_slotCache.TryGetValue(slot, out var cached))
         {
             var vals = cached.Split('|');
             for (int r = 0; r < Rows; r++)
-                for (int c = 0; c < Cols; c++)
+                for (int c = 0; c < TotalCols; c++)
                 {
-                    int idx = r * Cols + c;
+                    int idx = r * TotalCols + c;
                     _entries[r, c].Text = idx < vals.Length ? vals[idx] : "";
                 }
             CheckAll();
         }
-        else if (SlotHasData(slot))
-            FillFromSlot(slot);
+        else if (SlotHasData(slot)) FillFromSlot(slot);
         UpdateSlotPicker();
     }
 
@@ -341,13 +367,15 @@ public partial class WinnerPage : ContentPage
             {
                 ColumnDefinitions =
                 {
-                    new ColumnDefinition(GridLength.Auto),   // row # label
-                    new ColumnDefinition(GridLength.Star),
-                    new ColumnDefinition(GridLength.Star),
-                    new ColumnDefinition(GridLength.Star),
-                    new ColumnDefinition(GridLength.Star),
-                    new ColumnDefinition(GridLength.Star),
-                    new ColumnDefinition(GridLength.Auto),   // result label
+                    new ColumnDefinition(GridLength.Auto),    // row number
+                    new ColumnDefinition(GridLength.Star),    // main 1
+                    new ColumnDefinition(GridLength.Star),    // main 2
+                    new ColumnDefinition(GridLength.Star),    // main 3
+                    new ColumnDefinition(GridLength.Star),    // main 4
+                    new ColumnDefinition(GridLength.Star),    // main 5
+                    new ColumnDefinition(new GridLength(4)),  // separator
+                    new ColumnDefinition(GridLength.Star),    // mega ball
+                    new ColumnDefinition(GridLength.Auto),    // result
                 },
                 ColumnSpacing = 4,
                 BackgroundColor = Colors.White,
@@ -355,13 +383,12 @@ public partial class WinnerPage : ContentPage
                 Padding = new Thickness(4, 2),
             };
 
-            // Row number — tap to clear this row
             int rowIdx = r;
             var rowNum = new Label
             {
                 Text = $"{r + 1,2}.",
                 FontSize = 13,
-                TextColor = Color.FromArgb("#FF7043"),
+                TextColor = Color.FromArgb("#F57F17"),
                 VerticalOptions = LayoutOptions.Center,
                 WidthRequest = 24,
             };
@@ -372,68 +399,90 @@ public partial class WinnerPage : ContentPage
             Grid.SetColumn(rowNum, 0);
             row.Children.Add(rowNum);
 
-            // 5 Entry boxes
-            for (int c = 0; c < Cols; c++)
+            // 5 main entry boxes
+            for (int c = 0; c < MainCols; c++)
             {
-                var entry = new Entry
-                {
-                    Keyboard = Keyboard.Numeric,
-                    FontSize = 18,
-                    FontAttributes = FontAttributes.Bold,
-                    TextColor = Colors.Black,
-                    BackgroundColor = Color.FromArgb("#F5F5F5"),
-                    HorizontalTextAlignment = TextAlignment.Center,
-                    HeightRequest = 44,
-                    MaxLength = 2,
-                };
-                entry.HandlerChanged += ForceBlackText;
-                AttachMaxClamp(entry, 39);
-
-                // Capture row/col for the lambda
+                var entry = MakeEntry(Color.FromArgb("#FFF8E1"));
+                AttachMaxClamp(entry, MainMax);
                 int row_ = r, col_ = c;
                 entry.TextChanged += (_, _) =>
                 {
-                    if (!_voiceSettingText && _entries[row_, col_].Text?.Length == 2)
-                        AdvanceFocus(row_, col_);
+                    if (!_voiceSettingText && _entries[row_, col_].Text?.Length == 2) AdvanceFocus(row_, col_);
                     SaveEntries();
-                    // Auto-check once all 5 entries in the row are filled
-                    bool rowFull = true;
-                    for (int ci = 0; ci < Cols; ci++)
-                        if (string.IsNullOrEmpty(_entries[row_, ci].Text)) { rowFull = false; break; }
-                    if (rowFull) CheckAll();
+                    if (IsRowFull(row_)) CheckAll();
                 };
-
                 _entries[r, c] = entry;
                 Grid.SetColumn(entry, c + 1);
                 row.Children.Add(entry);
             }
 
+            // Thin separator (blue for Mega Ball)
+            var sep = new BoxView { BackgroundColor = Color.FromArgb("#1565C0"), WidthRequest = 2, VerticalOptions = LayoutOptions.Fill, Margin = new Thickness(1, 4) };
+            Grid.SetColumn(sep, 6);
+            row.Children.Add(sep);
+
+            // Mega Ball entry
+            var mbEntry = MakeEntry(Color.FromArgb("#E3F2FD"));
+            AttachMaxClamp(mbEntry, MBMax);
+            int mrow = r;
+            mbEntry.TextChanged += (_, _) =>
+            {
+                if (!_voiceSettingText && _entries[mrow, MBCol].Text?.Length == 2) AdvanceFocus(mrow, MBCol);
+                SaveEntries();
+                if (IsRowFull(mrow)) CheckAll();
+            };
+            _entries[r, MBCol] = mbEntry;
+            Grid.SetColumn(mbEntry, 7);
+            row.Children.Add(mbEntry);
+
             // Result label
             var result = new Label
             {
                 Text = "",
-                FontSize = 13,
+                FontSize = 12,
                 FontAttributes = FontAttributes.Bold,
                 TextColor = Color.FromArgb("#888"),
                 VerticalOptions = LayoutOptions.Center,
-                WidthRequest = 36,
+                WidthRequest = 40,
                 HorizontalTextAlignment = TextAlignment.Center,
             };
             _results[r] = result;
-            Grid.SetColumn(result, 6);
+            Grid.SetColumn(result, 8);
             row.Children.Add(result);
 
             rowsContainer.Children.Add(row);
         }
     }
 
+    private Entry MakeEntry(Color bg)
+    {
+        var e = new Entry
+        {
+            Keyboard = Keyboard.Numeric,
+            FontSize = 18,
+            FontAttributes = FontAttributes.Bold,
+            TextColor = Colors.Black,
+            BackgroundColor = bg,
+            HorizontalTextAlignment = TextAlignment.Center,
+            HeightRequest = 44,
+            MaxLength = 2,
+        };
+        e.HandlerChanged += ForceBlackText;
+        return e;
+    }
+
+    private bool IsRowFull(int r)
+    {
+        for (int c = 0; c < TotalCols; c++)
+            if (string.IsNullOrEmpty(_entries[r, c].Text)) return false;
+        return true;
+    }
+
     private void AdvanceFocus(int row, int col)
     {
-        int nextCol = col + 1;
-        int nextRow = row;
-        if (nextCol >= Cols) { nextCol = 0; nextRow = row + 1; }
-        if (nextRow < Rows)
-            _entries[nextRow, nextCol].Focus();
+        if (col < MainCols - 1) { _entries[row, col + 1].Focus(); return; }
+        if (col == MainCols - 1) { _entries[row, MBCol].Focus(); return; }
+        if (row + 1 < Rows) _entries[row + 1, 0].Focus();
     }
 
     static void AttachMaxClamp(Entry entry, int max)
@@ -479,40 +528,10 @@ public partial class WinnerPage : ContentPage
         _highlightedView = null;
     }
 
-    // ── WebView-based fetch (bypasses server bot detection) ──────────────────
-
-    private Task<string?> FetchViaWebView(string url)
-    {
-        var tcs = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        EventHandler<WebNavigatedEventArgs>? handler = null;
-        handler = async (s, e) =>
-        {
-            fetchView.Navigated -= handler;
-            if (e.Result == WebNavigationResult.Success)
-            {
-                try
-                {
-                    var raw = await fetchView.EvaluateJavaScriptAsync(
-                        "(function(){var p=document.querySelector('pre');return p?p.textContent:(document.body.innerText||document.body.textContent||'');})()");
-                    if (raw != null && raw.Length > 1 && raw[0] == '"' && raw[^1] == '"')
-                        raw = System.Text.RegularExpressions.Regex.Unescape(raw[1..^1]);
-                    tcs.TrySetResult(raw);
-                }
-                catch { tcs.TrySetResult(null); }
-            }
-            else tcs.TrySetResult(null);
-        };
-        fetchView.Navigated += handler;
-        MainThread.BeginInvokeOnMainThread(() =>
-            fetchView.Source = new UrlWebViewSource { Url = url });
-        return tcs.Task.WaitAsync(TimeSpan.FromSeconds(45));
-    }
-
-    // ── Load all past draws and populate Picker ──────────────────────────────
+    // ── Fetch draws ──────────────────────────────────────────────────────────
 
     private async Task LoadAllDraws()
     {
-        // Re-fetch if today's draw hasn't been loaded yet (e.g. cached before 6:30pm draw)
         if (_drawsLoaded)
         {
             bool hasTodayDraw = _allDraws.Any(d => d.Date.Date == DateTime.Today);
@@ -525,7 +544,7 @@ public partial class WinnerPage : ContentPage
         spinner.IsRunning = true;
         lblDrawDate.Text = "Fetching draws from calottery.com...";
 
-        var raw = await GetDataEntry.GetPastDraws(30);
+        var raw = await GetDataEntry.GetMegaMillionsDraws(30);
 
         spinner.IsVisible = false;
         spinner.IsRunning = false;
@@ -533,11 +552,10 @@ public partial class WinnerPage : ContentPage
         if (raw.Count == 0)
         {
             string errMsg = string.IsNullOrEmpty(GetDataEntry.LastError)
-                ? "Fantasy5: Could not fetch — check internet connection"
-                : $"Fantasy5: {GetDataEntry.LastError}";
+                ? "Mega Millions: Could not fetch — check internet"
+                : $"Mega Millions: {GetDataEntry.LastError}";
             lblDrawDate.Text = errMsg;
             lblStatus.Text = errMsg;
-            _ = Logger.LogAsync(errMsg);
             return;
         }
 
@@ -545,13 +563,13 @@ public partial class WinnerPage : ContentPage
             .Select(d => (
                 Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
                 Label: d.DrawDate,
-                Numbers: d.Numbers))
+                MainNumbers: d.MainNumbers,
+                MBNumber:    d.MegaNumber))
             .Where(d => d.Date != DateTime.MinValue)
             .ToList();
 
         _drawsLoaded = true;
 
-        // Use today's draw only if the API actually returned it
         bool todayAvailable = _allDraws.Any(d => d.Date.Date == DateTime.Today);
         var defaultDraw = todayAvailable
             ? _allDraws.First()
@@ -563,7 +581,7 @@ public partial class WinnerPage : ContentPage
             drawDatePicker.MaximumDate = _allDraws.First().Date.Date;
             var targetDate = defaultDraw.Date != default ? defaultDraw.Date.Date : _allDraws.First().Date.Date;
             if (drawDatePicker.Date == targetDate)
-                ShowDrawForDate(targetDate); // DateSelected won't fire if date unchanged
+                ShowDrawForDate(targetDate);
             else
                 drawDatePicker.Date = targetDate;
         });
@@ -571,55 +589,75 @@ public partial class WinnerPage : ContentPage
 
     private void ShowDrawForDate(DateTime date)
     {
-        // Fall back to yesterday only if today's draw isn't in the API data yet
         bool todayAvailable = _allDraws.Any(d => d.Date.Date == DateTime.Today);
         if (date.Date == DateTime.Today && !todayAvailable)
             date = date.AddDays(-1);
 
-        // Find the closest completed draw on or before the selected date
         var match = _allDraws.FirstOrDefault(d => d.Date.Date <= date.Date);
-        if (match.Numbers == null) return;
+        if (match.MainNumbers == null) return;
 
-        _winningNumbers = match.Numbers;
+        _winningMainNums = match.MainNumbers;
+        _winningMB       = match.MBNumber;
         lblDrawDate.Text = match.Label;
+
         for (int i = 0; i < _wLabels.Length; i++)
-            _wLabels[i].Text = match.Numbers[i].ToString();
+            _wLabels[i].Text = match.MainNumbers[i].ToString();
+        lblWMB.Text = match.MBNumber.ToString();
+
         CheckAll();
     }
 
     private void DrawDatePicker_DateSelected(object sender, DateChangedEventArgs e) =>
         ShowDrawForDate(e.NewDate ?? DateTime.Today);
 
-    // ── Check all rows ───────────────────────────────────────────────────────
+    // ── Check ────────────────────────────────────────────────────────────────
 
     private void CheckAll()
     {
-        if (_winningNumbers.Length == 0) return;
-        var winSet = new HashSet<int>(_winningNumbers);
+        if (_winningMainNums.Length == 0) return;
+        var mainSet = new HashSet<int>(_winningMainNums);
 
         for (int r = 0; r < Rows; r++)
         {
-            int matchCount = 0;
-            for (int c = 0; c < Cols; c++)
+            int mainMatches = 0;
+            bool mbMatch    = false;
+
+            for (int c = 0; c < MainCols; c++)
             {
-                if (int.TryParse(_entries[r, c].Text, out int n) && winSet.Contains(n))
+                if (int.TryParse(_entries[r, c].Text, out int n) && mainSet.Contains(n))
                 {
-                    _entries[r, c].BackgroundColor = Color.FromArgb("#F9A825"); // gold = match
-                    matchCount++;
+                    _entries[r, c].BackgroundColor = Color.FromArgb("#F9A825");
+                    mainMatches++;
                 }
                 else
                 {
-                    bool hasValue = !string.IsNullOrWhiteSpace(_entries[r, c].Text);
-                    _entries[r, c].BackgroundColor = hasValue
-                        ? Color.FromArgb("#FFCDD2")   // red-tint = no match
-                        : Color.FromArgb("#F5F5F5");   // grey = empty
+                    bool hasVal = !string.IsNullOrWhiteSpace(_entries[r, c].Text);
+                    _entries[r, c].BackgroundColor = hasVal ? Color.FromArgb("#FFCDD2") : Color.FromArgb("#FFF8E1");
                 }
             }
 
-            _results[r].Text = matchCount > 0 ? $"{matchCount}/5" : "";
-            _results[r].TextColor = matchCount >= 3
-                ? Color.FromArgb("#2E7D32")
-                : Color.FromArgb("#C62828");
+            if (int.TryParse(_entries[r, MBCol].Text, out int mb) && _winningMB > 0 && mb == _winningMB)
+            {
+                _entries[r, MBCol].BackgroundColor = Color.FromArgb("#F9A825");
+                mbMatch = true;
+            }
+            else
+            {
+                bool hasVal = !string.IsNullOrWhiteSpace(_entries[r, MBCol].Text);
+                _entries[r, MBCol].BackgroundColor = hasVal ? Color.FromArgb("#FFCDD2") : Color.FromArgb("#E3F2FD");
+            }
+
+            // Mega Millions has a prize if MB matches OR main >= 3
+            bool hasPrize = mbMatch || mainMatches >= 3;
+            if (mainMatches > 0 || mbMatch)
+            {
+                _results[r].Text = mbMatch ? $"{mainMatches}+MB" : $"{mainMatches}/5";
+                _results[r].TextColor = hasPrize ? Color.FromArgb("#E65100") : Color.FromArgb("#888888");
+            }
+            else
+            {
+                _results[r].Text = "";
+            }
         }
     }
 
@@ -662,13 +700,14 @@ public partial class WinnerPage : ContentPage
         for (int r = 0; r < Rows && filled < max; r++)
         {
             bool empty = true;
-            for (int c = 0; c < Cols; c++)
+            for (int c = 0; c < TotalCols; c++)
                 if (!string.IsNullOrEmpty(_entries[r, c].Text)) { empty = false; break; }
             if (!empty) continue;
 
-            var nums = Enumerable.Range(1, 39).OrderBy(_ => rng.Next()).Take(Cols).OrderBy(n => n).ToList();
-            for (int c = 0; c < Cols; c++)
-                _entries[r, c].Text = nums[c].ToString();
+            var main = Enumerable.Range(1, MainMax).OrderBy(_ => rng.Next()).Take(MainCols).OrderBy(n => n).ToList();
+            for (int c = 0; c < MainCols; c++)
+                _entries[r, c].Text = main[c].ToString();
+            _entries[r, MBCol].Text = rng.Next(1, MBMax + 1).ToString();
             filled++;
         }
 
@@ -686,22 +725,15 @@ public partial class WinnerPage : ContentPage
     {
         bool confirm = await DisplayAlert("Clear All Sets", "Remove all 10 saved sets?", "Yes", "Cancel");
         if (!confirm) return;
-
-        for (int i = 0; i < 10; i++)
-            Preferences.Remove(SetKey(i));
-
+        for (int i = 0; i < 10; i++) Preferences.Remove(SetKey(i));
         ClearAllEntries();
         UpdateSlotPicker();
-
         if (sender is Button btn)
         {
-            var orig = btn.Text;
-            var origColor = btn.BackgroundColor;
-            btn.Text = "Cleared";
-            btn.BackgroundColor = Color.FromArgb("#1B5E20");
+            var orig = btn.Text; var origColor = btn.BackgroundColor;
+            btn.Text = "Cleared"; btn.BackgroundColor = Color.FromArgb("#1B5E20");
             await Task.Delay(1200);
-            btn.Text = orig;
-            btn.BackgroundColor = origColor;
+            btn.Text = orig; btn.BackgroundColor = origColor;
         }
     }
 
@@ -715,9 +747,8 @@ public partial class WinnerPage : ContentPage
 
     void StartVoice()
     {
-        // Find first empty cell
         _voiceRow = 0; _voiceCol = 0;
-        VoiceSkipFilled(Cols);
+        VoiceSkipFilled();
         if (_voiceRow >= Rows) { lblStatus.Text = "No empty cells"; return; }
         _voiceOn = true;
         btnVoice.BackgroundColor = Colors.Red;
@@ -765,14 +796,15 @@ public partial class WinnerPage : ContentPage
         foreach (int n in nums)
         {
             if (_voiceRow >= Rows) { StopVoice(); return; }
-            if (n >= 1 && n <= 39)
+            int maxForCol = _voiceCol < MainCols ? MainMax : MBMax;
+            if (n >= 1 && n <= maxForCol)
             {
                 _voiceSettingText = true;
                 _entries[_voiceRow, _voiceCol].Text = n.ToString();
                 _voiceSettingText = false;
                 _voiceCol++;
-                if (_voiceCol >= Cols) { _voiceCol = 0; _voiceRow++; }
-                VoiceSkipFilled(Cols);
+                if (_voiceCol >= TotalCols) { _voiceCol = 0; _voiceRow++; }
+                VoiceSkipFilled();
             }
         }
         CheckAll(); SaveEntries();
@@ -781,12 +813,12 @@ public partial class WinnerPage : ContentPage
             lblStatus.Text = $"🔴 Listening | row {_voiceRow + 1} col {_voiceCol + 1}";
     }
 
-    void VoiceSkipFilled(int totalCols)
+    void VoiceSkipFilled()
     {
         while (_voiceRow < Rows && !string.IsNullOrEmpty(_entries[_voiceRow, _voiceCol].Text))
         {
             _voiceCol++;
-            if (_voiceCol >= totalCols) { _voiceCol = 0; _voiceRow++; }
+            if (_voiceCol >= TotalCols) { _voiceCol = 0; _voiceRow++; }
         }
     }
 
@@ -798,7 +830,7 @@ public partial class WinnerPage : ContentPage
         {
             SaveEntries();
             await MyFavoritePage.SaveCurrentToMyFavoriteAsync(
-                "Fantasy 5", "f5_set_", _activeSlot < 0 ? 0 : _activeSlot, GetCurrentEntryString());
+                "Mega Millions", "mm_set_", _activeSlot < 0 ? 0 : _activeSlot, GetCurrentEntryString());
             return;
         }
         // Cache current slot then flush all cached slots
@@ -824,5 +856,4 @@ public partial class WinnerPage : ContentPage
             btn.Text = orig; btn.BackgroundColor = origColor;
         }
     }
-
 }

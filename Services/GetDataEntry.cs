@@ -13,6 +13,8 @@ namespace DailyFantasyMAUI.Services
         const int    PBGameId     = 12;
         const int    D4GameId     = 14;
         const int    DDGameId     = 11;
+        const string PrefMMGameId = "mm_game_id";
+        const int    DefaultMMId  = 4;
 
         // ── Cache helpers (data folder txt files) ────────────────────────────
 
@@ -150,6 +152,28 @@ namespace DailyFantasyMAUI.Services
                 var main = parts[1].Split(',').Select(s => int.TryParse(s, out int n) ? n : -1).Where(n => n >= 0).ToArray();
                 if (main.Length != 5 || !int.TryParse(parts[2], out int mega)) continue;
                 results.Add((parts[0], main, mega, Array.Empty<DrawPrizeTier>()));
+            }
+            return results;
+        }
+
+        static void SaveMMCache(IEnumerable<(string DrawDate, int[] MainNumbers, int MegaNumber)> draws)
+        {
+            var lines = draws.Take(10).Select(d => $"{d.DrawDate}\t{string.Join(",", d.MainNumbers)}\t{d.MegaNumber}");
+            File.WriteAllText(CacheFile("megamillions.txt"), string.Join("\n", lines));
+        }
+
+        static List<(string DrawDate, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> LoadMMCache()
+        {
+            var path = CacheFile("megamillions.txt");
+            var results = new List<(string, int[], int, DrawPrizeTier[])>();
+            if (!File.Exists(path)) return results;
+            foreach (var line in File.ReadAllLines(path))
+            {
+                var parts = line.Split('\t');
+                if (parts.Length != 3) continue;
+                var main = parts[1].Split(',').Select(s => int.TryParse(s, out int n) ? n : -1).Where(n => n >= 0).ToArray();
+                if (main.Length != 5 || !int.TryParse(parts[2], out int mm)) continue;
+                results.Add((parts[0], main, mm, Array.Empty<DrawPrizeTier>()));
             }
             return results;
         }
@@ -659,6 +683,135 @@ namespace DailyFantasyMAUI.Services
             return results;
         }
 
+        public static async Task<int> GetMegaMillionsGameId()
+        {
+            int cachedId = Preferences.Get(PrefMMGameId, DefaultMMId);
+            try
+            {
+                var url = $"https://www.calottery.com/api/DrawGameApi/DrawGamePastDrawResults/{cachedId}/1/1";
+                using var client = MakeClient(8);
+                var json = await client.GetStringAsync(url).ConfigureAwait(false);
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.ValueKind == JsonValueKind.Object &&
+                    doc.RootElement.TryGetProperty("Name", out var ne) &&
+                    ne.GetRawText().Trim('"').Contains("Mega", StringComparison.OrdinalIgnoreCase))
+                    return cachedId;
+            }
+            catch { }
+            return await ScanForMegaMillionsId();
+        }
+
+        private static async Task<int> ScanForMegaMillionsId()
+        {
+            int cachedId = Preferences.Get(PrefMMGameId, DefaultMMId);
+            for (int id = 1; id <= 30; id++)
+            {
+                if (id == cachedId) continue;
+                try
+                {
+                    var url = $"https://www.calottery.com/api/DrawGameApi/DrawGamePastDrawResults/{id}/1/1";
+                    using var client = MakeClient(6);
+                    var json = await client.GetStringAsync(url).ConfigureAwait(false);
+                    using var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.ValueKind == JsonValueKind.Object &&
+                        doc.RootElement.TryGetProperty("Name", out var ne) &&
+                        ne.GetRawText().Trim('"').Contains("Mega", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Preferences.Set(PrefMMGameId, id);
+                        _ = Logger.LogAsync($"MM: found game ID {id}");
+                        return id;
+                    }
+                }
+                catch { }
+            }
+            _ = Logger.LogAsync($"MM: could not find Mega Millions game ID, using {cachedId}");
+            return cachedId;
+        }
+
+        public static async Task<List<(string DrawDate, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)>> GetMegaMillionsDraws(
+            int count = 30, Func<string, Task<string?>>? fetcher = null)
+        {
+            var results = new List<(string, int[], int, DrawPrizeTier[])>();
+            try
+            {
+                int gameId = await GetMegaMillionsGameId();
+                var url = $"https://www.calottery.com/api/DrawGameApi/DrawGamePastDrawResults/{gameId}/1/{count}";
+                string json;
+                if (fetcher != null)
+                {
+                    json = await fetcher(url) ?? "";
+                    if (string.IsNullOrWhiteSpace(json)) { SetError("MM: WebView returned no data"); return results; }
+                }
+                else
+                {
+                    using var client = MakeClient(30);
+                    json = await client.GetStringAsync(url).ConfigureAwait(false);
+                }
+
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.ValueKind != JsonValueKind.Object) { SetError("MM: bad root"); return results; }
+                if (!doc.RootElement.TryGetProperty("PreviousDraws", out var draws) || draws.ValueKind != JsonValueKind.Array)
+                { SetError("MM: no PreviousDraws"); return results; }
+
+                foreach (var draw in draws.EnumerateArray())
+                {
+                    try
+                    {
+                        var rawDate = draw.GetProperty("DrawDate").GetRawText().Trim('"');
+                        string drawDate = DateTime.TryParse(rawDate, out var dt) ? dt.ToString("ddd MMM d, yyyy") : rawDate;
+
+                        if (!draw.TryGetProperty("WinningNumbers", out var winNums) || winNums.ValueKind != JsonValueKind.Object) continue;
+
+                        var mainList = new List<int>();
+                        int mega = 0;
+
+                        bool zeroBased = winNums.TryGetProperty("0", out _);
+                        int start = zeroBased ? 0 : 1;
+                        int end = start + 5;
+
+                        for (int i = start; i <= end; i++)
+                        {
+                            if (!winNums.TryGetProperty(i.ToString(), out var numEl)) break;
+                            int n;
+                            bool isSpecial = false;
+                            if (numEl.ValueKind == JsonValueKind.Object)
+                            {
+                                if (!numEl.TryGetProperty("Number", out var np)) continue;
+                                if (!int.TryParse(np.GetRawText().Trim('"'), out n)) continue;
+                                if (numEl.TryGetProperty("IsSpecial", out var sp)) isSpecial = sp.GetBoolean();
+                            }
+                            else if (numEl.ValueKind == JsonValueKind.Number) n = numEl.GetInt32();
+                            else if (numEl.ValueKind == JsonValueKind.String) { if (!int.TryParse(numEl.GetString(), out n)) continue; }
+                            else continue;
+
+                            if (isSpecial) mega = n;
+                            else mainList.Add(n);
+                        }
+
+                        if (mega == 0 && mainList.Count == 6) { mega = mainList[5]; mainList.RemoveAt(5); }
+
+                        if (mainList.Count == 5 && mega > 0)
+                            results.Add((drawDate, mainList.ToArray(), mega, ParsePrizeTiers(draw)));
+                    }
+                    catch { }
+                }
+                if (results.Count == 0)
+                    SetError($"MM: parsed 0 draws from game ID {gameId}");
+                else
+                    LastError = "";
+            }
+            catch (Exception ex) { SetError($"MM: {ex.GetType().Name}: {ex.Message}"); }
+
+            if (results.Count > 0)
+                SaveMMCache(results.Select(r => (r.Item1, r.Item2, r.Item3)));
+            else
+            {
+                var cached = LoadMMCache();
+                if (cached.Count > 0) { SetError("Offline — showing last cached draws"); return cached; }
+            }
+            return results;
+        }
+
         public static string LastError { get; private set; } = "";
 
         static void SetError(string msg)
@@ -995,6 +1148,100 @@ namespace DailyFantasyMAUI.Services
             return results;
         }
 
+        // ── D3 CSV paths ─────────────────────────────────────────────────────
+        static string D3LocalCsvPath =>
+            Path.Combine(FileSystem.AppDataDirectory, "data", "myDaily3.csv");
+
+        // ── Daily update: copy bundled D3 CSV on first run, append new draws ─
+        public static async Task UpdateD3CsvAsync()
+        {
+            try
+            {
+                var localPath = D3LocalCsvPath;
+                Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+
+                if (!File.Exists(localPath))
+                {
+                    using var asset = await FileSystem.OpenAppPackageFileAsync("data/myDaily3.csv");
+                    using var fs = File.Create(localPath);
+                    await asset.CopyToAsync(fs);
+                    _ = Logger.LogAsync("D3 CSV: initialized from bundled asset");
+                }
+
+                DateTime lastDate = DateTime.MinValue;
+                int lastDrawNumber = 0;
+                {
+                    var lines = await File.ReadAllLinesAsync(localPath);
+                    foreach (var l in lines.Reverse())
+                    {
+                        if (string.IsNullOrWhiteSpace(l) || l.StartsWith("D")) continue;
+                        var p = l.Split(',');
+                        if (DateTime.TryParse(p[0], out lastDate))
+                        {
+                            if (p.Length >= 2) int.TryParse(p[1], out lastDrawNumber);
+                            break;
+                        }
+                    }
+                }
+                if (lastDate == DateTime.MinValue) return;
+                // Allow same-date fetches so both midday and evening are captured
+                if (lastDate.Date > DateTime.Today) return;
+
+                var recent = await GetDaily3Draws(30);
+                var toAppend = recent
+                    .Where(d => d.DrawNumber > lastDrawNumber)
+                    .Select(d => { DateTime.TryParse(d.DrawDate, out var dt); return (dt, d.DrawNumber, d.Numbers); })
+                    .OrderBy(x => x.DrawNumber)
+                    .ToList();
+
+                if (toAppend.Count == 0) return;
+
+                await using var sw = new StreamWriter(localPath, append: true, System.Text.Encoding.UTF8);
+                foreach (var (dt, drawNum, nums) in toAppend)
+                    await sw.WriteLineAsync($"{dt:yyyy-MM-dd},{drawNum},{nums[0]},{nums[1]},{nums[2]},");
+
+                _ = Logger.LogAsync($"D3 CSV: appended {toAppend.Count} new draw(s) through {toAppend[^1].dt:yyyy-MM-dd}");
+            }
+            catch (Exception ex) { _ = Logger.LogAsync($"D3 CSV update error: {ex.Message}"); }
+        }
+
+        // ── Load D3 draw history (local writable copy, falls back to bundled) ─
+        // Returns draws newest-first. Format: DrawDate,DrawNumber,N1,N2,N3,DrawTime
+        public static async Task<List<(string DrawDate, int DrawNumber, int[] Numbers, string DrawTime)>> LoadD3CsvDraws()
+        {
+            var results = new List<(string, int, int[], string)>();
+            try
+            {
+                var localPath = D3LocalCsvPath;
+                Stream stream = File.Exists(localPath)
+                    ? File.OpenRead(localPath)
+                    : await FileSystem.OpenAppPackageFileAsync("data/myDaily3.csv");
+
+                using var reader = new StreamReader(stream);
+                bool header = true;
+                while (!reader.EndOfStream)
+                {
+                    var line = await reader.ReadLineAsync();
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    if (header) { header = false; continue; }
+                    var p = line.Split(',');
+                    if (p.Length < 5) continue;
+                    if (!DateTime.TryParse(p[0], out var dt)) continue;
+                    if (!int.TryParse(p[1], out int drawNum)) drawNum = 0;
+                    var nums = new int[3];
+                    bool ok = true;
+                    for (int i = 0; i < 3; i++)
+                        if (!int.TryParse(p[i + 2], out nums[i])) { ok = false; break; }
+                    if (!ok) continue;
+                    string drawTime = p.Length >= 6 ? p[5].Trim() : "";
+                    results.Add((dt.ToString("ddd MMM d, yyyy"), drawNum, nums, drawTime));
+                }
+                results.Reverse(); // newest first
+            }
+            catch (Exception ex) { SetError($"D3 CSV: {ex.Message}"); }
+            return results;
+        }
+
         // ── Auto-discover Fantasy 5 game ID ──────────────────────────────────
 
         public static async Task<int> GetFantasy5GameId()
@@ -1038,6 +1285,49 @@ namespace DailyFantasyMAUI.Services
                 catch { }
             }
             return cachedId;
+        }
+
+        // ── Next-draw jackpot amounts ─────────────────────────────────────────
+
+        public static async Task<(decimal? F5, decimal? SL, decimal? PB, decimal? MM, decimal? DD)> GetNextJackpotAmounts()
+        {
+            static decimal? ExtractJackpot(string json)
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("NextDraw", out var nd) &&
+                        nd.TryGetProperty("JackpotAmount", out var ja) &&
+                        ja.ValueKind == JsonValueKind.Number)
+                    {
+                        double v = ja.GetDouble();
+                        return v > 0 ? (decimal)v : null;
+                    }
+                }
+                catch { }
+                return null;
+            }
+
+            int f5Id = Preferences.Get(PrefGameId, DefaultId);
+            int slId = Preferences.Get(PrefSLGameId, DefaultSLId);
+            int pbId = PBGameId;
+            int mmId = Preferences.Get(PrefMMGameId, DefaultMMId);
+            int ddId = DDGameId;
+
+            async Task<(int id, decimal? amount)> Fetch(int id)
+            {
+                try
+                {
+                    using var client = MakeClient(10);
+                    var url  = $"https://www.calottery.com/api/DrawGameApi/DrawGamePastDrawResults/{id}/1/1";
+                    var json = await client.GetStringAsync(url).ConfigureAwait(false);
+                    return (id, ExtractJackpot(json));
+                }
+                catch { return (id, null); }
+            }
+
+            var results = await Task.WhenAll(Fetch(f5Id), Fetch(slId), Fetch(pbId), Fetch(mmId), Fetch(ddId));
+            return (results[0].amount, results[1].amount, results[2].amount, results[3].amount, results[4].amount);
         }
 
         // ── Fetch latest single draw ──────────────────────────────────────────

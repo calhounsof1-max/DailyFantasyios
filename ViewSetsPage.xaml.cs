@@ -3,6 +3,8 @@ namespace DailyFantasyMAUI;
 public partial class ViewSetsPage : ContentPage
 {
     bool _isPanning = false;
+    readonly Dictionary<string, bool> _collapsed = new();
+    readonly List<(VerticalStackLayout body, Label chevron)> _setBodyRefs = [];
 
     // Edit row state
     string  _editPrefKey = "";
@@ -16,14 +18,16 @@ public partial class ViewSetsPage : ContentPage
     Entry?      _editTimeEntry;
 
     // Stride = values per row in storage (= Cols for most games, = 4 for Daily Derby which stores h1,h2,h3,time)
-    static readonly (string Caption, string PrefKey, int Rows, int Cols, int SpecialCol, string SpecialLabel, string AccentColor, int Stride, bool HasTime)[] Games =
+    // ExclKey = Preferences key suffix used to persist exclusion state ("excl_game_f5" etc.)
+    static readonly (string Caption, string PrefKey, int Rows, int Cols, int SpecialCol, string SpecialLabel, string AccentColor, int Stride, bool HasTime, string ExclKey)[] Games =
     {
-        ("Fantasy 5",        "f5_set_", 10, 5, -1, "",     "#FF8F00", 5, false),
-        ("Super Lotto Plus", "sl_set_", 10, 6,  5, "Mega", "#7B1FA2", 6, false),
-        ("Daily 3",          "d3_set_", 10, 3, -1, "",     "#1565C0", 3, false),
-        ("Daily 4",          "d4_set_", 10, 4, -1, "",     "#00695C", 4, false),
-        ("Powerball",        "pb_set_", 10, 6,  5, "PB",   "#C62828", 6, false),
-        ("Daily Derby",      "dd_set_", 10, 3, -1, "",     "#5D4037", 4, true),
+        ("Fantasy 5",        "f5_set_", 10, 5, -1, "",     "#FF8F00", 5, false, "f5"),
+        ("Super Lotto Plus", "sl_set_", 10, 6,  5, "Mega", "#7B1FA2", 6, false, "sl"),
+        ("Daily 3",          "d3_set_", 10, 3, -1, "",     "#1565C0", 3, false, "d3"),
+        ("Daily 4",          "d4_set_", 10, 4, -1, "",     "#00695C", 4, false, "d4"),
+        ("Powerball",        "pb_set_", 10, 6,  5, "PB",   "#C62828", 6, false, "pb"),
+        ("Mega Millions",    "mm_set_", 10, 6,  5, "MB",   "#F57F17", 6, false, "mm"),
+        ("Daily Derby",      "dd_set_", 10, 3, -1, "",     "#5D4037", 4, true,  "dd"),
     };
 
     public ViewSetsPage()
@@ -37,11 +41,11 @@ public partial class ViewSetsPage : ContentPage
         TranslationX = fromRight ? w : -w;
     }
 
-    protected override void OnAppearing()
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
         _ = this.TranslateTo(0, 0, 220, Easing.CubicOut);
-        BuildSets();
+        await BuildSetsAsync();
     }
 
     protected override bool OnBackButtonPressed()
@@ -203,7 +207,22 @@ public partial class ViewSetsPage : ContentPage
 
         Preferences.Set($"{_editPrefKey}{_editSlot}", string.Join("|", vals));
         editOverlay.IsVisible = false;
-        BuildSets();
+        _ = BuildSetsAsync();
+    }
+
+    private void BtnCollapseAll_Clicked(object sender, EventArgs e)
+    {
+        bool anyExpanded = _setBodyRefs.Any(x => x.body.IsVisible);
+        foreach (var (body, chevron) in _setBodyRefs)
+        {
+            body.IsVisible = !anyExpanded;
+            chevron.Text = body.IsVisible ? "▼" : "▶";
+        }
+        // Sync _collapsed so state survives rebuilds (e.g. after a delete)
+        foreach (var key in _collapsed.Keys.ToList())
+            _collapsed[key] = anyExpanded;
+        if (sender is Button btn)
+            btn.Text = anyExpanded ? "⊞" : "⊟";
     }
 
     private async void BtnGenerate_Clicked(object sender, EventArgs e)
@@ -220,25 +239,62 @@ public partial class ViewSetsPage : ContentPage
 
     // ── Build all game sections ──────────────────────────────────────────────
 
-    private void BuildSets()
+    private async Task BuildSetsAsync()
     {
+        loadingOverlay.IsVisible = true;
+        loadingSpinner.IsRunning = true;
+        await Task.Yield(); // let UI render spinner before background work starts
+
+        // Load all Preferences data on a background thread (this is the slow part)
+        var gameResults = await Task.Run(() =>
+        {
+            var results = new List<(
+                (string Caption, string PrefKey, int Rows, int Cols, int SpecialCol, string SpecialLabel, string AccentColor, int Stride, bool HasTime, string ExclKey) Game,
+                bool IsExcluded,
+                int?[][]?[] Sets,
+                string?[][]? Times,
+                List<(int?[][]? set, int idx)> VisibleSets,
+                int NonEmptyCount)>();
+
+            foreach (var game in Games)
+            {
+                bool isExcluded = Preferences.Get($"excl_game_{game.ExclKey}", false);
+                var sets  = LoadGameSets(game.PrefKey, game.Rows, game.Cols, game.Stride);
+                var times = game.HasTime ? LoadGameTimes(game.PrefKey, game.Rows, game.Stride) : null;
+                var visibleSets = sets
+                    .Select((s, i) => (set: s, idx: i))
+                    .Where(x => x.set != null && !Preferences.Get($"excl_set_{game.ExclKey}_{x.idx}", false))
+                    .ToList();
+                int nonEmptyCount = sets.Count(s => s != null);
+                results.Add((game, isExcluded, sets, times, visibleSets, nonEmptyCount));
+            }
+            return results;
+        });
+
+        // Build UI on main thread
         setsContainer.Children.Clear();
+        _setBodyRefs.Clear();
         int totalSets = 0;
 
-        foreach (var game in Games)
+        foreach (var (game, isExcluded, sets, times, visibleSets, nonEmptyCount) in gameResults)
         {
-            var sets  = LoadGameSets(game.PrefKey, game.Rows, game.Cols, game.Stride);
-            var times = game.HasTime ? LoadGameTimes(game.PrefKey, game.Rows, game.Stride) : null;
-            var nonEmpty = sets.Where(s => s != null).ToList();
-            totalSets += nonEmpty.Count;
+            if (!isExcluded) totalSets += visibleSets.Count;
 
-            setsContainer.Children.Add(MakeSectionHeader(game.Caption, game.AccentColor, nonEmpty.Count));
+            setsContainer.Children.Add(MakeExcludableSectionHeader(
+                game.Caption, game.AccentColor, visibleSets.Count, isExcluded,
+                (nowExcluded) =>
+                {
+                    Preferences.Set($"excl_game_{game.ExclKey}", nowExcluded);
+                    _ = BuildSetsAsync();
+                }));
 
-            if (nonEmpty.Count == 0)
+            if (isExcluded) continue;
+
+            if (visibleSets.Count == 0)
             {
                 setsContainer.Children.Add(new Label
                 {
-                    Text = "No sets saved",
+                    Text = nonEmptyCount > 0 ? "All sets excluded" : "No sets saved",
                     FontSize = 13,
                     TextColor = Color.FromArgb("#9CA3AF"),
                     Margin = new Thickness(20, 4, 20, 8),
@@ -247,10 +303,8 @@ public partial class ViewSetsPage : ContentPage
                 continue;
             }
 
-            for (int slotIdx = 0; slotIdx < sets.Length; slotIdx++)
+            foreach (var (rows, slotIdx) in visibleSets)
             {
-                var rows = sets[slotIdx];
-                if (rows == null) continue;
                 var slotTimes = times?[slotIdx];
                 string prefKey = game.PrefKey;
                 int capturedSlot = slotIdx;
@@ -260,7 +314,7 @@ public partial class ViewSetsPage : ContentPage
                 Action onDelete = () =>
                 {
                     Preferences.Remove($"{prefKey}{capturedSlot}");
-                    BuildSets();
+                    _ = BuildSetsAsync();
                 };
 
                 Action<int> onDeleteRow = (rowIdx) =>
@@ -269,10 +323,8 @@ public partial class ViewSetsPage : ContentPage
                     if (string.IsNullOrEmpty(raw)) return;
                     var vals = raw.Split('|');
                     if (vals.Length < 10 * stride) Array.Resize(ref vals, 10 * stride);
-                    // Clear the row
                     for (int c = 0; c < stride; c++)
                         vals[rowIdx * stride + c] = "";
-                    // Check if any rows remain
                     bool anyLeft = false;
                     for (int r = 0; r < 10; r++)
                         for (int c = 0; c < cols; c++)
@@ -281,7 +333,7 @@ public partial class ViewSetsPage : ContentPage
                         Preferences.Set($"{prefKey}{capturedSlot}", string.Join("|", vals));
                     else
                         Preferences.Remove($"{prefKey}{capturedSlot}");
-                    BuildSets();
+                    _ = BuildSetsAsync();
                 };
 
                 int specialCol = game.SpecialCol;
@@ -289,11 +341,19 @@ public partial class ViewSetsPage : ContentPage
                 Action<int> onEditRow = (rowIdx) =>
                     ShowEditRow(prefKey, capturedSlot, rowIdx, stride, cols, specialCol, hasTime);
 
-                setsContainer.Children.Add(MakeSetBlock(slotIdx + 1, rows, game.Cols, game.SpecialCol, game.SpecialLabel, game.AccentColor, slotTimes, onDelete, onDeleteRow, onEditRow));
+                string collapseKey = $"{prefKey}{capturedSlot}";
+                bool isCollapsed = _collapsed.TryGetValue(collapseKey, out bool cv) && cv;
+                Action onToggleCollapse = () =>
+                    _collapsed[collapseKey] = !(_collapsed.TryGetValue(collapseKey, out bool v) && v);
+
+                setsContainer.Children.Add(MakeSetBlock(slotIdx + 1, rows, game.Cols, game.SpecialCol, game.SpecialLabel, game.AccentColor, slotTimes, onDelete, onDeleteRow, onEditRow, isCollapsed, onToggleCollapse));
             }
         }
 
         lblStatus.Text = $"{totalSets} total set{(totalSets == 1 ? "" : "s")} saved";
+
+        loadingSpinner.IsRunning = false;
+        loadingOverlay.IsVisible = false;
     }
 
     // Returns array[slot] of int[row][col], null if slot empty
@@ -400,7 +460,84 @@ public partial class ViewSetsPage : ContentPage
         return grid;
     }
 
-    private static View MakeSetBlock(int setNumber, int?[][]? rows, int cols, int specialCol, string specialLabel, string accentColor, string?[]? times = null, Action? onDelete = null, Action<int>? onDeleteRow = null, Action<int>? onEditRow = null)
+    private static View MakeExcludableSectionHeader(string caption, string accentColor,
+        int count, bool isExcluded, Action<bool> onToggle)
+    {
+        var grid = new Grid
+        {
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(new GridLength(4)),   // accent bar
+                new ColumnDefinition(GridLength.Star),     // caption
+                new ColumnDefinition(GridLength.Auto),     // badge / excluded label
+                new ColumnDefinition(GridLength.Auto),     // excl checkbox
+            },
+            BackgroundColor = isExcluded ? Color.FromArgb("#D0D4D9") : Color.FromArgb("#E8EDF3"),
+            Margin = new Thickness(0, 10, 0, 0),
+            Padding = new Thickness(0, 8),
+        };
+
+        var accentBar = new BoxView
+        {
+            BackgroundColor = isExcluded ? Color.FromArgb("#999999") : Color.FromArgb(accentColor)
+        };
+        Grid.SetColumn(accentBar, 0);
+        grid.Children.Add(accentBar);
+
+        var lbl = new Label
+        {
+            Text = caption,
+            FontSize = 15,
+            FontAttributes = FontAttributes.Bold,
+            TextColor = isExcluded ? Color.FromArgb("#888888") : Color.FromArgb("#1E2733"),
+            VerticalOptions = LayoutOptions.Center,
+            Margin = new Thickness(12, 0, 0, 0)
+        };
+        Grid.SetColumn(lbl, 1);
+        grid.Children.Add(lbl);
+
+        var badge = new Label
+        {
+            Text = isExcluded ? "EXCLUDED" : $"{count} set{(count == 1 ? "" : "s")}",
+            FontSize = 11,
+            TextColor = isExcluded ? Color.FromArgb("#C62828") : Color.FromArgb(accentColor),
+            FontAttributes = FontAttributes.Bold,
+            VerticalOptions = LayoutOptions.Center,
+            Margin = new Thickness(0, 0, 6, 0)
+        };
+        Grid.SetColumn(badge, 2);
+        grid.Children.Add(badge);
+
+        var chkStack = new VerticalStackLayout
+        {
+            HorizontalOptions = LayoutOptions.Center,
+            VerticalOptions = LayoutOptions.Center,
+            Spacing = 0,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        chkStack.Children.Add(new Label
+        {
+            Text = "Excl",
+            FontSize = 9,
+            TextColor = Color.FromArgb("#555"),
+            HorizontalOptions = LayoutOptions.Center
+        });
+        var chk = new CheckBox
+        {
+            IsChecked = isExcluded,
+            Color = Color.FromArgb("#C62828"),
+            HorizontalOptions = LayoutOptions.Center,
+            Margin = new Thickness(0, -4, 0, 0)
+        };
+        chk.CheckedChanged += (s, e) => onToggle(e.Value);
+        chkStack.Children.Add(chk);
+        Grid.SetColumn(chkStack, 3);
+        grid.Children.Add(chkStack);
+
+        return grid;
+    }
+
+    private View MakeSetBlock(int setNumber, int?[][]? rows, int cols, int specialCol, string specialLabel, string accentColor, string?[]? times = null, Action? onDelete = null, Action<int>? onDeleteRow = null, Action<int>? onEditRow = null, bool isCollapsed = false, Action? onToggleCollapse = null)
     {
         var outer = new VerticalStackLayout
         {
@@ -409,25 +546,39 @@ public partial class ViewSetsPage : ContentPage
             Spacing = 0,
         };
 
-        // Set label header with delete button
+        // Set label header with collapse chevron and delete button
         var headerGrid = new Grid
         {
             ColumnDefinitions =
             {
-                new ColumnDefinition(GridLength.Star),
-                new ColumnDefinition(GridLength.Auto),
+                new ColumnDefinition(GridLength.Auto),  // chevron
+                new ColumnDefinition(GridLength.Star),  // label
+                new ColumnDefinition(GridLength.Auto),  // delete
             },
-            Padding = new Thickness(10, 4, 6, 2),
+            Padding = new Thickness(6, 4, 6, 2),
         };
 
-        headerGrid.Children.Add(new Label
+        var chevron = new Label
+        {
+            Text = isCollapsed ? "▶" : "▼",
+            FontSize = 11,
+            TextColor = Color.FromArgb(accentColor),
+            VerticalOptions = LayoutOptions.Center,
+            Margin = new Thickness(0, 0, 6, 0),
+        };
+        Grid.SetColumn(chevron, 0);
+        headerGrid.Children.Add(chevron);
+
+        var setLabel = new Label
         {
             Text = $"Set {setNumber}",
             FontSize = 12,
             FontAttributes = FontAttributes.Bold,
             TextColor = Color.FromArgb(accentColor),
             VerticalOptions = LayoutOptions.Center,
-        });
+        };
+        Grid.SetColumn(setLabel, 1);
+        headerGrid.Children.Add(setLabel);
 
         if (onDelete != null)
         {
@@ -442,14 +593,22 @@ public partial class ViewSetsPage : ContentPage
                 Padding = new Thickness(10, 0),
             };
             delBtn.Clicked += (_, _) => onDelete();
-            Grid.SetColumn(delBtn, 1);
+            Grid.SetColumn(delBtn, 2);
             headerGrid.Children.Add(delBtn);
         }
 
         outer.Children.Add(headerGrid);
 
+        // Collapsible body
+        var body = new VerticalStackLayout
+        {
+            Spacing = 0,
+            IsVisible = !isCollapsed,
+        };
+        _setBodyRefs.Add((body, chevron));
+
         // Divider
-        outer.Children.Add(new BoxView { BackgroundColor = Color.FromArgb("#E5E7EB"), HeightRequest = 1 });
+        body.Children.Add(new BoxView { BackgroundColor = Color.FromArgb("#E5E7EB"), HeightRequest = 1 });
 
         bool anyRow = false;
         for (int r = 0; r < rows!.Length; r++)
@@ -457,7 +616,6 @@ public partial class ViewSetsPage : ContentPage
             var rowData = rows[r];
             if (rowData == null) continue;
 
-            // Check if row is all null/empty
             bool empty = true;
             for (int c = 0; c < cols; c++)
                 if (rowData[c].HasValue && rowData[c] != 0) { empty = false; break; }
@@ -468,12 +626,12 @@ public partial class ViewSetsPage : ContentPage
             int capturedR = r;
             Action? delRow  = onDeleteRow != null ? () => onDeleteRow(capturedR) : null;
             Action? editRow = onEditRow   != null ? () => onEditRow(capturedR)   : null;
-            outer.Children.Add(MakeNumberRow(r + 1, rowData, cols, specialCol, specialLabel, raceTime, delRow, editRow));
+            body.Children.Add(MakeNumberRow(r + 1, rowData, cols, specialCol, specialLabel, raceTime, delRow, editRow));
         }
 
         if (!anyRow)
         {
-            outer.Children.Add(new Label
+            body.Children.Add(new Label
             {
                 Text = "Empty",
                 FontSize = 12,
@@ -482,6 +640,18 @@ public partial class ViewSetsPage : ContentPage
                 FontAttributes = FontAttributes.Italic
             });
         }
+
+        outer.Children.Add(body);
+
+        // Tap header to collapse/expand
+        var tap = new TapGestureRecognizer();
+        tap.Tapped += (_, _) =>
+        {
+            body.IsVisible = !body.IsVisible;
+            chevron.Text = body.IsVisible ? "▼" : "▶";
+            onToggleCollapse?.Invoke();
+        };
+        headerGrid.GestureRecognizers.Add(tap);
 
         return new Border
         {

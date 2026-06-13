@@ -15,13 +15,17 @@ public partial class AppShell : Shell
 	internal static readonly ScanTicketPage ScanTicketPageInstance = new();
 	internal static readonly ScanSlipPage   ScanSlipPageInstance   = new();
 	internal static readonly ResultsPage    ResultsPageInstance    = new();
-	internal static readonly PowerballPage  PowerballPageInstance  = new();
+	internal static readonly PowerballPage      PowerballPageInstance      = new();
+	internal static readonly MegaMillionsPage   MegaMillionsPageInstance   = new();
 	internal static readonly ArchivePage    ArchivePageInstance    = new();
 	internal static readonly DailyDerbyPage DailyDerbyPageInstance = new();
 
 	internal static readonly ViewSetsPage   ViewSetsPageInstance   = new();
 	internal static readonly GeneratePage   GeneratePageInstance   = new();
 	internal static readonly DataViewerPage DataViewerPageInstance = new();
+	internal static readonly JackpotPage       JackpotPageInstance       = new();
+	internal static readonly CheckTicketPage   CheckTicketPageInstance   = new();
+	internal static readonly MyFavoritePage   MyFavoritePageInstance    = new();
 
 	public AppShell()
 	{
@@ -33,11 +37,15 @@ public partial class AppShell : Shell
 		Routing.RegisterRoute(nameof(ScanTicketPage), new SingletonRouteFactory(ScanTicketPageInstance));
 		Routing.RegisterRoute(nameof(ScanSlipPage),   new SingletonRouteFactory(ScanSlipPageInstance));
 		Routing.RegisterRoute(nameof(ResultsPage),    new SingletonRouteFactory(ResultsPageInstance));
-		Routing.RegisterRoute(nameof(PowerballPage),  new SingletonRouteFactory(PowerballPageInstance));
+		Routing.RegisterRoute(nameof(PowerballPage),      new SingletonRouteFactory(PowerballPageInstance));
+		Routing.RegisterRoute(nameof(MegaMillionsPage),   new SingletonRouteFactory(MegaMillionsPageInstance));
 		Routing.RegisterRoute(nameof(ViewSetsPage),   new SingletonRouteFactory(ViewSetsPageInstance));
 		Routing.RegisterRoute(nameof(ArchivePage),    new SingletonRouteFactory(ArchivePageInstance));
 		Routing.RegisterRoute(nameof(DailyDerbyPage), new SingletonRouteFactory(DailyDerbyPageInstance));
 		Routing.RegisterRoute(nameof(GeneratePage),    new SingletonRouteFactory(GeneratePageInstance));
 		Routing.RegisterRoute(nameof(DataViewerPage),  new SingletonRouteFactory(DataViewerPageInstance));
+		Routing.RegisterRoute(nameof(JackpotPage),       new SingletonRouteFactory(JackpotPageInstance));
+		Routing.RegisterRoute(nameof(CheckTicketPage),   new SingletonRouteFactory(CheckTicketPageInstance));
+		Routing.RegisterRoute(nameof(MyFavoritePage),    new SingletonRouteFactory(MyFavoritePageInstance));
 	}
 }

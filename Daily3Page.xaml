@@ -13,13 +13,16 @@
 
         <!-- Row 0: Nav header -->
         <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="14,10"
-              ColumnDefinitions="Auto,*,Auto">
+              ColumnDefinitions="Auto,*,Auto,Auto">
             <Button Grid.Column="0" x:Name="btnBack" Text="← PB" FontSize="12" FontAttributes="Bold"
                     BackgroundColor="#C62828" TextColor="White" Padding="10,0"
                     HeightRequest="34" CornerRadius="17" Clicked="BtnGoBack_Clicked"/>
             <Label Grid.Column="1" Text="Daily 3" TextColor="White" FontSize="14"
                    FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center"/>
-            <Button Grid.Column="2" Text="D4 →" FontSize="12" FontAttributes="Bold"
+            <Button Grid.Column="2" Text="⌂" FontSize="14" FontAttributes="Bold"
+                    BackgroundColor="#2D3D50" TextColor="White" Padding="10,0"
+                    HeightRequest="34" CornerRadius="17" Clicked="BtnGoHome_Clicked" Margin="0,0,6,0"/>
+            <Button Grid.Column="3" Text="D4 →" FontSize="12" FontAttributes="Bold"
                     BackgroundColor="#00695C" TextColor="White" Padding="10,0"
                     HeightRequest="34" CornerRadius="17" Clicked="BtnGoD4_Clicked"/>
         </Grid>
@@ -122,7 +125,7 @@
 
         <!-- Row 3: Saved Numbers picker -->
         <Grid Grid.Row="3" BackgroundColor="White" Padding="12,6"
-              ColumnDefinitions="Auto,Auto,*">
+              ColumnDefinitions="Auto,Auto,*,Auto">
             <BoxView Grid.Column="0" BackgroundColor="#1565C0" WidthRequest="4"
                      VerticalOptions="Fill" Margin="0,4,10,4"/>
             <Label Grid.Column="1" Text="Saved Numbers" FontSize="13" FontAttributes="Bold"
@@ -130,6 +133,12 @@
             <Picker Grid.Column="2" x:Name="slotPicker" FontSize="13"
                     BackgroundColor="#F8F9FA" HeightRequest="36"
                     SelectedIndexChanged="SlotPicker_Changed"/>
+            <VerticalStackLayout Grid.Column="3" HorizontalOptions="Center"
+                                 VerticalOptions="Center" Spacing="0" Margin="6,0,2,0">
+                <Label Text="Excl" FontSize="9" TextColor="#666" HorizontalOptions="Center"/>
+                <CheckBox x:Name="chkExcl" Color="#C62828" HorizontalOptions="Center"
+                          CheckedChanged="ChkExcl_CheckedChanged" Margin="0,-4,0,0"/>
+            </VerticalStackLayout>
         </Grid>
 
         <!-- Row 4: 10 number rows -->
@@ -138,7 +147,7 @@
         </ScrollView>
 
         <!-- Row 5: Bottom buttons -->
-        <Grid Grid.Row="5" ColumnDefinitions="*,*,*,*,*" ColumnSpacing="6"
+        <Grid Grid.Row="5" ColumnDefinitions="*,*,*,*,*,Auto,Auto" ColumnSpacing="6"
               Padding="10,8" BackgroundColor="#1E2733">
             <Button Grid.Column="0" Text="CHECK" FontSize="12" FontAttributes="Bold"
                     BackgroundColor="#F9A825" TextColor="White" HeightRequest="42"
@@ -155,6 +164,12 @@
             <Button Grid.Column="4" Text="CLR SETS" FontSize="11"
                     BackgroundColor="#B71C1C" TextColor="White" HeightRequest="42"
                     CornerRadius="21" Padding="4,0" Clicked="BtnClearSets_Clicked"/>
+            <Button Grid.Column="5" Text="🎲 QP" FontSize="11"
+                    BackgroundColor="#6A1B9A" TextColor="White" HeightRequest="42"
+                    CornerRadius="21" Padding="10,0" Clicked="BtnQuickPick_Clicked"/>
+            <Button Grid.Column="6" x:Name="btnVoice" Text="🎤" FontSize="18"
+                    BackgroundColor="#0277BD" TextColor="White" HeightRequest="42"
+                    CornerRadius="21" Padding="10,0" Clicked="BtnVoice_Clicked"/>
         </Grid>
 
     </Grid>

@@ -16,8 +16,14 @@ namespace DailyFantasyMAUI.Model
         public int N3 { get => n3; set { n3 = value; OnPropertyChanged(nameof(N3)); } }
         public int N4 { get => n4; set { n4 = value; OnPropertyChanged(nameof(N4)); } }
         public int N5 { get => n5; set { n5 = value; OnPropertyChanged(nameof(N5)); } }
+        public int N6 { get; set; } // Mega/bonus number (Super Lotto); 0 when unused
+        public int DisplayCount { get; set; } = 5; // 3=D3, 5=F5, 6=SL
 
-        public string Display => $"{N1,2} {N2,2} {N3,2} {N4,2} {N5,2}   {DrawDate}";
+        public string Display => DisplayCount == 3
+            ? $"{N1} {N2} {N3}   {DrawDate}"
+            : N6 > 0
+                ? $"{N1,2} {N2,2} {N3,2} {N4,2} {N5,2} +{N6,2}  {DrawDate}"
+                : $"{N1,2} {N2,2} {N3,2} {N4,2} {N5,2}   {DrawDate}";
 
         public event PropertyChangedEventHandler? PropertyChanged;
         public void OnPropertyChanged(string pc) =>

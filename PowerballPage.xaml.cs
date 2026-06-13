@@ -16,12 +16,20 @@ public partial class PowerballPage : ContentPage
     readonly Label[]  _results = new Label[Rows];
     int  _activeSlot = -1;
     bool _suppressPickerEvent = false;
+    bool _suppressExcl = false;
+    readonly Dictionary<int, string> _slotCache = new();
+    View? _highlightedView;
 
     int[] _winningMainNums = Array.Empty<int>();
     int   _winningPB       = 0;
     List<(DateTime Date, string Label, int[] MainNumbers, int PBNumber)> _allDraws = new();
     bool _drawsLoaded = false;
     bool _isPanning   = false;
+    bool _voiceOn = false;
+    bool _voiceSettingText = false;
+    int  _voiceRow = 0, _voiceCol = 0;
+    Entry? _voiceTarget = null;
+    Color _voiceTargetOldColor = Colors.White;
 
     // "sl" = came via carousel from SuperLotto; "main" = navigated directly
     internal static string ComingFrom { get; set; } = "sl";
@@ -56,9 +64,9 @@ public partial class PowerballPage : ContentPage
                 if (_panLeft < -40)
                 {
                     _isPanning = true;
-                    Daily3Page.ComingFrom = "pb";
-                    AppShell.Daily3PageInstance.PrePosition(true);
-                    await Shell.Current.GoToAsync(nameof(Daily3Page), false);
+                    MegaMillionsPage.ComingFrom = "pb";
+                    AppShell.MegaMillionsPageInstance.PrePosition(true);
+                    await Shell.Current.GoToAsync(nameof(MegaMillionsPage), false);
                     _isPanning = false;
                 }
                 else if (_panRight > 40)
@@ -90,6 +98,9 @@ public partial class PowerballPage : ContentPage
         await Shell.Current.GoToAsync("..", false);
     }
 
+    private async void BtnGoHome_Clicked(object sender, EventArgs e) =>
+        await Shell.Current.Navigation.PopToRootAsync(false);
+
     private async void BtnGoBack_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;
@@ -99,9 +110,9 @@ public partial class PowerballPage : ContentPage
     private async void BtnGoD3_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;
-        Daily3Page.ComingFrom = "pb";
-        AppShell.Daily3PageInstance.PrePosition(true);
-        await Shell.Current.GoToAsync(nameof(Daily3Page), false);
+        MegaMillionsPage.ComingFrom = "pb";
+        AppShell.MegaMillionsPageInstance.PrePosition(true);
+        await Shell.Current.GoToAsync(nameof(MegaMillionsPage), false);
     }
 
     internal void PrePosition(bool fromRight)
@@ -113,7 +124,12 @@ public partial class PowerballPage : ContentPage
     protected override void OnAppearing()
     {
         this.TranslateTo(0, 0, 220, Easing.CubicOut);
-        if (ComingFrom == "main")
+        if (ComingFrom == "results")
+        {
+            btnBack.Text = "← RESULTS";
+            btnBack.BackgroundColor = Color.FromArgb("#FF8F00");
+        }
+        else if (ComingFrom == "main")
         {
             btnBack.Text = "← HOME";
             btnBack.BackgroundColor = Color.FromArgb("#FF8F00");
@@ -127,34 +143,50 @@ public partial class PowerballPage : ContentPage
         _ = LoadAllDraws();
         Dispatcher.Dispatch(() =>
         {
-            _activeSlot = Preferences.Get("pb_active_slot", -1);
-            if (_activeSlot < 0)
+            int pendingRow = -1;
+            if (PendingHighlight.HasPending && PendingHighlight.Game == "PB")
             {
-                var current = Preferences.Get("pb_entries", "");
-                if (!string.IsNullOrEmpty(current))
+                _activeSlot = PendingHighlight.Slot;
+                pendingRow  = PendingHighlight.Row;
+                PendingHighlight.Clear();
+                Preferences.Set("pb_active_slot", _activeSlot);
+                FillFromSlot(_activeSlot);
+            }
+            else
+            {
+                _activeSlot = Preferences.Get("pb_active_slot", -1);
+                if (_activeSlot < 0)
                 {
-                    for (int i = 0; i < 10; i++)
+                    var current = Preferences.Get("pb_entries", "");
+                    if (!string.IsNullOrEmpty(current))
                     {
-                        if (SlotHasData(i) && Preferences.Get(SetKey(i), "") == current)
+                        for (int i = 0; i < 10; i++)
                         {
-                            _activeSlot = i;
-                            break;
+                            if (SlotHasData(i) && Preferences.Get(SetKey(i), "") == current)
+                            {
+                                _activeSlot = i;
+                                break;
+                            }
                         }
                     }
+                    if (_activeSlot < 0) _activeSlot = 0;
                 }
-                if (_activeSlot < 0) _activeSlot = 0;
+                if (SlotHasData(_activeSlot))
+                    FillFromSlot(_activeSlot);
+                else
+                    LoadEntries();
             }
-            if (SlotHasData(_activeSlot))
-                FillFromSlot(_activeSlot);
-            else
-                LoadEntries();
             UpdateSlotPicker();
+            if (pendingRow >= 0)
+                _ = HighlightRow(pendingRow);
         });
     }
 
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        if (_voiceOn) StopVoice();
+        if (_highlightedView != null) { _highlightedView.BackgroundColor = Colors.White; _highlightedView = null; }
         SaveEntries();
         if (_activeSlot >= 0)
             Preferences.Set("pb_active_slot", _activeSlot);
@@ -254,8 +286,28 @@ public partial class PowerballPage : ContentPage
             slotPicker.Items.Add(SlotLabel(i));
     }
 
-    private string SlotLabel(int slot) =>
-        SlotHasData(slot) ? $"Set {slot + 1}  ✓" : $"Set {slot + 1}";
+    private string ExclKey(int slot) => $"excl_set_pb_{slot}";
+
+    private string SlotLabel(int slot)
+    {
+        bool excl = Preferences.Get(ExclKey(slot), false);
+        string mark = SlotHasData(slot) ? "  ✓" : "";
+        return excl ? $"Set {slot + 1}{mark} [X]" : $"Set {slot + 1}{mark}";
+    }
+
+    private void UpdateExclCheckbox()
+    {
+        _suppressExcl = true;
+        chkExcl.IsChecked = _activeSlot >= 0 && Preferences.Get(ExclKey(_activeSlot), false);
+        _suppressExcl = false;
+    }
+
+    private void ChkExcl_CheckedChanged(object sender, CheckedChangedEventArgs e)
+    {
+        if (_suppressExcl || _activeSlot < 0) return;
+        Preferences.Set(ExclKey(_activeSlot), e.Value);
+        UpdateSlotPicker();
+    }
 
     private void UpdateSlotPicker()
     {
@@ -264,6 +316,7 @@ public partial class PowerballPage : ContentPage
             slotPicker.Items[i] = SlotLabel(i);
         slotPicker.SelectedIndex = _activeSlot;
         _suppressPickerEvent = false;
+        UpdateExclCheckbox();
     }
 
     private void SlotPicker_Changed(object sender, EventArgs e)
@@ -271,10 +324,24 @@ public partial class PowerballPage : ContentPage
         if (_suppressPickerEvent) return;
         int slot = slotPicker.SelectedIndex;
         if (slot < 0) return;
+        // Cache current slot before switching
+        if (_activeSlot >= 0)
+            _slotCache[_activeSlot] = GetCurrentEntryString();
         _activeSlot = slot;
         Preferences.Set("pb_active_slot", slot);
         ClearAllEntries();
-        if (SlotHasData(slot)) FillFromSlot(slot);
+        if (_slotCache.TryGetValue(slot, out var cached))
+        {
+            var vals = cached.Split('|');
+            for (int r = 0; r < Rows; r++)
+                for (int c = 0; c < TotalCols; c++)
+                {
+                    int idx = r * TotalCols + c;
+                    _entries[r, c].Text = idx < vals.Length ? vals[idx] : "";
+                }
+            CheckAll();
+        }
+        else if (SlotHasData(slot)) FillFromSlot(slot);
         UpdateSlotPicker();
     }
 
@@ -324,10 +391,11 @@ public partial class PowerballPage : ContentPage
             for (int c = 0; c < MainCols; c++)
             {
                 var entry = MakeEntry(Color.FromArgb("#F5F5F5"));
+                AttachMaxClamp(entry, 69);
                 int row_ = r, col_ = c;
                 entry.TextChanged += (_, _) =>
                 {
-                    if (_entries[row_, col_].Text?.Length == 2) AdvanceFocus(row_, col_);
+                    if (!_voiceSettingText && _entries[row_, col_].Text?.Length == 2) AdvanceFocus(row_, col_);
                     SaveEntries();
                     if (IsRowFull(row_)) CheckAll();
                 };
@@ -343,10 +411,11 @@ public partial class PowerballPage : ContentPage
 
             // Powerball entry
             var pbEntry = MakeEntry(Color.FromArgb("#FFF3E0"));
+            AttachMaxClamp(pbEntry, 26);
             int mrow = r;
             pbEntry.TextChanged += (_, _) =>
             {
-                if (_entries[mrow, PBCol].Text?.Length == 2) AdvanceFocus(mrow, PBCol);
+                if (!_voiceSettingText && _entries[mrow, PBCol].Text?.Length == 2) AdvanceFocus(mrow, PBCol);
                 SaveEntries();
                 if (IsRowFull(mrow)) CheckAll();
             };
@@ -404,6 +473,15 @@ public partial class PowerballPage : ContentPage
         if (row + 1 < Rows) _entries[row + 1, 0].Focus();
     }
 
+    static void AttachMaxClamp(Entry entry, int max)
+    {
+        entry.TextChanged += (s, e) =>
+        {
+            if (int.TryParse(e.NewTextValue, out int v) && v > max)
+                ((Entry)s!).Text = e.OldTextValue ?? "";
+        };
+    }
+
     private void ForceBlackText(object? sender, EventArgs e)
     {
 #if ANDROID
@@ -414,6 +492,28 @@ public partial class PowerballPage : ContentPage
             et.SetSelectAllOnFocus(true);
         }
 #endif
+    }
+
+    // ── Highlight a row (called after navigating from ResultsPage) ───────────
+
+    internal void ClearHighlight()
+    {
+        if (_highlightedView == null) return;
+        _highlightedView.BackgroundColor = Colors.White;
+        _highlightedView = null;
+    }
+
+    private async Task HighlightRow(int rowIndex)
+    {
+        if (rowIndex < 0 || rowIndex >= rowsContainer.Children.Count) return;
+        if (rowsContainer.Children[rowIndex] is not View rowView) return;
+        _highlightedView = rowView;
+        rowView.BackgroundColor = Color.FromArgb("#FFF176");
+        if (rowsContainer.Parent is ScrollView sv)
+            await sv.ScrollToAsync(rowView, ScrollToPosition.MakeVisible, true);
+        await Task.Delay(2000);
+        rowView.BackgroundColor = Colors.White;
+        _highlightedView = null;
     }
 
     // ── Fetch draws ──────────────────────────────────────────────────────────
@@ -492,7 +592,7 @@ public partial class PowerballPage : ContentPage
             _wLabels[i].Text = match.MainNumbers[i].ToString();
         lblWPB.Text = match.PBNumber.ToString();
 
-        if (_results[0].Text != "") CheckAll();
+        CheckAll();
     }
 
     private void DrawDatePicker_DateSelected(object sender, DateChangedEventArgs e) =>
@@ -576,6 +676,39 @@ public partial class PowerballPage : ContentPage
         lblStatus.Text = orig;
     }
 
+    private async void BtnQuickPick_Clicked(object sender, EventArgs e)
+    {
+        string? choice = await DisplayActionSheet("Quick Pick — How many empty rows?", "Cancel", null,
+            "1", "2", "3", "5", "10", "All");
+        if (choice == null || choice == "Cancel") return;
+        int max = choice == "All" ? Rows : int.TryParse(choice, out int n) ? n : 1;
+
+        var rng = Random.Shared;
+        int filled = 0;
+        for (int r = 0; r < Rows && filled < max; r++)
+        {
+            bool empty = true;
+            for (int c = 0; c < TotalCols; c++)
+                if (!string.IsNullOrEmpty(_entries[r, c].Text)) { empty = false; break; }
+            if (!empty) continue;
+
+            var main = Enumerable.Range(1, 69).OrderBy(_ => rng.Next()).Take(MainCols).OrderBy(n => n).ToList();
+            for (int c = 0; c < MainCols; c++)
+                _entries[r, c].Text = main[c].ToString();
+            _entries[r, PBCol].Text = rng.Next(1, 27).ToString();
+            filled++;
+        }
+
+        if (filled == 0)
+            lblStatus.Text = "No empty rows to fill";
+        else
+        {
+            CheckAll();
+            SaveEntries();
+            lblStatus.Text = $"Quick Pick: filled {filled} row{(filled == 1 ? "" : "s")}";
+        }
+    }
+
     private async void BtnClearSets_Clicked(object sender, EventArgs e)
     {
         bool confirm = await DisplayAlert("Clear All Sets", "Remove all 10 saved sets?", "Yes", "Cancel");
@@ -592,14 +725,120 @@ public partial class PowerballPage : ContentPage
         }
     }
 
+    private void BtnVoice_Clicked(object sender, EventArgs e)
+    {
+#if ANDROID
+        if (!Services.VoiceNumberService.IsAvailable) { lblStatus.Text = "Speech recognition not available"; return; }
+        if (_voiceOn) StopVoice(); else StartVoice();
+#endif
+    }
+
+    void StartVoice()
+    {
+        _voiceRow = 0; _voiceCol = 0;
+        VoiceSkipFilled();
+        if (_voiceRow >= Rows) { lblStatus.Text = "No empty cells"; return; }
+        _voiceOn = true;
+        btnVoice.BackgroundColor = Colors.Red;
+        SetVoiceTarget();
+#if ANDROID
+        Services.VoiceNumberService.StatusUpdate += OnVoiceStatus;
+        Services.VoiceNumberService.StartContinuous(OnVoiceNumbers);
+#endif
+    }
+
+    void StopVoice()
+    {
+        _voiceOn = false;
+        ClearVoiceTarget();
+#if ANDROID
+        Services.VoiceNumberService.StatusUpdate -= OnVoiceStatus;
+        Services.VoiceNumberService.Stop();
+#endif
+        btnVoice.BackgroundColor = Color.FromArgb("#0277BD");
+        lblStatus.Text = "Mic off";
+    }
+
+    void SetVoiceTarget()
+    {
+        if (_voiceTarget != null) _voiceTarget.BackgroundColor = _voiceTargetOldColor;
+        if (_voiceRow < Rows)
+        {
+            _voiceTarget = _entries[_voiceRow, _voiceCol];
+            _voiceTargetOldColor = _voiceTarget.BackgroundColor;
+            _voiceTarget.BackgroundColor = Color.FromArgb("#A5D6A7");
+        }
+    }
+
+    void ClearVoiceTarget()
+    {
+        if (_voiceTarget != null) _voiceTarget.BackgroundColor = _voiceTargetOldColor;
+        _voiceTarget = null;
+    }
+
+    void OnVoiceStatus(string msg) => MainThread.BeginInvokeOnMainThread(() => lblStatus.Text = msg);
+
+    void OnVoiceNumbers(List<int> nums)
+    {
+        if (!_voiceOn) return;
+        foreach (int n in nums)
+        {
+            if (_voiceRow >= Rows) { StopVoice(); return; }
+            int maxForCol = _voiceCol < MainCols ? 69 : 26;
+            if (n >= 1 && n <= maxForCol)
+            {
+                _voiceSettingText = true;
+                _entries[_voiceRow, _voiceCol].Text = n.ToString();
+                _voiceSettingText = false;
+                _voiceCol++;
+                if (_voiceCol >= TotalCols) { _voiceCol = 0; _voiceRow++; }
+                VoiceSkipFilled();
+            }
+        }
+        CheckAll(); SaveEntries();
+        SetVoiceTarget(); // after CheckAll so green highlight isn't wiped
+        if (_voiceOn && _voiceRow < Rows)
+            lblStatus.Text = $"🔴 Listening | row {_voiceRow + 1} col {_voiceCol + 1}";
+    }
+
+    void VoiceSkipFilled()
+    {
+        while (_voiceRow < Rows && !string.IsNullOrEmpty(_entries[_voiceRow, _voiceCol].Text))
+        {
+            _voiceCol++;
+            if (_voiceCol >= TotalCols) { _voiceCol = 0; _voiceRow++; }
+        }
+    }
+
     private async void BtnSave_Clicked(object sender, EventArgs e)
     {
+        string? choice = await DisplayActionSheet("Save", "Cancel", null, "Save to Slot", "Save to MyFavorite");
+        if (choice == null || choice == "Cancel") return;
+        if (choice == "Save to MyFavorite")
+        {
+            SaveEntries();
+            await MyFavoritePage.SaveCurrentToMyFavoriteAsync(
+                "Powerball", "pb_set_", _activeSlot < 0 ? 0 : _activeSlot, GetCurrentEntryString());
+            return;
+        }
+        // Cache current slot then flush all cached slots
+        if (_activeSlot >= 0)
+            _slotCache[_activeSlot] = GetCurrentEntryString();
         SaveEntries();
-        if (_activeSlot >= 0) SaveSet(_activeSlot);
+        foreach (var (slot, entries) in _slotCache)
+        {
+            bool isEmpty = entries.Replace("|", "").Trim().Length == 0;
+            if (isEmpty)
+                Preferences.Remove(SetKey(slot));
+            else
+                Preferences.Set(SetKey(slot), entries);
+        }
+        UpdateSlotPicker();
+        int savedCount = _slotCache.Count(kv => kv.Value.Replace("|", "").Trim().Length > 0);
         if (sender is Button btn)
         {
             var orig = btn.Text; var origColor = btn.BackgroundColor;
-            btn.Text = _activeSlot >= 0 ? $"SET {_activeSlot + 1} ✓" : "SAVED";
+            btn.Text = savedCount > 1 ? $"ALL {savedCount} ✓" : _activeSlot >= 0 ? $"SET {_activeSlot + 1} ✓" : "SAVED";
             btn.BackgroundColor = Color.FromArgb("#1B5E20");
             await Task.Delay(1200);
             btn.Text = orig; btn.BackgroundColor = origColor;

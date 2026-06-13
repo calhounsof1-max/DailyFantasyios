@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DailyFantasyMAUI.JackpotPage"
+             Title="Jackpot Winners"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F0F4F8">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+        <Grid.GestureRecognizers>
+            <PanGestureRecognizer PanUpdated="OnPagePan"/>
+        </Grid.GestureRecognizers>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="10,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="0" Text="◀" FontSize="16" BackgroundColor="Transparent"
+                    TextColor="White" Padding="4,0" HeightRequest="34" WidthRequest="40"
+                    Clicked="BtnBack_Clicked"/>
+            <Label Grid.Column="1" Text="Jackpot Winners" TextColor="White"
+                   FontSize="15" FontAttributes="Bold" VerticalOptions="Center"
+                   HorizontalOptions="Center"/>
+            <Button Grid.Column="2" Text="Refresh" FontSize="12" BackgroundColor="#2D3D50"
+                    TextColor="White" Padding="12,0" HeightRequest="34" CornerRadius="17"
+                    Clicked="BtnRefresh_Clicked"/>
+        </Grid>
+
+        <!-- Progress bar -->
+        <ProgressBar Grid.Row="1" x:Name="progressBar" Progress="0"
+                     ProgressColor="#FF8F00" BackgroundColor="#2D3D50"
+                     HeightRequest="3" IsVisible="False"/>
+
+        <!-- Cards -->
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout Spacing="10" Padding="12,12,12,12">
+
+                <Label x:Name="lblLastChecked" Text="" HorizontalOptions="Center"
+                       FontSize="11" TextColor="#9CA3AF"/>
+
+                <!-- Fantasy 5 -->
+                <Frame x:Name="cardF5" BackgroundColor="White" CornerRadius="12"
+                       BorderColor="#E5E7EB" Padding="14,12" HasShadow="False">
+                    <VerticalStackLayout Spacing="5">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="Fantasy 5" FontSize="14"
+                                   FontAttributes="Bold" TextColor="#FF8F00"/>
+                            <Label Grid.Column="1" x:Name="lblF5Badge" Text=""
+                                   FontSize="11" FontAttributes="Bold"
+                                   TextColor="White" BackgroundColor="#9CA3AF"
+                                   Padding="8,3" VerticalOptions="Center"/>
+                        </Grid>
+                        <Label x:Name="lblF5Date" Text="" FontSize="11" TextColor="#6B7280"/>
+                        <Label x:Name="lblF5Numbers" Text="" FontFamily="Monospace"
+                               FontSize="20" FontAttributes="Bold" TextColor="#1E2733"/>
+                        <Label x:Name="lblF5Result" Text="" FontSize="12" TextColor="#6B7280"/>
+                        <Label x:Name="lblF5Jackpot" Text="" FontSize="13" FontAttributes="Bold" TextColor="#FF8F00"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Super Lotto Plus -->
+                <Frame x:Name="cardSL" BackgroundColor="White" CornerRadius="12"
+                       BorderColor="#E5E7EB" Padding="14,12" HasShadow="False">
+                    <VerticalStackLayout Spacing="5">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="Super Lotto Plus" FontSize="14"
+                                   FontAttributes="Bold" TextColor="#7B1FA2"/>
+                            <Label Grid.Column="1" x:Name="lblSLBadge" Text=""
+                                   FontSize="11" FontAttributes="Bold"
+                                   TextColor="White" BackgroundColor="#9CA3AF"
+                                   Padding="8,3" VerticalOptions="Center"/>
+                        </Grid>
+                        <Label x:Name="lblSLDate" Text="" FontSize="11" TextColor="#6B7280"/>
+                        <Label x:Name="lblSLNumbers" Text="" FontFamily="Monospace"
+                               FontSize="20" FontAttributes="Bold" TextColor="#1E2733"/>
+                        <Label x:Name="lblSLResult" Text="" FontSize="12" TextColor="#6B7280"/>
+                        <Label x:Name="lblSLJackpot" Text="" FontSize="13" FontAttributes="Bold" TextColor="#7B1FA2"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Powerball -->
+                <Frame x:Name="cardPB" BackgroundColor="White" CornerRadius="12"
+                       BorderColor="#E5E7EB" Padding="14,12" HasShadow="False">
+                    <VerticalStackLayout Spacing="5">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="Powerball" FontSize="14"
+                                   FontAttributes="Bold" TextColor="#C62828"/>
+                            <Label Grid.Column="1" x:Name="lblPBBadge" Text=""
+                                   FontSize="11" FontAttributes="Bold"
+                                   TextColor="White" BackgroundColor="#9CA3AF"
+                                   Padding="8,3" VerticalOptions="Center"/>
+                        </Grid>
+                        <Label x:Name="lblPBDate" Text="" FontSize="11" TextColor="#6B7280"/>
+                        <Label x:Name="lblPBNumbers" Text="" FontFamily="Monospace"
+                               FontSize="20" FontAttributes="Bold" TextColor="#1E2733"/>
+                        <Label x:Name="lblPBResult" Text="" FontSize="12" TextColor="#6B7280"/>
+                        <Label x:Name="lblPBJackpot" Text="" FontSize="13" FontAttributes="Bold" TextColor="#C62828"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Mega Millions -->
+                <Frame x:Name="cardMM" BackgroundColor="White" CornerRadius="12"
+                       BorderColor="#E5E7EB" Padding="14,12" HasShadow="False">
+                    <VerticalStackLayout Spacing="5">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="Mega Millions" FontSize="14"
+                                   FontAttributes="Bold" TextColor="#1565C0"/>
+                            <Label Grid.Column="1" x:Name="lblMMBadge" Text=""
+                                   FontSize="11" FontAttributes="Bold"
+                                   TextColor="White" BackgroundColor="#9CA3AF"
+                                   Padding="8,3" VerticalOptions="Center"/>
+                        </Grid>
+                        <Label x:Name="lblMMDate" Text="" FontSize="11" TextColor="#6B7280"/>
+                        <Label x:Name="lblMMNumbers" Text="" FontFamily="Monospace"
+                               FontSize="20" FontAttributes="Bold" TextColor="#1E2733"/>
+                        <Label x:Name="lblMMResult" Text="" FontSize="12" TextColor="#6B7280"/>
+                        <Label x:Name="lblMMJackpot" Text="" FontSize="13" FontAttributes="Bold" TextColor="#1565C0"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Daily Derby -->
+                <Frame x:Name="cardDD" BackgroundColor="White" CornerRadius="12"
+                       BorderColor="#E5E7EB" Padding="14,12" HasShadow="False">
+                    <VerticalStackLayout Spacing="5">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="Daily Derby" FontSize="14"
+                                   FontAttributes="Bold" TextColor="#5D4037"/>
+                            <Label Grid.Column="1" x:Name="lblDDBadge" Text=""
+                                   FontSize="11" FontAttributes="Bold"
+                                   TextColor="White" BackgroundColor="#9CA3AF"
+                                   Padding="8,3" VerticalOptions="Center"/>
+                        </Grid>
+                        <Label x:Name="lblDDDate" Text="" FontSize="11" TextColor="#6B7280"/>
+                        <Label x:Name="lblDDNumbers" Text="" FontFamily="Monospace"
+                               FontSize="16" FontAttributes="Bold" TextColor="#1E2733"/>
+                        <Label x:Name="lblDDResult" Text="" FontSize="12" TextColor="#6B7280"/>
+                        <Label x:Name="lblDDJackpot" Text="" FontSize="13" FontAttributes="Bold" TextColor="#5D4037"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Status bar -->
+        <Label Grid.Row="3" x:Name="lblStatus" Text="Loading..."
+               BackgroundColor="#1E2733" TextColor="#8B9DC3"
+               FontSize="12" Padding="14,5" LineBreakMode="TailTruncation"/>
+
+    </Grid>
+</ContentPage>

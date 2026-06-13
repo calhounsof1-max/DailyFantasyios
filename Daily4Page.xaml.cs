@@ -18,13 +18,21 @@ public partial class Daily4Page : ContentPage
     static readonly string[] BetCycle = ["S", "B", "S&B"];
     int  _activeSlot = -1;
     bool _suppressPickerEvent = false;
+    bool _suppressExcl = false;
     bool _loading = false;
+    readonly Dictionary<int, (string entries, string betTypes)> _slotCache = new();
+    View? _highlightedView;
 
     List<(string DateLabel, int[] Numbers)> _draws = new();
     bool _drawsLoaded = false;
 
     int[]? _winNums;
     bool _isPanning = false;
+    bool _voiceOn = false;
+    bool _voiceSettingText = false;
+    int  _voiceRow = 0, _voiceCol = 0;
+    Entry? _voiceTarget = null;
+    Color _voiceTargetOldColor = Colors.White;
 
     internal static string ComingFrom { get; set; } = "d3";
 
@@ -93,6 +101,9 @@ public partial class Daily4Page : ContentPage
         await Shell.Current.GoToAsync("..", false);
     }
 
+    private async void BtnGoHome_Clicked(object sender, EventArgs e) =>
+        await Shell.Current.Navigation.PopToRootAsync(false);
+
     private async void BtnGoBack_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;
@@ -118,7 +129,12 @@ public partial class Daily4Page : ContentPage
         this.TranslateTo(0, 0, 220, Easing.CubicOut);
         base.OnAppearing();
 
-        if (ComingFrom == "main")
+        if (ComingFrom == "results")
+        {
+            btnBack.Text = "← RESULTS";
+            btnBack.BackgroundColor = Color.FromArgb("#FF8F00");
+        }
+        else if (ComingFrom == "main")
         {
             btnBack.Text = "← HOME";
             btnBack.BackgroundColor = Color.FromArgb("#FF8F00");
@@ -132,34 +148,50 @@ public partial class Daily4Page : ContentPage
         _ = LoadAllDraws();
         Dispatcher.Dispatch(() =>
         {
-            _activeSlot = Preferences.Get("d4_active_slot", -1);
-            if (_activeSlot < 0)
+            int pendingRow = -1;
+            if (PendingHighlight.HasPending && PendingHighlight.Game == "D4")
             {
-                var current = Preferences.Get("d4_entries", "");
-                if (!string.IsNullOrEmpty(current))
+                _activeSlot = PendingHighlight.Slot;
+                pendingRow  = PendingHighlight.Row;
+                PendingHighlight.Clear();
+                Preferences.Set("d4_active_slot", _activeSlot);
+                FillFromSlot(_activeSlot);
+            }
+            else
+            {
+                _activeSlot = Preferences.Get("d4_active_slot", -1);
+                if (_activeSlot < 0)
                 {
-                    for (int i = 0; i < 10; i++)
+                    var current = Preferences.Get("d4_entries", "");
+                    if (!string.IsNullOrEmpty(current))
                     {
-                        if (SlotHasData(i) && Preferences.Get(SetKey(i), "") == current)
+                        for (int i = 0; i < 10; i++)
                         {
-                            _activeSlot = i;
-                            break;
+                            if (SlotHasData(i) && Preferences.Get(SetKey(i), "") == current)
+                            {
+                                _activeSlot = i;
+                                break;
+                            }
                         }
                     }
+                    if (_activeSlot < 0) _activeSlot = 0;
                 }
-                if (_activeSlot < 0) _activeSlot = 0;
+                if (SlotHasData(_activeSlot))
+                    FillFromSlot(_activeSlot);
+                else
+                    LoadEntries();
             }
-            if (SlotHasData(_activeSlot))
-                FillFromSlot(_activeSlot);
-            else
-                LoadEntries();
             UpdateSlotPicker();
+            if (pendingRow >= 0)
+                _ = HighlightRow(pendingRow);
         });
     }
 
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        if (_voiceOn) StopVoice();
+        if (_highlightedView != null) { _highlightedView.BackgroundColor = Colors.White; _highlightedView = null; }
         SaveEntries();
         if (_activeSlot >= 0)
             Preferences.Set("d4_active_slot", _activeSlot);
@@ -198,9 +230,12 @@ public partial class Daily4Page : ContentPage
             HighlightRows(n);
     }
 
-    private void LoadBetTypes(string key)
+    private void LoadBetTypes(string key) =>
+        LoadBetTypes_FromString(Preferences.Get(key, ""));
+
+    private void LoadBetTypes_FromString(string value)
     {
-        var parts = Preferences.Get(key, "").Split('|');
+        var parts = value.Split('|');
         for (int r = 0; r < Rows; r++)
         {
             var val = r < parts.Length ? parts[r] : "S";
@@ -286,8 +321,28 @@ public partial class Daily4Page : ContentPage
     private bool SlotHasData(int slot) =>
         !string.IsNullOrEmpty(Preferences.Get(SetKey(slot), ""));
 
-    private string SlotLabel(int slot) =>
-        SlotHasData(slot) ? $"Set {slot + 1}  ✓" : $"Set {slot + 1}";
+    private string ExclKey(int slot) => $"excl_set_d4_{slot}";
+
+    private string SlotLabel(int slot)
+    {
+        bool excl = Preferences.Get(ExclKey(slot), false);
+        string mark = SlotHasData(slot) ? "  ✓" : "";
+        return excl ? $"Set {slot + 1}{mark} [X]" : $"Set {slot + 1}{mark}";
+    }
+
+    private void UpdateExclCheckbox()
+    {
+        _suppressExcl = true;
+        chkExcl.IsChecked = _activeSlot >= 0 && Preferences.Get(ExclKey(_activeSlot), false);
+        _suppressExcl = false;
+    }
+
+    private void ChkExcl_CheckedChanged(object sender, CheckedChangedEventArgs e)
+    {
+        if (_suppressExcl || _activeSlot < 0) return;
+        Preferences.Set(ExclKey(_activeSlot), e.Value);
+        UpdateSlotPicker();
+    }
 
     private void BuildSlotPicker()
     {
@@ -302,6 +357,7 @@ public partial class Daily4Page : ContentPage
             slotPicker.Items[i] = SlotLabel(i);
         slotPicker.SelectedIndex = _activeSlot;
         _suppressPickerEvent = false;
+        UpdateExclCheckbox();
     }
 
     private void SlotPicker_Changed(object sender, EventArgs e)
@@ -309,12 +365,54 @@ public partial class Daily4Page : ContentPage
         if (_suppressPickerEvent) return;
         int slot = slotPicker.SelectedIndex;
         if (slot < 0) return;
+        // Cache current slot before switching
+        if (_activeSlot >= 0)
+            _slotCache[_activeSlot] = (GetCurrentEntryString(), string.Join("|", _betTypes));
         _activeSlot = slot;
         Preferences.Set("d4_active_slot", slot);
         ClearAllEntries();
-        if (SlotHasData(slot))
+        if (_slotCache.TryGetValue(slot, out var cached))
+        {
+            _loading = true;
+            var vals = cached.entries.Split('|');
+            for (int r = 0; r < Rows; r++)
+                for (int c = 0; c < Cols; c++)
+                {
+                    int idx = r * Cols + c;
+                    _entries[r, c].Text = idx < vals.Length ? vals[idx] : "";
+                }
+            LoadBetTypes_FromString(cached.betTypes);
+            _loading = false;
+            CheckAll();
+        }
+        else if (SlotHasData(slot))
             FillFromSlot(slot);
         UpdateSlotPicker();
+    }
+
+    // ── Highlight a row (called after navigating from ResultsPage) ───────────
+
+    internal void ClearHighlight()
+    {
+        if (_highlightedView == null) return;
+        _highlightedView.BackgroundColor = Colors.White;
+        _highlightedView = null;
+    }
+
+    private async Task HighlightRow(int rowIndex)
+    {
+        if (rowIndex < 0 || rowIndex >= rowsContainer.Children.Count) return;
+        var wrapper = rowsContainer.Children[rowIndex] as Layout;
+        if (wrapper == null || wrapper.Children.Count < 1) return;
+        var rowView = wrapper.Children[0] as View;
+        if (rowView == null) return;
+        _highlightedView = rowView;
+        rowView.BackgroundColor = Color.FromArgb("#FFF176");
+        if (rowsContainer.Parent is ScrollView sv)
+            await sv.ScrollToAsync(wrapper, ScrollToPosition.MakeVisible, true);
+        await Task.Delay(2000);
+        rowView.BackgroundColor = Colors.White;
+        _highlightedView = null;
     }
 
     // ── Highlight rows ───────────────────────────────────────────────────────
@@ -396,7 +494,7 @@ public partial class Daily4Page : ContentPage
                 entry.TextChanged += (_, _) =>
                 {
                     if (_loading) return;
-                    if (_entries[row_, col_].Text?.Length == 1)
+                    if (!_voiceSettingText && _entries[row_, col_].Text?.Length == 1)
                         AdvanceFocus(row_, col_);
                     SaveEntries();
                     CheckAll();
@@ -651,7 +749,7 @@ public partial class Daily4Page : ContentPage
         for (int i = 0; i < 4; i++)
             _wLabels[i].Text = _winNums != null ? _winNums[i].ToString() : "?";
 
-        if (_results[0].Text != "") CheckAll();
+        CheckAll();
     }
 
     private void DrawDatePicker_DateSelected(object sender, DateChangedEventArgs e) =>
@@ -747,6 +845,37 @@ public partial class Daily4Page : ContentPage
         lblStatus.Text = orig;
     }
 
+    private async void BtnQuickPick_Clicked(object sender, EventArgs e)
+    {
+        string? choice = await DisplayActionSheet("Quick Pick — How many empty rows?", "Cancel", null,
+            "1", "2", "3", "5", "10", "All");
+        if (choice == null || choice == "Cancel") return;
+        int max = choice == "All" ? Rows : int.TryParse(choice, out int n) ? n : 1;
+
+        var rng = Random.Shared;
+        int filled = 0;
+        for (int r = 0; r < Rows && filled < max; r++)
+        {
+            bool empty = true;
+            for (int c = 0; c < Cols; c++)
+                if (!string.IsNullOrEmpty(_entries[r, c].Text)) { empty = false; break; }
+            if (!empty) continue;
+
+            for (int c = 0; c < Cols; c++)
+                _entries[r, c].Text = rng.Next(0, 10).ToString();
+            filled++;
+        }
+
+        if (filled == 0)
+            lblStatus.Text = "No empty rows to fill";
+        else
+        {
+            CheckAll();
+            SaveEntries();
+            lblStatus.Text = $"Quick Pick: filled {filled} row{(filled == 1 ? "" : "s")}";
+        }
+    }
+
     private async void BtnClearSets_Clicked(object sender, EventArgs e)
     {
         string setLabel = _activeSlot >= 0 ? $"Set {_activeSlot + 1}" : "Current Set";
@@ -784,14 +913,126 @@ public partial class Daily4Page : ContentPage
         }
     }
 
+    private void BtnVoice_Clicked(object sender, EventArgs e)
+    {
+#if ANDROID
+        if (!Services.VoiceNumberService.IsAvailable) { lblStatus.Text = "Speech recognition not available"; return; }
+        if (_voiceOn) StopVoice(); else StartVoice();
+#endif
+    }
+
+    void StartVoice()
+    {
+        _voiceRow = 0; _voiceCol = 0;
+        VoiceSkipFilled();
+        if (_voiceRow >= Rows) { lblStatus.Text = "No empty cells"; return; }
+        _voiceOn = true;
+        btnVoice.BackgroundColor = Colors.Red;
+        SetVoiceTarget();
+#if ANDROID
+        Services.VoiceNumberService.StatusUpdate += OnVoiceStatus;
+        Services.VoiceNumberService.StartContinuous(OnVoiceNumbers);
+#endif
+    }
+
+    void StopVoice()
+    {
+        _voiceOn = false;
+        ClearVoiceTarget();
+#if ANDROID
+        Services.VoiceNumberService.StatusUpdate -= OnVoiceStatus;
+        Services.VoiceNumberService.Stop();
+#endif
+        btnVoice.BackgroundColor = Color.FromArgb("#0277BD");
+        lblStatus.Text = "Mic off";
+    }
+
+    void SetVoiceTarget()
+    {
+        if (_voiceTarget != null) _voiceTarget.BackgroundColor = _voiceTargetOldColor;
+        if (_voiceRow < Rows)
+        {
+            _voiceTarget = _entries[_voiceRow, _voiceCol];
+            _voiceTargetOldColor = _voiceTarget.BackgroundColor;
+            _voiceTarget.BackgroundColor = Color.FromArgb("#A5D6A7");
+        }
+    }
+
+    void ClearVoiceTarget()
+    {
+        if (_voiceTarget != null) _voiceTarget.BackgroundColor = _voiceTargetOldColor;
+        _voiceTarget = null;
+    }
+
+    void OnVoiceStatus(string msg) => MainThread.BeginInvokeOnMainThread(() => lblStatus.Text = msg);
+
+    void OnVoiceNumbers(List<int> nums)
+    {
+        if (!_voiceOn) return;
+        foreach (int n in nums)
+        {
+            if (_voiceRow >= Rows) { StopVoice(); return; }
+            if (n >= 0 && n <= 9)
+            {
+                _voiceSettingText = true;
+                _entries[_voiceRow, _voiceCol].Text = n.ToString();
+                _voiceSettingText = false;
+                _voiceCol++;
+                if (_voiceCol >= Cols) { _voiceCol = 0; _voiceRow++; }
+                VoiceSkipFilled();
+            }
+        }
+        CheckAll(); SaveEntries();
+        SetVoiceTarget(); // after CheckAll so green highlight isn't wiped
+        if (_voiceOn && _voiceRow < Rows)
+            lblStatus.Text = $"🔴 Listening | row {_voiceRow + 1} col {_voiceCol + 1}";
+    }
+
+    void VoiceSkipFilled()
+    {
+        while (_voiceRow < Rows && !string.IsNullOrEmpty(_entries[_voiceRow, _voiceCol].Text))
+        {
+            _voiceCol++;
+            if (_voiceCol >= Cols) { _voiceCol = 0; _voiceRow++; }
+        }
+    }
+
     private async void BtnSave_Clicked(object sender, EventArgs e)
     {
+        string? choice = await DisplayActionSheet("Save", "Cancel", null, "Save to Slot", "Save to MyFavorite");
+        if (choice == null || choice == "Cancel") return;
+        if (choice == "Save to MyFavorite")
+        {
+            SaveEntries();
+            await MyFavoritePage.SaveCurrentToMyFavoriteAsync(
+                "Daily 4", "d4_set_", _activeSlot < 0 ? 0 : _activeSlot,
+                GetCurrentEntryString(), string.Join("|", _betTypes));
+            return;
+        }
+        // Cache current slot then flush all cached slots
+        if (_activeSlot >= 0)
+            _slotCache[_activeSlot] = (GetCurrentEntryString(), string.Join("|", _betTypes));
         SaveEntries();
-        if (_activeSlot >= 0) SaveSet(_activeSlot);
+        foreach (var (slot, (entries, betTypes)) in _slotCache)
+        {
+            bool isEmpty = entries.Replace("|", "").Trim().Length == 0;
+            if (isEmpty)
+            {
+                Preferences.Remove(SetKey(slot));
+                Preferences.Remove(BetKey(slot));
+            }
+            else
+            {
+                Preferences.Set(SetKey(slot), entries);
+                Preferences.Set(BetKey(slot), betTypes);
+            }
+        }
+        UpdateSlotPicker();
+        int savedCount = _slotCache.Count(kv => kv.Value.entries.Replace("|", "").Trim().Length > 0);
         if (sender is Button btn)
         {
             var orig = btn.Text; var origColor = btn.BackgroundColor;
-            btn.Text = _activeSlot >= 0 ? $"SET {_activeSlot + 1} ✓" : "SAVED";
+            btn.Text = savedCount > 1 ? $"ALL {savedCount} ✓" : _activeSlot >= 0 ? $"SET {_activeSlot + 1} ✓" : "SAVED";
             btn.BackgroundColor = Color.FromArgb("#1B5E20");
             await Task.Delay(1200);
             btn.Text = orig; btn.BackgroundColor = origColor;

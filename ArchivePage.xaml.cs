@@ -38,9 +38,10 @@ public partial class ArchivePage : ContentPage
         int f5 = ArchiveService.CountNonEmpty(entry, "f5");
         int sl = ArchiveService.CountNonEmpty(entry, "sl");
         int pb = ArchiveService.CountNonEmpty(entry, "pb");
+        int mm = ArchiveService.CountNonEmpty(entry, "mm");
         int d3 = ArchiveService.CountNonEmpty(entry, "d3");
         int d4 = ArchiveService.CountNonEmpty(entry, "d4");
-        int total = f5 + sl + pb + d3 + d4;
+        int total = f5 + sl + pb + mm + d3 + d4;
 
         var dateLabel = new Label
         {
@@ -52,7 +53,7 @@ public partial class ArchivePage : ContentPage
 
         var summaryLabel = new Label
         {
-            Text = $"F5: {f5}  SL: {sl}  PB: {pb}  D3: {d3}  D4: {d4}   ({total} total sets)",
+            Text = $"F5: {f5}  SL: {sl}  PB: {pb}  MM: {mm}  D3: {d3}  D4: {d4}   ({total} total sets)",
             FontSize = 12,
             TextColor = Color.FromArgb("#546E7A"),
             Margin = new Thickness(0, 3, 0, 10)
@@ -117,7 +118,7 @@ public partial class ArchivePage : ContentPage
         var action = await DisplayActionSheet(
             $"Restore from {entry.Date:MMM d, yyyy}",
             "Cancel", null,
-            "All Games", "Fantasy 5", "Super Lotto", "Powerball", "Daily 3", "Daily 4");
+            "All Games", "Fantasy 5", "Super Lotto", "Powerball", "Mega Millions", "Daily 3", "Daily 4");
 
         if (action == null || action == "Cancel") return;
 
@@ -131,8 +132,9 @@ public partial class ArchivePage : ContentPage
             case "All Games":   ArchiveService.RestoreAll(entry); break;
             case "Fantasy 5":   ArchiveService.RestoreGame(entry, "f5"); break;
             case "Super Lotto": ArchiveService.RestoreGame(entry, "sl"); break;
-            case "Powerball":   ArchiveService.RestoreGame(entry, "pb"); break;
-            case "Daily 3":     ArchiveService.RestoreGame(entry, "d3"); break;
+            case "Powerball":      ArchiveService.RestoreGame(entry, "pb"); break;
+            case "Mega Millions":  ArchiveService.RestoreGame(entry, "mm"); break;
+            case "Daily 3":        ArchiveService.RestoreGame(entry, "d3"); break;
             case "Daily 4":     ArchiveService.RestoreGame(entry, "d4"); break;
         }
 

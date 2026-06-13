@@ -14,7 +14,14 @@
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+    <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
+
+  <ItemGroup Condition="$(TargetFramework.Contains('-ios'))">
+    <None Update="Platforms\iOS\Info.plist">
+      <LogicalName>Info.plist</LogicalName>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <MauiIcon Include="Resources\AppIcon\appicon.png" Color="#FFFFFF" />

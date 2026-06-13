@@ -13,6 +13,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Button Grid.Column="0" x:Name="btnBack" Text="← Back"
                     FontSize="13" FontAttributes="Bold"
@@ -22,12 +23,23 @@
             <Label Grid.Column="1" Text="All Saved Sets"
                    TextColor="White" FontSize="15" FontAttributes="Bold"
                    VerticalOptions="Center" HorizontalOptions="Center"/>
+            <Button Grid.Column="2" x:Name="btnCollapseAll" Text="⊟"
+                    FontSize="14" BackgroundColor="#2D3D50" TextColor="White"
+                    Padding="10,0" HeightRequest="34" CornerRadius="17"
+                    Clicked="BtnCollapseAll_Clicked"/>
         </Grid>
 
         <!-- Scrollable content -->
         <ScrollView Grid.Row="1">
             <VerticalStackLayout x:Name="setsContainer" Spacing="0" Padding="0,6,0,6"/>
         </ScrollView>
+
+        <!-- Loading overlay -->
+        <Grid Grid.Row="1" x:Name="loadingOverlay" IsVisible="False" BackgroundColor="#F0F4F8">
+            <ActivityIndicator x:Name="loadingSpinner" IsRunning="False"
+                               Color="#1E2733" WidthRequest="48" HeightRequest="48"
+                               HorizontalOptions="Center" VerticalOptions="Center"/>
+        </Grid>
 
         <!-- Bottom bar -->
         <Grid Grid.Row="2" BackgroundColor="#1E2733" ColumnDefinitions="*,Auto">

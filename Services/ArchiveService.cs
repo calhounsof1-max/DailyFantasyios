@@ -22,6 +22,7 @@ public static class ArchiveService
         ("f5", 10, "f5_entries"),
         ("sl", 10, "sl_entries"),
         ("pb", 10, "pb_entries"),
+        ("mm", 10, "mm_entries"),
         ("d3", 10, "d3_entries"),
         ("d4", 10, "d4_entries"),
     ];

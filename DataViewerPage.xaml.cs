@@ -28,6 +28,22 @@ public partial class DataViewerPage : ContentPage
             new("Error Log",        Path.Combine(appDir, "error_log.txt")),
         ];
 
+        // Add any saved MyFavorite files dynamically
+#if ANDROID
+        var favDir = Path.Combine(
+            Android.App.Application.Context.GetExternalFilesDir(null)?.AbsolutePath ?? appDir,
+            "MyFavorite");
+#else
+        var favDir = Path.Combine(appDir, "data", "MyFavorite");
+#endif
+        if (Directory.Exists(favDir))
+        {
+            foreach (var f in Directory.GetFiles(favDir, "*.*")
+                         .Where(f => f.EndsWith(".json") || f.EndsWith(".txt"))
+                         .OrderByDescending(f => f))
+                _files.Add(new($"⭐ {Path.GetFileName(f)}", f));
+        }
+
         filePicker.Items.Clear();
         foreach (var f in _files)
             filePicker.Items.Add(f.Label + (File.Exists(f.Path) ? "" : " (missing)"));

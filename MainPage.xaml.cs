@@ -65,6 +65,22 @@ public partial class MainPage : ContentPage
 #endif
     }
 
+    static void HideKeyboard()
+    {
+#if ANDROID
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var activity = Microsoft.Maui.ApplicationModel.Platform.CurrentActivity;
+            activity?.CurrentFocus?.ClearFocus();
+            var imm = activity?.GetSystemService(Android.Content.Context.InputMethodService)
+                      as Android.Views.InputMethods.InputMethodManager;
+            var token = activity?.Window?.DecorView?.WindowToken;
+            if (token != null) imm?.HideSoftInputFromWindow(token, 0);
+            activity?.Window?.DecorView?.RequestFocus();
+        });
+#endif
+    }
+
     protected override async void OnAppearing()
     {
         base.OnAppearing();
@@ -73,6 +89,7 @@ public partial class MainPage : ContentPage
         {
             // TranslationX was pre-set by the caller before navigating back — just animate in
             await this.TranslateTo(0, 0, 220, Easing.CubicOut);
+            HideKeyboard();
             return;
         }
         _initialized = true;
@@ -83,14 +100,18 @@ public partial class MainPage : ContentPage
             int idx = i;
             _boxes[i].TextChanged += (_, _) =>
             {
+                if (_isRestoring) return;
                 SavePreferences();
-                if (_boxes[idx].Text?.Length == 2 && idx + 1 < _boxes.Length)
+                int advanceLen = _mode == 2 ? 1 : 2;
+                if (_boxes[idx].Text?.Length == advanceLen && idx + 1 < _boxes.Length)
                     _boxes[idx + 1].Focus();
             };
         }
         MaxNum.TextChanged += (_, _) => SavePreferences();
         HowMany.TextChanged += (_, _) => SavePreferences();
+        _isRestoring = true;
         RestorePreferences();
+        _isRestoring = false;
         await vm.LoadDataAsync();
         await vm.LoadPicksAsync(_mode);
         var comboMeta = await vm.LoadSavedCombosAsync();
@@ -102,17 +123,27 @@ public partial class MainPage : ContentPage
                 for (int i = 0; i < meta.Boxes.Length && i < _boxes.Length; i++)
                     _boxes[i].Text = meta.Boxes[i];
                 MaxNum.Text = meta.MaxNum;
-                HowMany.Text = meta.HowMany;
             }
             finally { _isRestoring = false; }
         }
+        // Enforce mode-correct PICK/FROM — combos restore may have overwritten them
+        if (_mode == 2) { MaxNum.Text = "3"; if (string.IsNullOrEmpty(Preferences.Get("howmany", ""))) HowMany.Text = "9"; }
+        else if (_mode == 1) { MaxNum.Text = "6"; if (string.IsNullOrEmpty(Preferences.Get("howmany", ""))) HowMany.Text = "47"; }
+        UpdateBoxMaxLength(_mode);
         UpdateCombosLabel();
         if (int.TryParse(HowMany.Text, out int from)) HighlightBoxes(from);
         btnInsertToWinner.Text = _mode == 0 ? "Insert Combos → F5 Winner"
                                 : _mode == 1 ? "Insert Combos → SL Winner"
                                 :              "Insert Combos → Daily 3";
         UpdateModeButtons();
+        UpdateRecurrencePicker(_mode);
         vm.ActiveTab = 0;
+        await Task.Delay(300);
+        foreach (var e in _boxes) e.Unfocus();
+        MaxNum.Unfocus();
+        HowMany.Unfocus();
+        HideKeyboard();
+
     }
 
     protected override void OnDisappearing()
@@ -175,6 +206,8 @@ public partial class MainPage : ContentPage
         HowMany.Text = mode == 0 ? "39" : mode == 1 ? "47" : "9";
         Preferences.Set("gameMode", _mode);
         UpdateModeButtons();
+        UpdateRecurrencePicker(mode);
+        UpdateBoxMaxLength(mode);
         btnInsertToWinner.Text = mode == 0 ? "Insert Combos → F5 Winner"
                                 : mode == 1 ? "Insert Combos → SL Winner"
                                 :              "Insert Combos → Daily 3";
@@ -386,15 +419,30 @@ public partial class MainPage : ContentPage
         HighlightBoxes(0);
     }
 
-    // ── Shift buttons ─────────────────────────────────────────────────────────
+    // ── Quick Pick ────────────────────────────────────────────────────────────
 
-    private void BtnShiftLeft_Clicked(object sender, EventArgs e)
+    private async void BtnQuickPick_Clicked(object sender, EventArgs e)
     {
         if (_boxes == null) return;
-        string first = _boxes[0].Text;
-        for (int i = 0; i < _boxes.Length - 1; i++)
-            _boxes[i].Text = _boxes[i + 1].Text;
-        _boxes[_boxes.Length - 1].Text = first;
+        string gameName = _mode == 0 ? "Fantasy 5" : _mode == 1 ? "Super Lotto" : "Daily 3";
+        bool ok = await DisplayAlert("Quick Pick", $"Fill boxes with random {gameName} numbers?", "Yes", "Cancel");
+        if (!ok) return;
+        var rng = Random.Shared;
+        if (_mode == 0) // Fantasy 5: 5 unique from 1-39
+        {
+            var nums = Enumerable.Range(1, 39).OrderBy(_ => rng.Next()).Take(5).OrderBy(n => n).ToList();
+            for (int i = 0; i < 5 && i < _boxes.Length; i++) _boxes[i].Text = nums[i].ToString();
+        }
+        else if (_mode == 1) // Super Lotto: 5 from 1-47 + Mega from 1-27
+        {
+            var nums = Enumerable.Range(1, 47).OrderBy(_ => rng.Next()).Take(5).OrderBy(n => n).ToList();
+            for (int i = 0; i < 5 && i < _boxes.Length; i++) _boxes[i].Text = nums[i].ToString();
+            if (_boxes.Length > 5) _boxes[5].Text = rng.Next(1, 28).ToString();
+        }
+        else // Daily 3: 3 random digits 0-9
+        {
+            for (int i = 0; i < 3 && i < _boxes.Length; i++) _boxes[i].Text = rng.Next(0, 10).ToString();
+        }
     }
 
     private void BtnShiftRight_Clicked(object sender, EventArgs e)
@@ -496,14 +544,50 @@ public partial class MainPage : ContentPage
 
     private void BtnRecurrence_Clicked(object sender, EventArgs e)
     {
-        string numbers = $"{Box1.Text} {Box2.Text} {Box3.Text} {Box4.Text} {Box5.Text}";
         string matchCount = cmbRecurrence.SelectedIndex >= 0
             ? cmbRecurrence.Items[cmbRecurrence.SelectedIndex]
             : "2";
 
-        vm.SearchRecurrence(numbers, matchCount);
+        if (_mode == 1) // Super Lotto: box1–5 main, box6 = Mega/bonus
+        {
+            string numbers = $"{Box1.Text} {Box2.Text} {Box3.Text} {Box4.Text} {Box5.Text} {Box6.Text}";
+            vm.SearchRecurrenceSL(numbers, matchCount);
+        }
+        else if (_mode == 2) // Daily 3: box1–3
+        {
+            string numbers = $"{Box1.Text} {Box2.Text} {Box3.Text}";
+            vm.SearchRecurrenceD3(numbers, matchCount);
+        }
+        else // Fantasy 5: box1–5
+        {
+            string numbers = $"{Box1.Text} {Box2.Text} {Box3.Text} {Box4.Text} {Box5.Text}";
+            vm.SearchRecurrence(numbers, matchCount);
+        }
+
         vm.StatusMessage = $"Complete — {vm.NumberInList} matches found";
         vm.ActiveTab = 1;
+    }
+
+    private void UpdateBoxMaxLength(int mode)
+    {
+        if (_boxes == null) return;
+        int maxLen = mode == 2 ? 1 : 2;
+        foreach (var box in _boxes)
+            box.MaxLength = maxLen;
+    }
+
+    private void UpdateRecurrencePicker(int mode)
+    {
+        string current = cmbRecurrence.SelectedIndex >= 0
+            ? cmbRecurrence.Items[cmbRecurrence.SelectedIndex] : "2";
+        cmbRecurrence.Items.Clear();
+        cmbRecurrence.Items.Add("2");
+        cmbRecurrence.Items.Add("3");
+        if (mode != 2) cmbRecurrence.Items.Add("4"); // D3 max is 3
+        if (mode != 2) cmbRecurrence.Items.Add("5");
+        if (mode == 1) cmbRecurrence.Items.Add("6");
+        int idx = cmbRecurrence.Items.IndexOf(current);
+        cmbRecurrence.SelectedIndex = idx >= 0 ? idx : 0;
     }
 
     // ── Draws toggle (reuses History listbox) ────────────────────────────────
@@ -535,53 +619,57 @@ public partial class MainPage : ContentPage
     {
         if (_isPanning) return;
         SavePreferences();
+        vm.IsLoading = true;
+        await Task.Yield(); // let spinner render before navigation work starts
         AppShell.WinnerPageInstance.PrePosition(true);
         await Shell.Current.GoToAsync(nameof(WinnerPage), false);
-    }
-
-    private async void BtnScan_Clicked(object sender, EventArgs e)
-    {
-        string result = await DisplayActionSheet("What are you scanning?", "Cancel", null,
-            "Ticket (printed machine receipt)", "Slip (bubble form you filled in)");
-        if (result?.Contains("Ticket") == true)
-            await Shell.Current.GoToAsync(nameof(ScanTicketPage), false);
-        else if (result?.Contains("Slip") == true)
-            await Shell.Current.GoToAsync(nameof(ScanSlipPage), false);
+        vm.IsLoading = false;
     }
 
     private async void BtnSuperLotto_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;
         SavePreferences();
+        vm.IsLoading = true;
+        await Task.Yield();
         SuperLottoPage.ComingFrom = "main";
         AppShell.SuperLottoPageInstance.PrePosition(true);
         await Shell.Current.GoToAsync(nameof(SuperLottoPage), false);
+        vm.IsLoading = false;
     }
 
     private async void BtnDaily3_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;
         SavePreferences();
+        vm.IsLoading = true;
+        await Task.Yield();
         Daily3Page.ComingFrom = "main";
         AppShell.Daily3PageInstance.PrePosition(true);
         await Shell.Current.GoToAsync(nameof(Daily3Page), false);
+        vm.IsLoading = false;
     }
 
     private async void BtnPowerball_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;
         SavePreferences();
+        vm.IsLoading = true;
+        await Task.Yield();
         AppShell.PowerballPageInstance.PrePosition(true);
         await Shell.Current.GoToAsync(nameof(PowerballPage), false);
+        vm.IsLoading = false;
     }
 
     private async void BtnNavDropdown_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;
         string result = await DisplayActionSheet(null, "Cancel", null,
-            "Fantasy 5", "Super Lotto", "Daily 3", "Daily 4", "Powerball", "Daily Derby");
+            "Fantasy 5", "Super Lotto", "Daily 3", "Daily 4", "Powerball", "Mega Millions", "Daily Derby", "Jackpot Winners");
         if (result == null || result == "Cancel") return;
         SavePreferences();
+        vm.IsLoading = true;
+        await Task.Yield(); // let spinner render before navigation work starts
         switch (result)
         {
             case "Fantasy 5":
@@ -608,12 +696,22 @@ public partial class MainPage : ContentPage
                 AppShell.PowerballPageInstance.PrePosition(true);
                 await Shell.Current.GoToAsync(nameof(PowerballPage), false);
                 break;
+            case "Mega Millions":
+                MegaMillionsPage.ComingFrom = "main";
+                AppShell.MegaMillionsPageInstance.PrePosition(true);
+                await Shell.Current.GoToAsync(nameof(MegaMillionsPage), false);
+                break;
             case "Daily Derby":
                 DailyDerbyPage.ComingFrom = "main";
                 AppShell.DailyDerbyPageInstance.PrePosition(true);
                 await Shell.Current.GoToAsync(nameof(DailyDerbyPage), false);
                 break;
+            case "Jackpot Winners":
+                AppShell.JackpotPageInstance.PrePosition(true);
+                await Shell.Current.GoToAsync(nameof(JackpotPage), false);
+                break;
         }
+        vm.IsLoading = false;
     }
 
     private async void BtnResults_Clicked(object sender, EventArgs e)
@@ -622,6 +720,13 @@ public partial class MainPage : ContentPage
         SavePreferences();
         AppShell.ResultsPageInstance.PrePosition(true);
         await Shell.Current.GoToAsync(nameof(ResultsPage), false);
+    }
+
+    private async void BtnJackpot_Clicked(object sender, EventArgs e)
+    {
+        if (_isPanning) return;
+        AppShell.JackpotPageInstance.PrePosition(true);
+        await Shell.Current.GoToAsync(nameof(JackpotPage), false);
     }
 
     private async void BtnViewSets_Clicked(object sender, EventArgs e)
@@ -640,18 +745,79 @@ public partial class MainPage : ContentPage
     private async void BtnMore_Clicked(object sender, EventArgs e)
     {
         string action = await DisplayActionSheet("More", "Cancel", null,
-            "History", "Recurrence", "Combos", "View Sets", "Save", "Archive", "Data Files", "Export Sets");
+            "History", "Recurrence", "Combos", "View Sets", "Archive", "Data Files", "Export Sets", "My Favorites", "Load Picks", "Refresh Data", "Jackpot Winners", "Voice Settings");
         switch (action)
         {
             case "History":      vm.ActiveTab = 0; break;
             case "Recurrence":   vm.ActiveTab = 1; break;
             case "Combos":       vm.ActiveTab = 2; break;
             case "View Sets":    BtnViewSets_Clicked(sender, e); break;
-            case "Save":         BtnSave_Clicked(sender, e); break;
             case "Archive":      BtnArchive_Clicked(sender, e); break;
             case "Data Files":   await Shell.Current.GoToAsync(nameof(DataViewerPage), false); break;
-            case "Export Sets":  await Task.Delay(300); await ExportAllSetsAsync(); break;
+            case "Export Sets":            await Task.Delay(300); await ExportAllSetsAsync(); break;
+            case "My Favorites":           await Shell.Current.GoToAsync(nameof(MyFavoritePage), false); break;
+            case "Load Picks":             await Task.Delay(300); await LoadPicksFromFileAsync(); break;
+            case "Refresh Data": await vm.RefreshAllDataAsync(); break;
+            case "Jackpot Winners":
+                AppShell.JackpotPageInstance.PrePosition(true);
+                await Shell.Current.GoToAsync(nameof(JackpotPage), false);
+                break;
+            case "Voice Settings":
+                await ShowVoiceSettingsAsync();
+                break;
         }
+    }
+
+    async Task ShowVoiceSettingsAsync()
+    {
+        int silenceMs = Preferences.Get("voice_silence_ms", 150);
+        int minMs     = Preferences.Get("voice_min_ms", 100);
+        int postMs    = Preferences.Get("voice_post_ms", 50);
+        bool muteBeep = Preferences.Get("voice_mute_beep", true);
+
+        string? setting = await DisplayActionSheet("🎤 Voice Settings", "Done", null,
+            $"Silence Timeout: {silenceMs}ms",
+            $"Min Speech: {minMs}ms",
+            $"Post-Number Delay: {postMs}ms",
+            $"Mute Beep: {(muteBeep ? "ON ✓" : "OFF")}",
+            "Reset to Defaults");
+
+        if (setting == null || setting == "Done") return;
+
+        if (setting.StartsWith("Silence Timeout"))
+        {
+            string? v = await DisplayActionSheet("Silence Timeout\n(how long after you stop speaking)", "Cancel", null,
+                "150ms — fastest", "200ms", "300ms — default", "400ms", "500ms", "700ms", "1000ms — slowest");
+            if (v != null && v != "Cancel")
+                Preferences.Set("voice_silence_ms", int.Parse(v.Split('m')[0]));
+        }
+        else if (setting.StartsWith("Min Speech"))
+        {
+            string? v = await DisplayActionSheet("Min Speech Length\n(minimum time to listen)", "Cancel", null,
+                "50ms", "100ms — default", "200ms", "300ms", "500ms");
+            if (v != null && v != "Cancel")
+                Preferences.Set("voice_min_ms", int.Parse(v.Split('m')[0]));
+        }
+        else if (setting.StartsWith("Post-Number"))
+        {
+            string? v = await DisplayActionSheet("Post-Number Delay\n(gap before listening again)", "Cancel", null,
+                "0ms", "50ms — default", "100ms", "200ms", "300ms");
+            if (v != null && v != "Cancel")
+                Preferences.Set("voice_post_ms", int.Parse(v.Split('m')[0]));
+        }
+        else if (setting.StartsWith("Mute Beep"))
+        {
+            Preferences.Set("voice_mute_beep", !muteBeep);
+        }
+        else if (setting == "Reset to Defaults")
+        {
+            Preferences.Set("voice_silence_ms", 300);
+            Preferences.Set("voice_min_ms", 100);
+            Preferences.Set("voice_post_ms", 50);
+            Preferences.Set("voice_mute_beep", true);
+        }
+
+        await ShowVoiceSettingsAsync();
     }
 
     // ── Export All Sets ───────────────────────────────────────────────────────
@@ -663,6 +829,7 @@ public partial class MainPage : ContentPage
         ("Daily 3",          "d3_set_", 10, 3, -1, "",     "#1565C0", 3, false),
         ("Daily 4",          "d4_set_", 10, 4, -1, "",     "#00695C", 4, false),
         ("Powerball",        "pb_set_", 10, 6,  5, "PB",   "#C62828", 6, false),
+        ("Mega Millions",    "mm_set_", 10, 6,  5, "MB",   "#F57F17", 6, false),
         ("Daily Derby",      "dd_set_", 10, 3, -1, "",     "#5D4037", 4, true),
     };
 
@@ -693,7 +860,7 @@ public partial class MainPage : ContentPage
 
         // Pick format
         string? format = await DisplayActionSheet("Export Format", "Cancel", null,
-            "Share as Text", "Print / Save PDF");
+            "Share as Text", "Save to MyFavorite", "Print / Save PDF");
         if (format == null || format == "Cancel") return;
 
         // Determine which sets to export
@@ -756,6 +923,49 @@ public partial class MainPage : ContentPage
                 File = new ShareFile(path, "text/plain")
             });
         }
+        else if (format == "Save to MyFavorite")
+        {
+            var sets = new System.Text.Json.Nodes.JsonArray();
+            foreach (var (label, gameIdx, slot) in toExport)
+            {
+                var game = ExportGames[gameIdx];
+                string raw  = Preferences.Get($"{game.PrefKey}{slot}", "");
+                string bkey = $"{game.PrefKey.Replace("set_", "btypes_")}{slot}";
+                string braw = Preferences.Get(bkey, "");
+                var node = new System.Text.Json.Nodes.JsonObject
+                {
+                    ["label"]    = label,
+                    ["caption"]  = game.Caption,
+                    ["prefKey"]  = game.PrefKey,
+                    ["slot"]     = slot,
+                    ["data"]     = raw,
+                    ["betTypes"] = braw,
+                };
+                sets.Add(node);
+            }
+            var root = new System.Text.Json.Nodes.JsonObject
+            {
+                ["saved"] = DateTime.Now.ToString("o"),
+                ["sets"]  = sets,
+            };
+            string json = root.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+
+            string favDir = GetMyFavoriteDir();
+            Directory.CreateDirectory(favDir);
+            string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            string favName = toExport.Count == 1
+                ? $"{toExport[0].Label.Replace(" — ", "_").Replace(" ", "_")}_{stamp}.json"
+                : $"LotterySets_{stamp}.json";
+            string favPath = Path.Combine(favDir, favName);
+            await File.WriteAllTextAsync(favPath, json);
+
+            // Share so user can save to Downloads, Drive, etc.
+            await Share.RequestAsync(new ShareFileRequest
+            {
+                Title = "Save to MyFavorite",
+                File  = new ShareFile(favPath, "application/json")
+            });
+        }
         else if (format == "Print / Save PDF")
         {
             var sb = new System.Text.StringBuilder();
@@ -809,14 +1019,165 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
             string jobName = toExport.Count == 1 ? toExport[0].Label : "Lottery Sets";
 #if ANDROID
             PrintHelper.PrintHtml(sb.ToString(), jobName);
-#else
-            await DisplayAlert("Print", "Printing is not supported on this platform.", "OK");
 #endif
         }
         }
         catch (Exception ex)
         {
             await DisplayAlert("Export Error", ex.Message, "OK");
+        }
+    }
+
+    // ── Load Picks from file ──────────────────────────────────────────────────
+
+    private async Task LoadPicksFromFileAsync()
+    {
+        string game = _mode switch { 1 => "SL", 2 => "D3", _ => "F5" };
+
+        // Check for internally saved picks file first
+        string internalPath = Path.Combine(FileSystem.AppDataDirectory, $"my{game}_picks.txt");
+        bool hasInternal = File.Exists(internalPath);
+
+        var options = new List<string>();
+        if (hasInternal)
+        {
+            var info = new FileInfo(internalPath);
+            options.Add($"Load saved {game} picks ({info.LastWriteTime:MMM d h:mm tt})");
+        }
+        options.Add("Browse for file...");
+
+        string? choice = await DisplayActionSheet($"Load {game} Picks", "Cancel", null, options.ToArray());
+        if (choice == null || choice == "Cancel") return;
+
+        string? filePath = null;
+
+        if (choice.StartsWith("Load saved"))
+        {
+            filePath = internalPath;
+        }
+        else
+        {
+            var result = await FilePicker.PickAsync(new PickOptions
+            {
+                PickerTitle = $"Select {game} picks .txt file",
+                FileTypes   = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    { DevicePlatform.Android, new[] { "text/plain", "*/*" } },
+                    { DevicePlatform.iOS,     new[] { "public.plain-text" } },
+                    { DevicePlatform.WinUI,   new[] { ".txt" } },
+                })
+            });
+            if (result == null) return;
+            filePath = result.FullPath;
+        }
+
+        try
+        {
+            var lines = (await File.ReadAllLinesAsync(filePath))
+                        .Where(l => !l.StartsWith("#") && !string.IsNullOrWhiteSpace(l))
+                        .ToList();
+
+            if (lines.Count == 0) { vm.StatusMessage = "File is empty or unrecognized format"; return; }
+
+            vm.Picks = new System.Collections.ObjectModel.ObservableCollection<string>(lines);
+            vm.ActiveTab = 0; // switch to History tab to show the list
+            vm.StatusMessage = $"Loaded {lines.Count} {game} picks from file";
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Load Error", ex.Message, "OK");
+        }
+    }
+
+    // ── MyFavorite folder path ────────────────────────────────────────────────
+
+    static string GetMyFavoriteDir()
+    {
+#if ANDROID
+        // External files dir — accessible in file manager at
+        // Android/data/com.calho.dailyfantasy/files/MyFavorite/
+        var extDir = Android.App.Application.Context.GetExternalFilesDir(null)?.AbsolutePath
+                     ?? FileSystem.AppDataDirectory;
+        return Path.Combine(extDir, "MyFavorite");
+#else
+        return Path.Combine(FileSystem.AppDataDirectory, "data", "MyFavorite");
+#endif
+    }
+
+    // ── Load from MyFavorite ─────────────────────────────────────────────────
+
+    private async Task LoadFromMyFavoriteAsync()
+    {
+        try
+        {
+            // Use system file picker — works from Downloads, Drive, anywhere
+            var result = await FilePicker.PickAsync(new PickOptions
+            {
+                PickerTitle = "Select a MyFavorite .json file",
+                FileTypes   = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    { DevicePlatform.Android, new[] { "application/json", "*/*" } },
+                    { DevicePlatform.iOS,     new[] { "public.json" } },
+                    { DevicePlatform.WinUI,   new[] { ".json" } },
+                })
+            });
+            if (result == null) return;
+
+            string json = await File.ReadAllTextAsync(result.FullPath);
+            var root = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject();
+            var sets = root?["sets"]?.AsArray();
+            if (sets == null || sets.Count == 0)
+            {
+                await DisplayAlert("Load Error", "File contains no sets.", "OK");
+                return;
+            }
+
+            // Pick which set to load if multiple
+            System.Text.Json.Nodes.JsonObject? setNode;
+            if (sets.Count == 1)
+            {
+                setNode = sets[0]?.AsObject();
+            }
+            else
+            {
+                var labels = sets.Select(s => s?["label"]?.GetValue<string>() ?? "?").ToArray();
+                string? chosenLabel = await DisplayActionSheet("Select Set to Load", "Cancel", null, labels);
+                if (chosenLabel == null || chosenLabel == "Cancel") return;
+                setNode = sets.FirstOrDefault(s => s?["label"]?.GetValue<string>() == chosenLabel)?.AsObject();
+            }
+            if (setNode == null) return;
+
+            string prefKey  = setNode["prefKey"]?.GetValue<string>() ?? "";
+            string data     = setNode["data"]?.GetValue<string>()    ?? "";
+            string betTypes = setNode["betTypes"]?.GetValue<string>() ?? "";
+            string caption  = setNode["caption"]?.GetValue<string>() ?? "this game";
+            int    origSlot = setNode["slot"]?.GetValue<int>() ?? 0;
+
+            if (string.IsNullOrEmpty(prefKey) || string.IsNullOrEmpty(data))
+            {
+                await DisplayAlert("Load Error", "Set data is missing.", "OK");
+                return;
+            }
+
+            // Pick destination slot
+            var slotOptions = Enumerable.Range(0, 10).Select(i => $"Set {i + 1}").ToArray();
+            string? destLabel = await DisplayActionSheet($"Load into which slot? ({caption})", "Cancel", null, slotOptions);
+            if (destLabel == null || destLabel == "Cancel") return;
+            int destSlot = int.Parse(destLabel.Replace("Set ", "")) - 1;
+
+            // Write to preferences
+            Preferences.Set($"{prefKey}{destSlot}", data);
+            if (!string.IsNullOrEmpty(betTypes))
+            {
+                string bkey = prefKey.Replace("set_", "btypes_");
+                Preferences.Set($"{bkey}{destSlot}", betTypes);
+            }
+
+            await DisplayAlert("Loaded", $"Loaded into {caption} — Set {destSlot + 1}.\nOpen that game to see the numbers.", "OK");
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Load Error", ex.Message, "OK");
         }
     }
 
@@ -976,25 +1337,74 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
     {
         SavePreferences();
 
+        string game = _mode switch { 1 => "SL", 2 => "D3", _ => "F5" };
+
         if (vm.ActiveTab == 2 && vm.Combinations.Count > 0)
         {
+            string? choice = await DisplayActionSheet(
+                $"Save {vm.Combinations.Count:N0} combos", "Cancel", null,
+                "Save to myCombos.txt", $"Share as File ({game})");
+            if (choice == null || choice == "Cancel") return;
+
             try
             {
-                var path = Path.Combine(FileSystem.AppDataDirectory, "myCombos.txt");
                 var boxValues = string.Join(",", _boxes.Select(b => b.Text ?? ""));
                 var lines = new List<string>
                 {
+                    $"#game:{game}",
                     $"#boxes:{boxValues}",
                     $"#params:{MaxNum.Text},{HowMany.Text}"
                 };
                 lines.AddRange(vm.Combinations);
+
+                var path = Path.Combine(FileSystem.AppDataDirectory, "myCombos.txt");
                 await File.WriteAllLinesAsync(path, lines);
-                vm.StatusMessage = $"Saved {vm.Combinations.Count:N0} combos to myCombos.txt";
+                vm.StatusMessage = $"Saved {vm.Combinations.Count:N0} combos";
+
+                if (choice.StartsWith("Share"))
+                {
+                    string stamp     = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                    string sharePath = Path.Combine(FileSystem.CacheDirectory, $"{game}_combos_{stamp}.txt");
+                    await File.WriteAllLinesAsync(sharePath, lines);
+                    await Share.RequestAsync(new ShareFileRequest
+                    {
+                        Title = $"{game} Combos",
+                        File  = new ShareFile(sharePath, "text/plain")
+                    });
+                }
             }
-            catch (Exception ex)
+            catch (Exception ex) { vm.StatusMessage = "Save error: " + ex.Message; }
+            return;
+        }
+
+        if (vm.Picks.Count > 0)
+        {
+            string? choice = await DisplayActionSheet(
+                $"Save {vm.Picks.Count} {game} picks", "Cancel", null,
+                $"Save to my{game}_picks.txt", $"Share as File ({game})");
+            if (choice == null || choice == "Cancel") return;
+
+            try
             {
-                vm.StatusMessage = "Save error: " + ex.Message;
+                var lines = vm.Picks.ToList();
+                string internalPath = Path.Combine(FileSystem.AppDataDirectory, $"my{game}_picks.txt");
+                await File.WriteAllLinesAsync(internalPath, lines);
+                vm.StatusMessage = $"Saved {lines.Count} {game} picks";
+
+                if (choice.StartsWith("Share"))
+                {
+                    string stamp     = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                    string sharePath = Path.Combine(FileSystem.CacheDirectory, $"{game}_picks_{stamp}.txt");
+                    await File.WriteAllLinesAsync(sharePath, lines);
+                    await Share.RequestAsync(new ShareFileRequest
+                    {
+                        Title = $"{game} Picks",
+                        File  = new ShareFile(sharePath, "text/plain")
+                    });
+                }
             }
+            catch (Exception ex) { vm.StatusMessage = "Save error: " + ex.Message; }
+            return;
         }
 
         if (sender is Button btn)
