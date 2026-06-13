@@ -23,6 +23,7 @@ jobs:
           echo "Using: $XCODE"
           sudo xcode-select -s /Applications/$XCODE/Contents/Developer
           xcodebuild -version
+          echo "XCODE_VERSION=$(xcodebuild -version | head -1 | awk '{print $2}')" >> $GITHUB_ENV
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
@@ -44,7 +45,9 @@ jobs:
             -p:EnableCodeSigning=false \
             -p:CodesignKey="" \
             -p:CodesignProvision="" \
-            -p:CodesignRequireProvisioningProfile=false
+            -p:CodesignRequireProvisioningProfile=false \
+            -p:RequiredXcodeVersion=${{ env.XCODE_VERSION }} \
+            -p:MinimumXcodeVersion=${{ env.XCODE_VERSION }}
 
       - name: Package IPA
         run: |
