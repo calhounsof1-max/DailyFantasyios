@@ -55,8 +55,7 @@ jobs:
             -p:EnableCodeSigning=false \
             -p:CodesignKey="" \
             -p:CodesignProvision="" \
-            -p:CodesignRequireProvisioningProfile=false \
-            -p:MauiSplashScreenEnabled=false
+            -p:CodesignRequireProvisioningProfile=false
 
       - name: Package IPA
         run: |

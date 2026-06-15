@@ -11,4 +11,9 @@
     <EnableAotAnalyzer>false</EnableAotAnalyzer>
     <EnableSingleFileAnalyzer>false</EnableSingleFileAnalyzer>
   </PropertyGroup>
+
+  <!-- In CI, skip splash screen — ibtool (storyboard compiler) was removed in Xcode 16 -->
+  <ItemGroup Condition="'$(CI)' == 'true'">
+    <MauiSplashScreen Remove="@(MauiSplashScreen)" />
+  </ItemGroup>
 </Project>
