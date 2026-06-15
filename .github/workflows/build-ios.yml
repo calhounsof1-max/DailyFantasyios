@@ -28,37 +28,6 @@ jobs:
           xcodebuild -version
           echo "XCODE_VERSION=$(xcodebuild -version | head -1 | awk '{print $2}')" >> $GITHUB_ENV
 
-      - name: Diagnose SDK and tools
-        run: |
-          SDK_DIR="$DEVELOPER_DIR/Platforms/MacOSX.platform/Developer/SDKs"
-          echo "=== macOS SDKs ==="
-          ls -la "$SDK_DIR"
-          echo ""
-          for SDK in "$SDK_DIR"/MacOSX*.sdk; do
-            PLIST="$SDK/SDKSettings.plist"
-            if [ -f "$PLIST" ]; then
-              NAME=$(plutil -extract CanonicalName raw "$PLIST" 2>/dev/null)
-              echo "$SDK -> CanonicalName: $NAME"
-            fi
-          done
-          echo ""
-          echo "=== Tool lookup tests ==="
-          echo "xcrun --find actool: $(xcrun --find actool 2>&1)"
-          echo "xcrun --find ibtool: $(xcrun --find ibtool 2>&1)"
-          echo "xcrun -sdk macosx --find actool: $(xcrun -sdk macosx --find actool 2>&1)"
-          echo "xcrun -sdk iphoneos --find actool: $(xcrun -sdk iphoneos --find actool 2>&1)"
-          echo ""
-          echo "=== xcodebuild showsdks ==="
-          xcodebuild -showsdks 2>&1 | head -30
-          echo ""
-          echo "=== actool in usr/bin ==="
-          ls "$DEVELOPER_DIR/usr/bin/" | grep -E "actool|ibtool" || echo "none found"
-          echo ""
-          echo "=== xcodebuild -sdk <absolute-path> -find actool test ==="
-          SDK=$(ls "$SDK_DIR"/MacOSX*.sdk | head -1)
-          echo "Testing with: $SDK"
-          xcodebuild -sdk "$SDK" -find actool 2>&1 || true
-
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
@@ -79,12 +48,13 @@ jobs:
             -f net10.0-ios \
             -c Release \
             -p:RuntimeIdentifier=ios-arm64 \
-            -p:PublishTrimmed=true \
+            -p:PublishTrimmed=false \
             -p:ValidateXcodeVersion=false \
             -p:EnableCodeSigning=false \
             -p:CodesignKey="" \
             -p:CodesignProvision="" \
-            -p:CodesignRequireProvisioningProfile=false
+            -p:CodesignRequireProvisioningProfile=false \
+            -p:UseInterpreter=true
 
       - name: Package IPA
         run: |
