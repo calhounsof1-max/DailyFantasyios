@@ -7,17 +7,12 @@
              x:Class="DailyFantasyMAUI.MainPage"
              Title="Lottery"
              Shell.NavBarIsVisible="False"
-             BackgroundColor="#1E2733">
+             BackgroundColor="#1E2733"
+             ios:Page.UseSafeArea="true">
 
     <ContentPage.Resources>
         <conv:BoolToColorConverter x:Key="BoolToColor"/>
     </ContentPage.Resources>
-
-    <ContentPage.Padding>
-        <OnPlatform x:TypeArguments="Thickness">
-            <On Platform="iOS" Value="0,0,0,34"/>
-        </OnPlatform>
-    </ContentPage.Padding>
 
     <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto">
         <Grid.GestureRecognizers>

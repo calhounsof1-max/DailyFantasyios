@@ -4,13 +4,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="DailyFantasyMAUI.ResultsPage"
              Shell.NavBarIsVisible="False"
-             BackgroundColor="#1E2733">
-
-    <ContentPage.Padding>
-        <OnPlatform x:TypeArguments="Thickness">
-            <On Platform="iOS" Value="0,0,0,34"/>
-        </OnPlatform>
-    </ContentPage.Padding>
+             BackgroundColor="#1E2733"
+             ios:Page.UseSafeArea="true">
 
     <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,Auto,Auto,*,Auto">
 
