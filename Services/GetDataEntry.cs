@@ -1340,6 +1340,163 @@ namespace DailyFantasyMAUI.Services
             return (true, date, numbers);
         }
 
+        // ── Jackpot prize cache (daily fetch, persisted as JSON) ─────────────
+
+        const string PrefJackpotDate = "jackpot_last_date";
+        static string PrizeCacheFile => CacheFile("jackpot_prizes.json");
+
+        /// <summary>
+        /// Called on every app launch. Fetches all 5 games once per calendar day
+        /// and persists the draw date, numbers, and all prize tiers to a JSON cache.
+        /// JackpotPage loads from this cache instantly on open.
+        /// </summary>
+        public static async Task UpdateJackpotCacheAsync()
+        {
+            string today = DateTime.Today.ToString("yyyy-MM-dd");
+            if (Preferences.Get(PrefJackpotDate, "") == today) return; // already done today
+
+            try
+            {
+                var f5Task = GetPastDraws(3);
+                var slTask = GetSuperLottoDraws(3);
+                var pbTask = GetPowerballDraws(3);
+                var mmTask = GetMegaMillionsDraws(3);
+                var ddTask = GetDailyDerbyDraws(3);
+                var d3Task = GetDaily3Draws(3);
+                var d4Task = GetDaily4Draws(3);
+                var jpTask = GetNextJackpotAmounts();
+
+                await Task.WhenAll(f5Task, slTask, pbTask, mmTask, ddTask, d3Task, d4Task, jpTask);
+
+                var jp = jpTask.Result;
+                SavePrizeCache(today,
+                    f5Task.Result, slTask.Result, pbTask.Result, mmTask.Result, ddTask.Result, d3Task.Result, d4Task.Result, jp);
+
+                Preferences.Set(PrefJackpotDate, today);
+                _ = Logger.LogAsync($"Jackpot results cached for {today}");
+            }
+            catch (Exception ex)
+            {
+                _ = Logger.LogAsync($"Jackpot cache update failed: {ex.Message}");
+            }
+        }
+
+        static void SavePrizeCache(
+            string date,
+            List<(string DrawDate, int[] Numbers, DrawPrizeTier[] Prizes)> f5,
+            List<(string DrawDate, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> sl,
+            List<(string DrawDate, int[] MainNumbers, int PBNumber, DrawPrizeTier[] Prizes)> pb,
+            List<(string DrawDate, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> mm,
+            List<(string DrawDate, int[] Horses, string RaceTime, DrawPrizeTier[] Prizes)> dd,
+            List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> d3,
+            List<(string DrawDate, int[] Numbers, DrawPrizeTier[] Prizes)> d4,
+            (decimal? F5, decimal? SL, decimal? PB, decimal? MM, decimal? DD) jp)
+        {
+            try
+            {
+                var root = new System.Text.Json.Nodes.JsonObject
+                {
+                    ["date"] = date,
+                    ["F5"]   = BuildGameNode(f5.Count > 0 ? f5[0].DrawDate : "", f5.Count > 0 ? f5[0].Numbers : Array.Empty<int>(), -1, "", f5.Count > 0 ? f5[0].Prizes : Array.Empty<DrawPrizeTier>(), jp.F5),
+                    ["SL"]   = BuildGameNode(sl.Count > 0 ? sl[0].DrawDate : "", sl.Count > 0 ? sl[0].MainNumbers : Array.Empty<int>(), sl.Count > 0 ? sl[0].MegaNumber : -1, "", sl.Count > 0 ? sl[0].Prizes : Array.Empty<DrawPrizeTier>(), jp.SL),
+                    ["PB"]   = BuildGameNode(pb.Count > 0 ? pb[0].DrawDate : "", pb.Count > 0 ? pb[0].MainNumbers : Array.Empty<int>(), pb.Count > 0 ? pb[0].PBNumber : -1, "", pb.Count > 0 ? pb[0].Prizes : Array.Empty<DrawPrizeTier>(), jp.PB),
+                    ["MM"]   = BuildGameNode(mm.Count > 0 ? mm[0].DrawDate : "", mm.Count > 0 ? mm[0].MainNumbers : Array.Empty<int>(), mm.Count > 0 ? mm[0].MegaNumber : -1, "", mm.Count > 0 ? mm[0].Prizes : Array.Empty<DrawPrizeTier>(), jp.MM),
+                    ["DD"]   = BuildGameNode(dd.Count > 0 ? dd[0].DrawDate : "", dd.Count > 0 ? dd[0].Horses : Array.Empty<int>(), -1, dd.Count > 0 ? dd[0].RaceTime : "", dd.Count > 0 ? dd[0].Prizes : Array.Empty<DrawPrizeTier>(), jp.DD),
+                    ["D3"]   = BuildGameNode(d3.Count > 0 ? d3[0].DrawDate : "", d3.Count > 0 ? d3[0].Numbers : Array.Empty<int>(), d3.Count > 0 ? d3[0].DrawNumber : -1, "", d3.Count > 0 ? d3[0].Prizes : Array.Empty<DrawPrizeTier>(), null),
+                    ["D4"]   = BuildGameNode(d4.Count > 0 ? d4[0].DrawDate : "", d4.Count > 0 ? d4[0].Numbers : Array.Empty<int>(), -1, "", d4.Count > 0 ? d4[0].Prizes : Array.Empty<DrawPrizeTier>(), null),
+                };
+                File.WriteAllText(PrizeCacheFile, root.ToJsonString());
+            }
+            catch { }
+        }
+
+        static System.Text.Json.Nodes.JsonObject BuildGameNode(
+            string drawDate, int[] nums, int special, string raceTime,
+            DrawPrizeTier[] prizes, decimal? nextJp)
+        {
+            var prizeArr = new System.Text.Json.Nodes.JsonArray();
+            foreach (var p in prizes)
+                prizeArr.Add(new System.Text.Json.Nodes.JsonObject
+                    { ["t"] = p.Tier, ["a"] = (double)p.Amount, ["c"] = p.Count });
+
+            var node = new System.Text.Json.Nodes.JsonObject
+            {
+                ["dd"]  = drawDate,
+                ["num"] = string.Join(",", nums),
+                ["sp"]  = special,
+                ["rt"]  = raceTime,
+                ["pr"]  = prizeArr,
+            };
+            if (nextJp.HasValue) node["jp"] = (double)nextJp.Value;
+            return node;
+        }
+
+        /// <summary>
+        /// Loads the last-saved jackpot prize cache. Returns false if no cache exists.
+        /// </summary>
+        public static bool TryLoadPrizeCache(
+            out string savedDate,
+            out (string DrawDate, int[] Numbers, DrawPrizeTier[] Prizes) f5,
+            out (string DrawDate, int[] Main, int Special, DrawPrizeTier[] Prizes) sl,
+            out (string DrawDate, int[] Main, int Special, DrawPrizeTier[] Prizes) pb,
+            out (string DrawDate, int[] Main, int Special, DrawPrizeTier[] Prizes) mm,
+            out (string DrawDate, int[] Horses, string RaceTime, DrawPrizeTier[] Prizes) dd,
+            out (string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes) d3,
+            out (string DrawDate, int[] Numbers, DrawPrizeTier[] Prizes) d4,
+            out (decimal? F5, decimal? SL, decimal? PB, decimal? MM, decimal? DD) jp)
+        {
+            savedDate = ""; f5 = default; sl = default; pb = default; mm = default; dd = default; d3 = default; d4 = default; jp = default;
+            try
+            {
+                if (!File.Exists(PrizeCacheFile)) return false;
+                var root = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(PrizeCacheFile))?.AsObject();
+                if (root == null) return false;
+
+                savedDate = root["date"]?.GetValue<string>() ?? "";
+
+                var f5n = root["F5"]; f5 = (ReadStr(f5n, "dd"), ReadNums(f5n), ReadPrizes(f5n));
+                var sln = root["SL"]; sl = (ReadStr(sln, "dd"), ReadNums(sln), ReadInt(sln, "sp"), ReadPrizes(sln));
+                var pbn = root["PB"]; pb = (ReadStr(pbn, "dd"), ReadNums(pbn), ReadInt(pbn, "sp"), ReadPrizes(pbn));
+                var mmn = root["MM"]; mm = (ReadStr(mmn, "dd"), ReadNums(mmn), ReadInt(mmn, "sp"), ReadPrizes(mmn));
+                var ddn = root["DD"]; dd = (ReadStr(ddn, "dd"), ReadNums(ddn), ReadStr(ddn, "rt"), ReadPrizes(ddn));
+                var d3n = root["D3"]; d3 = (ReadStr(d3n, "dd"), ReadInt(d3n, "sp"), ReadNums(d3n), ReadPrizes(d3n));
+                var d4n = root["D4"]; d4 = (ReadStr(d4n, "dd"), ReadNums(d4n), ReadPrizes(d4n));
+
+                jp = (ReadJp(root["F5"]), ReadJp(root["SL"]), ReadJp(root["PB"]), ReadJp(root["MM"]), ReadJp(root["DD"]));
+                return true;
+            }
+            catch { return false; }
+        }
+
+        static string ReadStr(System.Text.Json.Nodes.JsonNode? n, string key) =>
+            n?[key]?.GetValue<string>() ?? "";
+        static int ReadInt(System.Text.Json.Nodes.JsonNode? n, string key) =>
+            n?[key]?.GetValue<int>() ?? -1;
+        static int[] ReadNums(System.Text.Json.Nodes.JsonNode? n)
+        {
+            string s = ReadStr(n, "num");
+            if (string.IsNullOrWhiteSpace(s)) return Array.Empty<int>();
+            return s.Split(',').Select(x => int.TryParse(x, out int v) ? v : -1).Where(v => v >= 0).ToArray();
+        }
+        static DrawPrizeTier[] ReadPrizes(System.Text.Json.Nodes.JsonNode? n)
+        {
+            if (n?["pr"] is not System.Text.Json.Nodes.JsonArray arr) return Array.Empty<DrawPrizeTier>();
+            var list = new List<DrawPrizeTier>();
+            foreach (var item in arr)
+            {
+                int t = item?["t"]?.GetValue<int>() ?? 0;
+                decimal a = item?["a"] is { } av ? (decimal)av.GetValue<double>() : 0;
+                int c = item?["c"]?.GetValue<int>() ?? 0;
+                if (t > 0) list.Add(new DrawPrizeTier(t, a, c));
+            }
+            return list.ToArray();
+        }
+        static decimal? ReadJp(System.Text.Json.Nodes.JsonNode? n)
+        {
+            if (n?["jp"] is { } j && j.GetValue<double>() is double v && v > 0) return (decimal)v;
+            return null;
+        }
+
         // ── Legacy: download full history file ───────────────────────────────
 
         public static async Task<(bool Success, string LastDraw)> GetDataSource()
