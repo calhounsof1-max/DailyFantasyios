@@ -1,22 +1,27 @@
 using Microsoft.Maui.Handlers;
 using UIKit;
-using CoreGraphics;
 
 namespace DailyFantasyMAUI;
 
 /// <summary>
-/// Removes the extra internal padding UITextField adds on iOS so that
-/// HeightRequest values match Android's rendering (no inflated heights).
+/// Removes UITextField's default border and internal padding so that
+/// HeightRequest values are actually respected on iOS (matching Android sizes).
+/// AppendToMapping runs AFTER all MAUI's own property mappers, ensuring our
+/// changes are last and not overwritten.
 /// </summary>
 public class CompactEntryHandler : EntryHandler
 {
-    protected override void ConnectHandler(UITextField platformView)
+    public static void Register()
     {
-        base.ConnectHandler(platformView);
-        // Remove the default rounded-rect border and its extra vertical padding.
-        platformView.BorderStyle = UITextBorderStyle.None;
-        // Zero out the internal content insets so the text is centred within
-        // whatever height MAUI requests, not within UITextField's default minimum.
-        platformView.VerticalAlignment = UIControlContentVerticalAlignment.Center;
+        Mapper.AppendToMapping("CompactEntry", (handler, view) =>
+        {
+            if (handler.PlatformView is UITextField tf)
+            {
+                tf.BorderStyle = UITextBorderStyle.None;
+                tf.VerticalAlignment = UIControlContentVerticalAlignment.Center;
+                // Clear any content insets that inflate the height
+                tf.LayoutMargins = UIEdgeInsets.Zero;
+            }
+        });
     }
 }
