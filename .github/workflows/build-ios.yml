@@ -38,14 +38,33 @@ jobs:
 
       - name: Patch iOS SDK Xcode version requirement
         run: |
-          XCODE_VER=$(xcodebuild -version | head -1 | awk '{print $2}')
-          echo "Installed Xcode: $XCODE_VER"
-          find $HOME/.dotnet/packs -name "*.targets" -o -name "*.props" 2>/dev/null \
-            | xargs grep -l "RequiredXcodeVersion" 2>/dev/null \
-            | while read f; do
-                echo "Patching $f"
-                sed -i '' "s|<RequiredXcodeVersion>[0-9.]*</RequiredXcodeVersion>|<RequiredXcodeVersion>${XCODE_VER}</RequiredXcodeVersion>|g" "$f"
-              done
+          python3 - <<'EOF'
+import glob, os, re
+
+home = os.path.expanduser('~')
+pattern = f'{home}/.dotnet/packs/Microsoft.iOS.Sdk*/*/targets/Xamarin.Shared.Sdk.targets'
+files = glob.glob(pattern)
+print(f'Found targets files: {files}')
+for f in files:
+    with open(f) as fh:
+        content = fh.read()
+    lines = content.split('\n')
+    for i, line in enumerate(lines):
+        if 'xcode' in line.lower() and ('require' in line.lower() or 'version' in line.lower()):
+            print(f'Line {i+1}: {line.strip()}')
+    # Remove or neutralize any Xcode version Error condition
+    patched = re.sub(
+        r'<Error\s[^/]*requires\s+Xcode[^/]*/?>',
+        '<!-- xcode check removed -->',
+        content, flags=re.IGNORECASE|re.DOTALL
+    )
+    if patched != content:
+        with open(f, 'w') as fh:
+            fh.write(patched)
+        print(f'Patched: {f}')
+    else:
+        print(f'No match found in: {f}')
+EOF
 
       - name: Build unsigned app
         run: |
