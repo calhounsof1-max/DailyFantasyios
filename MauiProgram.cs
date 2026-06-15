@@ -25,9 +25,17 @@ public static class MauiProgram
 			});
 
 #if IOS
-		// Use PageHandler.Mapper to reach the concrete PageHandler (which has ViewController)
-		// and from there get the UINavigationController to force-hide the nav bar.
-		// This fires every time a ContentPage handler is created or updated.
+		// 1. Color the nav bar dark so the band is invisible even if we can't hide it.
+		var navAppearance = new UIKit.UINavigationBarAppearance();
+		navAppearance.ConfigureWithOpaqueBackground();
+		navAppearance.BackgroundColor = UIKit.UIColor.FromRGB(0x1E, 0x27, 0x33);
+		navAppearance.ShadowColor = UIKit.UIColor.Clear;
+		UIKit.UINavigationBar.Appearance.StandardAppearance   = navAppearance;
+		UIKit.UINavigationBar.Appearance.ScrollEdgeAppearance = navAppearance;
+		UIKit.UINavigationBar.Appearance.CompactAppearance    = navAppearance;
+
+		// 2. Hide the nav bar as soon as the page handler is connected to its ViewController.
+		//    BeginInvokeOnMainThread defers until after MAUI finishes its own nav bar setup.
 		Microsoft.Maui.Handlers.PageHandler.Mapper.AppendToMapping("HideIOSNavBar", (handler, view) =>
 		{
 			if (view is ContentPage && handler is Microsoft.Maui.Handlers.PageHandler pageHandler)
