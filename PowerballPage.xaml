@@ -5,7 +5,6 @@
              x:Class="DailyFantasyMAUI.PowerballPage"
              Title="Powerball"
              Shell.NavBarIsVisible="False"
-             ios:Page.UseSafeArea="true"
              BackgroundColor="#1E2733">
 
     <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,Auto,Auto,*,Auto,Auto,1">

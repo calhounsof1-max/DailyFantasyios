@@ -7,7 +7,6 @@
              x:Class="DailyFantasyMAUI.MainPage"
              Title="Lottery"
              Shell.NavBarIsVisible="False"
-             ios:Page.UseSafeArea="true"
              BackgroundColor="#1E2733">
 
     <ContentPage.Resources>

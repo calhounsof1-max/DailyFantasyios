@@ -4,7 +4,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="DailyFantasyMAUI.GeneratePage"
              Shell.NavBarIsVisible="False"
-             ios:Page.UseSafeArea="true"
              BackgroundColor="#0D1117">
 
     <Grid RowDefinitions="Auto,*,Auto" x:Name="rootGrid">

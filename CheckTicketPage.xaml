@@ -5,7 +5,6 @@
              x:Class="DailyFantasyMAUI.CheckTicketPage"
              Title="Check-A-Ticket"
              Shell.NavBarIsVisible="False"
-             ios:Page.UseSafeArea="true"
              BackgroundColor="#1E2733">
 
     <Grid RowDefinitions="Auto,Auto,*">

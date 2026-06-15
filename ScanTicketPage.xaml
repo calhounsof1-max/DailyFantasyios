@@ -5,7 +5,6 @@
              x:Class="DailyFantasyMAUI.ScanTicketPage"
              Title="Scan Ticket"
              Shell.NavBarIsVisible="False"
-             ios:Page.UseSafeArea="true"
              BackgroundColor="Black">
 
     <Grid RowDefinitions="Auto,*,Auto">

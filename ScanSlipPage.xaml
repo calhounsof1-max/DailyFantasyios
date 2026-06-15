@@ -5,7 +5,6 @@
              x:Class="DailyFantasyMAUI.ScanSlipPage"
              Title="F5 Slip"
              Shell.NavBarIsVisible="False"
-             ios:Page.UseSafeArea="true"
              BackgroundColor="#0D1117">
 
     <Grid RowDefinitions="Auto,*,Auto">
