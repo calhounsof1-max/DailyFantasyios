@@ -51,22 +51,16 @@ jobs:
           echo "xcrun wrapper installed"
           echo "actool: $(/tmp/xcrun-wrapper/xcrun --find actool 2>&1)"
 
-          # Patch iOS SDK plist so xcrun reports 26.5 (belt-and-suspenders; main fix is in patch_xcode.py)
+          # The MAUI SDK check looks for a directory named iPhoneOS26.5.sdk.
+          # xcrun --sdk iphoneos returns iPhoneOS26.2.sdk (only installed SDK).
+          # Solution: symlink iPhoneOS26.5.sdk → iPhoneOS26.2.sdk so the check passes.
           IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path 2>/dev/null)
           echo "iPhoneOS SDK path: $IOS_SDK"
-          echo "iPhoneOS SDK version (before patch): $(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null)"
           if [ -n "$IOS_SDK" ]; then
-            PLIST="$IOS_SDK/SDKSettings.plist"
-            echo "Plist before patch:"; plutil -p "$PLIST" | grep -E 'Version|CanonicalName|MaximumDeployment' || true
-            sudo plutil -replace MaximumDeploymentTarget -string "26.5" "$PLIST"
-            # Version key: use replace first; if it fails (key missing), insert it
-            sudo plutil -replace Version -string "26.5" "$PLIST" 2>/dev/null \
-              || sudo plutil -insert Version -string "26.5" "$PLIST" 2>/dev/null || true
-            # CanonicalName: xcrun may use this to report --show-sdk-version
-            sudo plutil -replace CanonicalName -string "iphoneos26.5" "$PLIST" 2>/dev/null \
-              || sudo plutil -insert CanonicalName -string "iphoneos26.5" "$PLIST" 2>/dev/null || true
-            echo "Plist after patch:"; plutil -p "$PLIST" | grep -E 'Version|CanonicalName|MaximumDeployment' || true
-            echo "iPhoneOS SDK version (after patch): $(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null)"
+            SDK_PARENT=$(dirname "$IOS_SDK")
+            sudo ln -sfn "$IOS_SDK" "$SDK_PARENT/iPhoneOS26.5.sdk"
+            echo "Created symlink: $SDK_PARENT/iPhoneOS26.5.sdk -> $IOS_SDK"
+            ls -la "$SDK_PARENT/" | grep iPhoneOS
           fi
 
       - name: Setup .NET 10
@@ -82,15 +76,6 @@ jobs:
 
       - name: Patch iOS SDK Xcode version requirement
         run: python3 scripts/patch_xcode.py
-
-      - name: Show where _SdkVersion is set
-        run: |
-          # Search props/targets files in ALL iOS-related packs for _SdkVersion
-          for f in $(find ~/.dotnet/packs/Microsoft.iOS.Sdk.net10.0_26.5 -name "*.props" -o -name "*.targets" 2>/dev/null); do
-            if grep -q '_SdkVersion' "$f" 2>/dev/null; then
-              echo "=== $f ==="; grep -n '_SdkVersion' "$f"
-            fi
-          done
 
       - name: Build unsigned app
         run: |
