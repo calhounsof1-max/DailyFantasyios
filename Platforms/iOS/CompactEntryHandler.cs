@@ -1,14 +1,15 @@
 using CoreGraphics;
 using Microsoft.Maui.Handlers;
+using Microsoft.Maui.Platform;
 using UIKit;
 
 namespace DailyFantasyMAUI;
 
 /// <summary>
-/// Custom UITextField that overrides the text/editing rects to remove
-/// UIKit's default vertical padding, so HeightRequest is actually respected.
+/// Subclass of MauiTextField that overrides text/editing rects to remove
+/// UIKit's default vertical padding, so MAUI's HeightRequest is respected.
 /// </summary>
-class ZeroPaddingTextField : UITextField
+class ZeroPaddingTextField : MauiTextField
 {
     public override CGRect TextRect(CGRect forBounds)
         => forBounds.Inset(8, 0);
@@ -22,7 +23,7 @@ class ZeroPaddingTextField : UITextField
 
 public class CompactEntryHandler : EntryHandler
 {
-    protected override UITextField CreatePlatformView()
+    protected override MauiTextField CreatePlatformView()
     {
         var tf = new ZeroPaddingTextField();
         tf.BorderStyle = UITextBorderStyle.None;
