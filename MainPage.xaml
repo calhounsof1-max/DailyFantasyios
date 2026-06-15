@@ -7,14 +7,20 @@
              x:Class="DailyFantasyMAUI.MainPage"
              Title="Lottery"
              Shell.NavBarIsVisible="False"
-             BackgroundColor="#1E2733"
-             ios:Page.UseSafeArea="true">
+             BackgroundColor="#1E2733">
 
     <ContentPage.Resources>
         <conv:BoolToColorConverter x:Key="BoolToColor"/>
     </ContentPage.Resources>
 
-    <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,Auto,30,30,30,Auto,Auto,*,Auto,Auto,Auto">
+    <!-- iOS: top=47 covers status bar only (not nav bar), bottom=34 covers home indicator -->
+    <ContentPage.Padding>
+        <OnPlatform x:TypeArguments="Thickness">
+            <On Platform="iOS" Value="0,47,0,34"/>
+        </OnPlatform>
+    </ContentPage.Padding>
+
+    <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,Auto,24,24,24,Auto,Auto,*,Auto,Auto,Auto">
         <Grid.GestureRecognizers>
             <PanGestureRecognizer PanUpdated="OnPagePan"/>
         </Grid.GestureRecognizers>
@@ -62,24 +68,24 @@
               ColumnDefinitions="*,*,*,*,*">
             <Entry Grid.Column="0" x:Name="Box1" Text="1" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
-                   FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="26"/>
+                   FontSize="12" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="20"/>
             <Entry Grid.Column="1" x:Name="Box2" Text="2" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
-                   FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="26"/>
+                   FontSize="12" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="20"/>
             <Entry Grid.Column="2" x:Name="Box3" Text="3" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
-                   FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="26"/>
+                   FontSize="12" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="20"/>
             <Entry Grid.Column="3" x:Name="Box4" Text="4" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
-                   FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="26"/>
+                   FontSize="12" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="20"/>
             <Entry Grid.Column="4" x:Name="Box5" Text="5" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
-                   FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="26"/>
+                   FontSize="12" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="20"/>
         </Grid>
 
         <!-- Row 3: Number boxes 6–10 -->
@@ -87,24 +93,24 @@
               ColumnDefinitions="*,*,*,*,*">
             <Entry Grid.Column="0" x:Name="Box6" Text="6" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
-                   FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="26"/>
+                   FontSize="12" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="20"/>
             <Entry Grid.Column="1" x:Name="Box7" Text="7" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
-                   FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="26"/>
+                   FontSize="12" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="20"/>
             <Entry Grid.Column="2" x:Name="Box8" Text="8" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
-                   FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="26"/>
+                   FontSize="12" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="20"/>
             <Entry Grid.Column="3" x:Name="Box9" Text="9" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
-                   FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="26"/>
+                   FontSize="12" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="20"/>
             <Entry Grid.Column="4" x:Name="Box10" Text="10" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
-                   FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="26"/>
+                   FontSize="12" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="20"/>
         </Grid>
 
         <!-- Row 4: Number boxes 11–12 -->
@@ -112,12 +118,12 @@
               ColumnDefinitions="*,*,*,*,*">
             <Entry Grid.Column="0" x:Name="Box11" Text="11" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
-                   FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="26"/>
+                   FontSize="12" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="20"/>
             <Entry Grid.Column="1" x:Name="Box12" Text="12" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
-                   FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="26"/>
+                   FontSize="12" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                   MaxLength="2" HeightRequest="20"/>
         </Grid>
 
         <!-- Row 5: Pick / From / Combos / Count -->
@@ -129,7 +135,7 @@
                 <Border BackgroundColor="White" StrokeThickness="1.5" Stroke="#DDE3EE"
                         StrokeShape="RoundRectangle 8" HeightRequest="22">
                     <Entry x:Name="MaxNum" Text="5" Keyboard="Numeric"
-                           FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                           FontSize="12" FontAttributes="Bold" HorizontalTextAlignment="Center"
                            TextColor="Black" BackgroundColor="Transparent"
                            TextChanged="MaxNum_TextChanged"/>
                 </Border>
@@ -140,7 +146,7 @@
                 <Border BackgroundColor="White" StrokeThickness="1.5" Stroke="#DDE3EE"
                         StrokeShape="RoundRectangle 8" HeightRequest="22">
                     <Entry x:Name="HowMany" Text="39" Keyboard="Numeric"
-                           FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
+                           FontSize="12" FontAttributes="Bold" HorizontalTextAlignment="Center"
                            TextColor="Black" BackgroundColor="Transparent"
                            TextChanged="HowMany_TextChanged"/>
                 </Border>
