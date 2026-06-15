@@ -31,12 +31,15 @@ public partial class AppShell : Shell
 	protected override void OnNavigated(ShellNavigatedEventArgs args)
 	{
 		base.OnNavigated(args);
-		// Walk the ViewController hierarchy from the key window to find and hide
-		// the UINavigationController. This reclaims the ~44pt gray band at the top.
-		UIKit.UIWindow? keyWindow = null;
-		foreach (var w in UIKit.UIApplication.SharedApplication.Windows)
-			if (w.IsKeyWindow) { keyWindow = w; break; }
-		HideNavBar(keyWindow?.RootViewController);
+		// Delay one main-thread tick so MAUI's Shell finishes its own nav bar
+		// setup before we force-hide it. Runs after the current event loop iteration.
+		Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(() =>
+		{
+			UIKit.UIWindow? keyWindow = null;
+			foreach (var w in UIKit.UIApplication.SharedApplication.Windows)
+				if (w.IsKeyWindow) { keyWindow = w; break; }
+			HideNavBar(keyWindow?.RootViewController);
+		});
 	}
 
 	static void HideNavBar(UIKit.UIViewController? vc)

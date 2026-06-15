@@ -22,6 +22,11 @@ public static class MauiProgram
 #if ANDROID
 				handlers.AddHandler<Entry, BlackTextEntryHandler>();
 #endif
+#if IOS
+				// Route Shell through CustomShellRenderer so our HideNavBarTracker
+				// gets the actual UINavigationController and can force-hide the bar.
+				handlers.AddHandler<Shell, CustomShellRenderer>();
+#endif
 			});
 
 #if IOS
