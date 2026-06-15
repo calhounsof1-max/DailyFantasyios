@@ -83,6 +83,15 @@ jobs:
       - name: Patch iOS SDK Xcode version requirement
         run: python3 scripts/patch_xcode.py
 
+      - name: Show where _SdkVersion is set
+        run: |
+          # Search props/targets files in ALL iOS-related packs for _SdkVersion
+          for f in $(find ~/.dotnet/packs/Microsoft.iOS.Sdk.net10.0_26.5 -name "*.props" -o -name "*.targets" 2>/dev/null); do
+            if grep -q '_SdkVersion' "$f" 2>/dev/null; then
+              echo "=== $f ==="; grep -n '_SdkVersion' "$f"
+            fi
+          done
+
       - name: Build unsigned app
         run: |
           dotnet publish DailyFantasyIOS.csproj \
@@ -95,7 +104,8 @@ jobs:
             -p:EnableCodeSigning=false \
             -p:CodesignKey="" \
             -p:CodesignProvision="" \
-            -p:CodesignRequireProvisioningProfile=false
+            -p:CodesignRequireProvisioningProfile=false \
+            -p:_SdkVersion=26.5
 
       - name: Package IPA
         run: |
