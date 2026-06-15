@@ -37,6 +37,14 @@ jobs:
             fi
           done
 
+          # Create MacOSX.sdk symlink if missing (Xcode 26 names it MacOSX26.x.sdk)
+          if [ ! -e "$SDK_DIR/MacOSX.sdk" ]; then
+            REAL_SDK=$(ls "$SDK_DIR" | grep "^MacOSX.*\.sdk$" | sort -V | tail -1)
+            echo "Creating MacOSX.sdk -> $REAL_SDK"
+            sudo ln -sf "$SDK_DIR/$REAL_SDK" "$SDK_DIR/MacOSX.sdk"
+          fi
+          echo "SDKs after fix: $(ls $SDK_DIR)"
+
           # Add Xcode developer tools to PATH
           echo "$DEVELOPER_DIR/usr/bin" >> $GITHUB_PATH
 
