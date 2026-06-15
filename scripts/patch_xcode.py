@@ -1,37 +1,22 @@
 import glob, os, re, subprocess
 
 home = os.path.expanduser('~')
+ios_pack = f'{home}/.dotnet/packs/Microsoft.iOS.Sdk.net10.0_26.5'
 
-# ── 1. Print xcrun iphoneos SDK version BEFORE plist patch ──────────────────
+# ── 0. Print xcrun SDK version ───────────────────────────────────────────────
 result = subprocess.run(['xcrun', '--sdk', 'iphoneos', '--show-sdk-version'],
                         capture_output=True, text=True)
-print(f'xcrun iphoneos SDK version (before): {result.stdout.strip()} {result.stderr.strip()}')
+print(f'xcrun iphoneos SDK version: {result.stdout.strip()}  (xcrun ignores plist; reads dir name)')
 
-result2 = subprocess.run(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path'],
-                         capture_output=True, text=True)
-sdk_path = result2.stdout.strip()
-print(f'xcrun iphoneos SDK path: {sdk_path}')
+# ── 1. Patch Xamarin.Shared.Sdk.targets (Xcode version check) ───────────────
+shared_pattern = f'{ios_pack}/*/targets/Xamarin.Shared.Sdk.targets'
+shared_files = glob.glob(shared_pattern)
+print(f'Found Xamarin.Shared.Sdk.targets: {shared_files}')
 
-# ── 2. Patch Xamarin.Shared.Sdk.targets ─────────────────────────────────────
-pattern = f'{home}/.dotnet/packs/Microsoft.iOS.Sdk.net10.0_26.5/*/targets/Xamarin.Shared.Sdk.targets'
-files = glob.glob(pattern)
-print(f'Found targets: {files}')
-
-for f in files:
+for f in shared_files:
     with open(f) as fh:
         lines = fh.readlines()
 
-    # Diagnostics: print ALL lines that mention Xcode OR SDK version
-    print(f'\n--- SDK/Version-related lines in {f} ---')
-    for i, line in enumerate(lines):
-        low = line.lower()
-        if any(k in low for k in ['sdkversion', 'iossdkversion', '_sdkversion', 'xcodeversion',
-                                    'requirexcode', 'requireddotnet', 'sdkdevroot',
-                                    'iossdk', 'mtouchsdkversion', 'iphoneos',
-                                    'xcode' , 'sdk_ver']):
-            print(f'  {i+1}: {line.rstrip()}')
-
-    # ── Patch 1: comment out <Error> lines with Xcode condition ──────────────
     changed = False
     patched = []
     for i, line in enumerate(lines):
@@ -48,48 +33,73 @@ for f in files:
         else:
             patched.append(line)
 
-    lines = patched  # use patched lines for next pass
+    if changed:
+        with open(f, 'w') as fh:
+            fh.writelines(patched)
+        print(f'Xamarin.Shared.Sdk.targets patched: {f}')
+    else:
+        print(f'Xamarin.Shared.Sdk.targets: nothing to patch.')
 
-    # ── Patch 2: override _iOSSdkVersion / _SdkVersion to "26.5" ─────────────
-    # MAUI reads the SDK version from the directory name (e.g. iPhoneOS26.2.sdk).
-    # We override the computed property to bypass the iOS 26.4+ type availability check.
-    patched2 = []
-    version_patched = False
+# ── 2. Find and patch Microsoft.MaciOS.Sdk.Xcode.targets (_SdkVersion) ───────
+# This file computes _SdkVersion from xcrun (which reads directory name, not plist).
+# We override it to 26.5 so the ManagedRegistrar linker step accepts iOS 26.4+ types.
+xcode_pattern = f'{ios_pack}/*/targets/Microsoft.MaciOS.Sdk.Xcode.targets'
+xcode_files = glob.glob(xcode_pattern)
+print(f'\nFound MaciOS.Sdk.Xcode.targets: {xcode_files}')
+
+for f in xcode_files:
+    with open(f) as fh:
+        lines = fh.readlines()
+
+    # Print ALL lines that mention SdkVersion, iOSSdk, MtouchSdk, Sdk version etc.
+    print(f'\n--- SdkVersion-related lines in {f} ---')
     for i, line in enumerate(lines):
-        # Match any assignment of _iOSSdkVersion, _SdkVersion, MtouchSdkVersion
-        # (only the computed/default assignment, not if already hardcoded)
-        if re.search(r'<_iOSSdkVersion\b[^>]*>', line) and '26.5' not in line:
-            # Comment out original and inject hardcoded version after
-            patched2.append(f'<!-- sdk-ver-patch: {line.rstrip()} -->\n')
-            patched2.append('    <_iOSSdkVersion>26.5</_iOSSdkVersion>\n')
+        low = line.lower()
+        if any(k in low for k in ['sdkversion', 'iossdkversion', '_sdkversion',
+                                    'mtouchsdkversion', 'iossdk', 'sdk_ver',
+                                    'show-sdk-version', 'show-sdk-path', 'iphoneos',
+                                    'sdk_platform_version', 'platformversion',
+                                    'deploymenttarget', 'minimum-deployment']):
+            print(f'  {i+1}: {line.rstrip()}')
+
+    # Patch: replace any assignment of _SdkVersion computed from xcrun/regex
+    # with a hardcoded "26.5"
+    changed = False
+    patched = []
+    for i, line in enumerate(lines):
+        # Match lines that SET _SdkVersion (not lines that USE it)
+        if re.search(r'<_SdkVersion\b', line) and '26.5' not in line:
+            patched.append(f'<!-- sdk-ver-patch: {line.rstrip()} -->\n')
+            patched.append('      <_SdkVersion>26.5</_SdkVersion>\n')
             changed = True
-            version_patched = True
-            print(f'Patched _iOSSdkVersion at line {i+1}: {line.rstrip()}')
-        elif re.search(r'<MtouchSdkVersion\b[^>]*>', line) and '26.5' not in line and 'Condition' not in line:
-            patched2.append(f'<!-- sdk-ver-patch: {line.rstrip()} -->\n')
-            patched2.append('    <MtouchSdkVersion>26.5</MtouchSdkVersion>\n')
+            print(f'Patched _SdkVersion at line {i+1}: {line.rstrip()}')
+        elif re.search(r'<MtouchSdkVersion\b', line) and '26.5' not in line:
+            patched.append(f'<!-- sdk-ver-patch: {line.rstrip()} -->\n')
+            patched.append('      <MtouchSdkVersion>26.5</MtouchSdkVersion>\n')
             changed = True
-            version_patched = True
             print(f'Patched MtouchSdkVersion at line {i+1}: {line.rstrip()}')
         else:
-            patched2.append(line)
-
-    if not version_patched:
-        print('WARNING: _iOSSdkVersion / MtouchSdkVersion pattern not found in targets file.')
-        print('  All iOSSdk / SdkVersion lines:')
-        for i, line in enumerate(patched2):
-            if re.search(r'(_iOSSdkVersion|_SdkVersion|MtouchSdkVersion)', line, re.IGNORECASE):
-                print(f'    {i+1}: {line.rstrip()}')
+            patched.append(line)
 
     if changed:
         with open(f, 'w') as fh:
-            fh.writelines(patched2)
-        print(f'File patched: {f}')
+            fh.writelines(patched)
+        print(f'MaciOS.Sdk.Xcode.targets patched: {f}')
     else:
-        print(f'No patchable content found.')
+        print(f'MaciOS.Sdk.Xcode.targets: _SdkVersion not found by pattern.')
+        print('  All lines with "<_" (private properties):')
+        for i, line in enumerate(lines):
+            if re.search(r'<_[A-Z][a-zA-Z]*Sdk|<_Sdk|<_iOS', line):
+                print(f'    {i+1}: {line.rstrip()}')
 
-# ── 3. Print xcrun iphoneos SDK version AFTER plist patch ───────────────────
-# (The plist was already patched in the workflow Select Xcode step)
-result3 = subprocess.run(['xcrun', '--sdk', 'iphoneos', '--show-sdk-version'],
-                         capture_output=True, text=True)
-print(f'\nxcrun iphoneos SDK version (after targets patch): {result3.stdout.strip()} {result3.stderr.strip()}')
+# ── 3. Also search ALL targets files for _SdkVersion ─────────────────────────
+all_targets = glob.glob(f'{ios_pack}/*/targets/*.targets')
+print(f'\n--- Searching {len(all_targets)} targets files for _SdkVersion setter ---')
+for f in all_targets:
+    with open(f) as fh:
+        content = fh.read()
+    if '<_SdkVersion' in content or '<MtouchSdkVersion' in content:
+        fname = os.path.basename(f)
+        for i, line in enumerate(content.splitlines()):
+            if '<_SdkVersion' in line or '<MtouchSdkVersion' in line:
+                print(f'  {fname}:{i+1}: {line.strip()}')
