@@ -28,18 +28,17 @@ jobs:
           xcodebuild -version
           echo "XCODE_VERSION=$(xcodebuild -version | head -1 | awk '{print $2}')" >> $GITHUB_ENV
 
-          # Replace DEVELOPER_DIR/usr/bin/xcrun with wrapper (scripts/xcrun-wrapper.sh).
-          # MAUI's XcrunFindTool task calls xcrun by absolute path, bypassing PATH.
-          # The wrapper intercepts MacOSX SDK tool-find calls and looks up tools directly
-          # in XcodeDefault.xctoolchain to bypass the broken xcodebuild -sdk /abs -find.
-          DEV_XCRUN="$DEVELOPER_DIR/usr/bin/xcrun"
-          sudo cp "$DEV_XCRUN" "$DEV_XCRUN.real"
-          sudo cp scripts/xcrun-wrapper.sh "$DEV_XCRUN"
-          sudo chmod +x "$DEV_XCRUN"
-          echo "xcrun wrapper installed at $DEV_XCRUN"
-          echo "actool: $("$DEV_XCRUN" -sdk macosx -find actool 2>&1)"
-          echo "clang: $("$DEV_XCRUN" -sdk macosx -find clang 2>&1)"
-          echo "clang++: $("$DEV_XCRUN" -sdk macosx -find clang++ 2>&1)"
+          # Wrap xcodebuild to fix: xcodebuild -sdk /abs/path -find <tool> (exits 64 in Xcode 26.3).
+          # xcrun calls xcodebuild internally using its ABSOLUTE path, so we must wrap xcodebuild.
+          # xcrun itself is only at /usr/bin/xcrun (SIP-protected) in Xcode 26.3.
+          DEV_XCODEBUILD="$DEVELOPER_DIR/usr/bin/xcodebuild"
+          sudo cp "$DEV_XCODEBUILD" "$DEV_XCODEBUILD.real"
+          sudo cp scripts/xcodebuild-wrapper.sh "$DEV_XCODEBUILD"
+          sudo chmod +x "$DEV_XCODEBUILD"
+          echo "xcodebuild wrapper installed at $DEV_XCODEBUILD"
+          echo "actool via wrapped xcodebuild: $(xcrun -sdk macosx -find actool 2>&1)"
+          echo "clang via wrapped xcodebuild: $(xcrun -sdk macosx -find clang 2>&1)"
+          echo "clang++ via wrapped xcodebuild: $(xcrun -sdk macosx -find clang++ 2>&1)"
 
           # The MAUI SDK check looks for a directory named iPhoneOS26.5.sdk.
           # xcrun --sdk iphoneos returns iPhoneOS26.2.sdk (only installed SDK).
