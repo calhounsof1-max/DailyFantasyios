@@ -14,7 +14,7 @@
         <conv:BoolToColorConverter x:Key="BoolToColor"/>
     </ContentPage.Resources>
 
-    <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto">
+    <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,Auto,56,56,56,Auto,Auto,*,Auto,Auto,Auto">
         <Grid.GestureRecognizers>
             <PanGestureRecognizer PanUpdated="OnPagePan"/>
         </Grid.GestureRecognizers>

@@ -6,11 +6,16 @@ using UIKit;
 namespace DailyFantasyMAUI;
 
 /// <summary>
-/// Subclass of MauiTextField that overrides text/editing rects to remove
-/// UIKit's default vertical padding, so MAUI's HeightRequest is respected.
+/// Subclass of MauiTextField that removes UIKit's internal vertical padding and
+/// reports a compact intrinsic height so iOS layout doesn't inflate row heights.
 /// </summary>
 class ZeroPaddingTextField : MauiTextField
 {
+    // Tell iOS layout system this control is 34pt tall (standard touch target).
+    // Without this, UITextField reports ~44pt+ which inflates Auto grid rows.
+    public override CGSize IntrinsicContentSize
+        => new CGSize(UIView.NoIntrinsicMetric, 34);
+
     public override CGRect TextRect(CGRect forBounds)
         => forBounds.Inset(8, 0);
 
