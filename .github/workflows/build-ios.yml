@@ -15,8 +15,9 @@ jobs:
 
       - name: Select Xcode
         run: |
-          # Use Xcode 26 — required for iOS 26 SDK (MAUI iOS 26.5 needs it)
-          XCODE=$(ls /Applications/ | grep "^Xcode_26" | sort -V | tail -1)
+          # Use Xcode 16 — MacOSX.sdk lookup works (actool/ibtool work via xcrun)
+          # Xcode 26 has broken xcodebuild -sdk <absolute-path> -find tool lookup
+          XCODE=$(ls /Applications/ | grep "^Xcode_16" | sort -V | tail -1)
           if [ -z "$XCODE" ]; then
             XCODE=$(ls /Applications/ | grep "^Xcode_" | sort -V | tail -1)
           fi
@@ -27,6 +28,7 @@ jobs:
           echo "$DEVELOPER_DIR/usr/bin" >> $GITHUB_PATH
           xcodebuild -version
           echo "XCODE_VERSION=$(xcodebuild -version | head -1 | awk '{print $2}')" >> $GITHUB_ENV
+          echo "actool: $(xcrun --find actool 2>&1)"
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
