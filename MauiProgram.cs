@@ -24,16 +24,6 @@ public static class MauiProgram
 #endif
 			});
 
-#if IOS
-		// Apply iOS safe area padding to all ContentPages globally so content
-		// stays below the notch/Dynamic Island on every page.
-		Microsoft.Maui.Handlers.PageHandler.Mapper.AppendToMapping("iOSSafeArea", (handler, view) =>
-		{
-			if (view is ContentPage page)
-				Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific.Page.SetUseSafeArea(page, true);
-		});
-#endif
-
 #if DEBUG
 		builder.Logging.AddDebug();
 #endif
