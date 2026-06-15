@@ -15,20 +15,23 @@ jobs:
 
       - name: Select Xcode
         run: |
-          xcodebuild -version
-          xcode-select -p
-          ls /Applications/ | grep Xcode
-          # Find latest Xcode that has the macOS SDK
-          for XCODE in $(ls /Applications/ | grep "^Xcode" | sort -rV); do
-            SDK_PATH="/Applications/$XCODE/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs"
-            if ls "$SDK_PATH" 2>/dev/null | grep -q "MacOSX"; then
-              echo "Using $XCODE (has macOS SDK)"
-              sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
-              break
-            else
-              echo "Skipping $XCODE (no macOS SDK)"
-            fi
-          done
+          # Use latest Xcode 26.x for iOS 26 SDK support
+          XCODE=$(ls /Applications/ | grep "^Xcode_26" | sort -V | tail -1)
+          if [ -z "$XCODE" ]; then
+            XCODE=$(ls /Applications/ | grep "^Xcode_" | sort -V | tail -1)
+          fi
+          echo "Selected: $XCODE"
+          sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
+
+          # Fix macOS SDK symlink — Xcode 26 names it MacOSX26.sdk etc.
+          SDK_DIR="/Applications/$XCODE/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs"
+          echo "SDKs available: $(ls $SDK_DIR 2>/dev/null)"
+          ACTUAL_SDK=$(ls "$SDK_DIR" 2>/dev/null | grep "^MacOSX" | sort -V | tail -1)
+          if [ -n "$ACTUAL_SDK" ] && [ "$ACTUAL_SDK" != "MacOSX.sdk" ]; then
+            echo "Creating symlink: MacOSX.sdk -> $ACTUAL_SDK"
+            sudo ln -sfn "$SDK_DIR/$ACTUAL_SDK" "$SDK_DIR/MacOSX.sdk"
+          fi
+
           xcodebuild -version
           echo "XCODE_VERSION=$(xcodebuild -version | head -1 | awk '{print $2}')" >> $GITHUB_ENV
 
