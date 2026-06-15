@@ -14,7 +14,7 @@
         <conv:BoolToColorConverter x:Key="BoolToColor"/>
     </ContentPage.Resources>
 
-    <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,Auto,42,42,42,Auto,Auto,*,Auto,Auto,Auto">
+    <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,Auto,30,30,30,Auto,Auto,*,Auto,Auto,Auto">
         <Grid.GestureRecognizers>
             <PanGestureRecognizer PanUpdated="OnPagePan"/>
         </Grid.GestureRecognizers>
@@ -26,12 +26,12 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Label Grid.Column="0" Text="Daily Fantasy v9" TextColor="White"
+            <Label Grid.Column="0" Text="Daily Fantasy" TextColor="White"
                    FontSize="12" VerticalOptions="Center" LineBreakMode="NoWrap"/>
             <Button Grid.Column="1" x:Name="btnNavDropdown"
                     Text="Games ▾" FontSize="13" FontAttributes="Bold"
                     BackgroundColor="#2D3D50" TextColor="White"
-                    Padding="14,0" HeightRequest="34" CornerRadius="17"
+                    Padding="14,0" HeightRequest="28" CornerRadius="17"
                     Clicked="BtnNavDropdown_Clicked"/>
             <Border Grid.Column="2" BackgroundColor="#2D3D50" StrokeThickness="0"
                     StrokeShape="RoundRectangle 14" Padding="4,2" Margin="8,0,0,0" VerticalOptions="Center">
@@ -63,23 +63,23 @@
             <Entry Grid.Column="0" x:Name="Box1" Text="1" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
                    FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="36"/>
+                   MaxLength="2" HeightRequest="26"/>
             <Entry Grid.Column="1" x:Name="Box2" Text="2" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
                    FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="36"/>
+                   MaxLength="2" HeightRequest="26"/>
             <Entry Grid.Column="2" x:Name="Box3" Text="3" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
                    FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="36"/>
+                   MaxLength="2" HeightRequest="26"/>
             <Entry Grid.Column="3" x:Name="Box4" Text="4" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
                    FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="36"/>
+                   MaxLength="2" HeightRequest="26"/>
             <Entry Grid.Column="4" x:Name="Box5" Text="5" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
                    FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="36"/>
+                   MaxLength="2" HeightRequest="26"/>
         </Grid>
 
         <!-- Row 3: Number boxes 6–10 -->
@@ -88,23 +88,23 @@
             <Entry Grid.Column="0" x:Name="Box6" Text="6" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
                    FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="36"/>
+                   MaxLength="2" HeightRequest="26"/>
             <Entry Grid.Column="1" x:Name="Box7" Text="7" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
                    FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="36"/>
+                   MaxLength="2" HeightRequest="26"/>
             <Entry Grid.Column="2" x:Name="Box8" Text="8" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
                    FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="36"/>
+                   MaxLength="2" HeightRequest="26"/>
             <Entry Grid.Column="3" x:Name="Box9" Text="9" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
                    FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="36"/>
+                   MaxLength="2" HeightRequest="26"/>
             <Entry Grid.Column="4" x:Name="Box10" Text="10" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
                    FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="36"/>
+                   MaxLength="2" HeightRequest="26"/>
         </Grid>
 
         <!-- Row 4: Number boxes 11–12 -->
@@ -113,11 +113,11 @@
             <Entry Grid.Column="0" x:Name="Box11" Text="11" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
                    FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="36"/>
+                   MaxLength="2" HeightRequest="26"/>
             <Entry Grid.Column="1" x:Name="Box12" Text="12" Keyboard="Numeric"
                    TextColor="Black" BackgroundColor="White"
                    FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                   MaxLength="2" HeightRequest="36"/>
+                   MaxLength="2" HeightRequest="26"/>
         </Grid>
 
         <!-- Row 5: Pick / From / Combos / Count -->
@@ -127,7 +127,7 @@
                 <Label Text="PICK" FontSize="10" TextColor="#9CA3AF"
                        FontAttributes="Bold" CharacterSpacing="1"/>
                 <Border BackgroundColor="White" StrokeThickness="1.5" Stroke="#DDE3EE"
-                        StrokeShape="RoundRectangle 8" HeightRequest="48">
+                        StrokeShape="RoundRectangle 8" HeightRequest="28">
                     <Entry x:Name="MaxNum" Text="5" Keyboard="Numeric"
                            FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
                            TextColor="Black" BackgroundColor="Transparent"
@@ -138,7 +138,7 @@
                 <Label Text="FROM" FontSize="10" TextColor="#9CA3AF"
                        FontAttributes="Bold" CharacterSpacing="1"/>
                 <Border BackgroundColor="White" StrokeThickness="1.5" Stroke="#DDE3EE"
-                        StrokeShape="RoundRectangle 8" HeightRequest="48">
+                        StrokeShape="RoundRectangle 8" HeightRequest="28">
                     <Entry x:Name="HowMany" Text="39" Keyboard="Numeric"
                            FontSize="15" FontAttributes="Bold" HorizontalTextAlignment="Center"
                            TextColor="Black" BackgroundColor="Transparent"
@@ -167,25 +167,25 @@
         <Grid Grid.Row="6" Margin="10,8,10,8" ColumnSpacing="4"
               ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto">
             <Button Grid.Column="0" Text="🎲 QP" FontSize="11" Padding="6,0"
-                    BackgroundColor="#6A1B9A" TextColor="White" HeightRequest="34"
+                    BackgroundColor="#6A1B9A" TextColor="White" HeightRequest="28"
                     Clicked="BtnQuickPick_Clicked" CornerRadius="17"/>
             <Button Grid.Column="1" Text="&gt;&gt;" FontSize="11" Padding="6,0"
-                    BackgroundColor="#78909C" TextColor="White" HeightRequest="34"
+                    BackgroundColor="#78909C" TextColor="White" HeightRequest="28"
                     Clicked="BtnShiftRight_Clicked" CornerRadius="17" IsVisible="False"/>
             <Button Grid.Column="2" Text="CLR" FontSize="11" Padding="8,0"
-                    BackgroundColor="#FF7043" TextColor="White" HeightRequest="34"
+                    BackgroundColor="#FF7043" TextColor="White" HeightRequest="28"
                     Clicked="BtnClear_Clicked" CornerRadius="17"/>
             <Grid Grid.Column="3" ColumnDefinitions="Auto,*">
                 <CheckBox x:Name="chkBoxPerms" Grid.Column="0" Color="#1565C0"
                           VerticalOptions="Center" Margin="2,0,0,0"/>
                 <Button Grid.Column="1" Text="Combos" FontSize="11"
-                        BackgroundColor="#3949AB" TextColor="White" HeightRequest="34"
+                        BackgroundColor="#3949AB" TextColor="White" HeightRequest="28"
                         Clicked="BtnProcess_Clicked" CornerRadius="17"/>
             </Grid>
             <Button Grid.Column="4" Text="Draws" FontSize="11" Padding="8,0"
-                    BackgroundColor="#00897B" TextColor="White" HeightRequest="34"
+                    BackgroundColor="#00897B" TextColor="White" HeightRequest="28"
                     Clicked="BtnDraws_Clicked" CornerRadius="17"/>
-            <Picker x:Name="cmbRecurrence" Grid.Column="5" WidthRequest="46" HeightRequest="34"
+            <Picker x:Name="cmbRecurrence" Grid.Column="5" WidthRequest="46" HeightRequest="28"
                     BackgroundColor="White" FontSize="10" SelectedIndexChanged="Recurrence_Changed">
                 <Picker.Items>
                     <x:String>2</x:String>
@@ -195,7 +195,7 @@
                 </Picker.Items>
             </Picker>
             <Button Grid.Column="6" Text="Match" FontSize="11" Padding="8,0"
-                    BackgroundColor="#E53935" TextColor="White" HeightRequest="34"
+                    BackgroundColor="#E53935" TextColor="White" HeightRequest="28"
                     Clicked="BtnRecurrence_Clicked" CornerRadius="17"/>
         </Grid>
 
