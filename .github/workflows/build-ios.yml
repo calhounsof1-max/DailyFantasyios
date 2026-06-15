@@ -37,34 +37,7 @@ jobs:
         run: dotnet restore DailyFantasyIOS.csproj
 
       - name: Patch iOS SDK Xcode version requirement
-        run: |
-          python3 - <<'EOF'
-import glob, os, re
-
-home = os.path.expanduser('~')
-pattern = f'{home}/.dotnet/packs/Microsoft.iOS.Sdk*/*/targets/Xamarin.Shared.Sdk.targets'
-files = glob.glob(pattern)
-print(f'Found targets files: {files}')
-for f in files:
-    with open(f) as fh:
-        content = fh.read()
-    lines = content.split('\n')
-    for i, line in enumerate(lines):
-        if 'xcode' in line.lower() and ('require' in line.lower() or 'version' in line.lower()):
-            print(f'Line {i+1}: {line.strip()}')
-    # Remove or neutralize any Xcode version Error condition
-    patched = re.sub(
-        r'<Error\s[^/]*requires\s+Xcode[^/]*/?>',
-        '<!-- xcode check removed -->',
-        content, flags=re.IGNORECASE|re.DOTALL
-    )
-    if patched != content:
-        with open(f, 'w') as fh:
-            fh.write(patched)
-        print(f'Patched: {f}')
-    else:
-        print(f'No match found in: {f}')
-EOF
+        run: python3 scripts/patch_xcode.py
 
       - name: Build unsigned app
         run: |
