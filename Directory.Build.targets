@@ -10,6 +10,5 @@
     <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
     <EnableAotAnalyzer>false</EnableAotAnalyzer>
     <EnableSingleFileAnalyzer>false</EnableSingleFileAnalyzer>
-    <NoWarn>$(NoWarn);NETSDK1195</NoWarn>
   </PropertyGroup>
 </Project>
