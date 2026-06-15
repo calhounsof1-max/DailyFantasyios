@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Handlers;
 using ZXing.Net.Maui.Controls;
 
@@ -22,25 +22,22 @@ public static class MauiProgram
 #if ANDROID
 				handlers.AddHandler<Entry, BlackTextEntryHandler>();
 #endif
-#if IOS
-				// Route Shell through CustomShellRenderer so our HideNavBarTracker
-				// gets the actual UINavigationController and can force-hide the bar.
-				handlers.AddHandler<Shell, CustomShellRenderer>();
-#endif
 			});
 
 #if IOS
-		// Color the UINavigationBar to match the app background (#1E2733).
-		// Shell.NavBarIsVisible=False hides the MAUI-managed content but the native
-		// UINavigationBar still renders as a gray band and steals ~44pt of height.
-		// Coloring it dark makes the band invisible; AppShell.OnNavigated hides it.
-		var navAppearance = new UIKit.UINavigationBarAppearance();
-		navAppearance.ConfigureWithOpaqueBackground();
-		navAppearance.BackgroundColor = UIKit.UIColor.FromRGB(0x1E, 0x27, 0x33);
-		navAppearance.ShadowColor = UIKit.UIColor.Clear;
-		UIKit.UINavigationBar.Appearance.StandardAppearance   = navAppearance;
-		UIKit.UINavigationBar.Appearance.ScrollEdgeAppearance = navAppearance;
-		UIKit.UINavigationBar.Appearance.CompactAppearance    = navAppearance;
+		// Use PageHandler.Mapper to reach the concrete PageHandler (which has ViewController)
+		// and from there get the UINavigationController to force-hide the nav bar.
+		// This fires every time a ContentPage handler is created or updated.
+		Microsoft.Maui.Handlers.PageHandler.Mapper.AppendToMapping("HideIOSNavBar", (handler, view) =>
+		{
+			if (view is ContentPage && handler is Microsoft.Maui.Handlers.PageHandler pageHandler)
+			{
+				Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(() =>
+				{
+					pageHandler.ViewController?.NavigationController?.SetNavigationBarHidden(true, false);
+				});
+			}
+		});
 #endif
 
 #if DEBUG
