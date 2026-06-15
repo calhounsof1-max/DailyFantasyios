@@ -22,6 +22,11 @@ public static class MauiProgram
 #if ANDROID
 				handlers.AddHandler<Entry, BlackTextEntryHandler>();
 #endif
+#if IOS
+				// Remove UITextField's extra internal padding so HeightRequest
+				// on Entry controls matches Android sizing (no inflated heights).
+				handlers.AddHandler<Entry, CompactEntryHandler>();
+#endif
 			});
 
 #if IOS
