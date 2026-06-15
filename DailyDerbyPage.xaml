@@ -6,9 +6,9 @@
              Title="Daily Derby"
              Shell.NavBarIsVisible="False"
              ios:Page.UseSafeArea="true"
-             BackgroundColor="#F0F4F8">
+             BackgroundColor="#1E2733">
 
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto,1">
+    <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto,1">
         <Grid.GestureRecognizers>
             <PanGestureRecognizer PanUpdated="OnPagePan"/>
         </Grid.GestureRecognizers>

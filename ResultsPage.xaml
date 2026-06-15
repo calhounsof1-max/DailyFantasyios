@@ -5,9 +5,9 @@
              x:Class="DailyFantasyMAUI.ResultsPage"
              Shell.NavBarIsVisible="False"
              ios:Page.UseSafeArea="true"
-             BackgroundColor="#F0F4F8">
+             BackgroundColor="#1E2733">
 
-    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+    <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,Auto,Auto,*,Auto">
 
         <!-- Row 0: Header -->
         <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="10,10">
