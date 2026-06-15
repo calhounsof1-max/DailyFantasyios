@@ -8,11 +8,6 @@ public static class MauiProgram
 {
 	public static MauiApp CreateMauiApp()
 	{
-#if IOS
-		// Must run before builder so Mapper.AppendToMapping applies to all handlers.
-		CompactEntryHandler.Register();
-#endif
-
 		var builder = MauiApp.CreateBuilder();
 		builder
 			.UseMauiApp<App>()
@@ -30,7 +25,19 @@ public static class MauiProgram
 			});
 
 #if IOS
-		// Color the nav bar dark so the band is invisible even if we can't hide it.
+		// Fix Entry controls rendering much taller than HeightRequest on iOS.
+		// UITextField adds large internal padding by default. AppendToMapping
+		// runs AFTER all MAUI's own property mappers so our change sticks.
+		EntryHandler.Mapper.AppendToMapping("CompactEntry", (handler, view) =>
+		{
+			if (handler.PlatformView is UIKit.UITextField tf)
+			{
+				tf.BorderStyle = UIKit.UITextBorderStyle.None;
+				tf.VerticalAlignment = UIKit.UIControlContentVerticalAlignment.Center;
+			}
+		});
+
+		// Color the nav bar dark so the gray band is invisible.
 		var navAppearance = new UIKit.UINavigationBarAppearance();
 		navAppearance.ConfigureWithOpaqueBackground();
 		navAppearance.BackgroundColor = UIKit.UIColor.FromRGB(0x1E, 0x27, 0x33);
@@ -40,9 +47,9 @@ public static class MauiProgram
 		UIKit.UINavigationBar.Appearance.CompactAppearance    = navAppearance;
 
 		// Hide the nav bar after MAUI finishes its own nav bar setup.
-		Microsoft.Maui.Handlers.PageHandler.Mapper.AppendToMapping("HideIOSNavBar", (handler, view) =>
+		PageHandler.Mapper.AppendToMapping("HideIOSNavBar", (handler, view) =>
 		{
-			if (view is ContentPage && handler is Microsoft.Maui.Handlers.PageHandler pageHandler)
+			if (view is ContentPage && handler is PageHandler pageHandler)
 			{
 				Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(() =>
 				{
