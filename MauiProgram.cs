@@ -24,6 +24,18 @@ public static class MauiProgram
 #endif
 			});
 
+#if IOS
+		// Force-hide the iOS UINavigationBar at the native level.
+		// MAUI Shell.NavBarIsVisible=False hides the bar content but the bar
+		// itself still renders as a gray band and steals ~44pt of layout height.
+		// Calling SetNavigationBarHidden(true) directly reclaims that space.
+		Microsoft.Maui.Handlers.PageHandler.Mapper.AppendToMapping("HideIOSNavBar", (handler, view) =>
+		{
+			if (view is ContentPage)
+				handler.ViewController?.NavigationController?.SetNavigationBarHidden(true, false);
+		});
+#endif
+
 #if DEBUG
 		builder.Logging.AddDebug();
 #endif
