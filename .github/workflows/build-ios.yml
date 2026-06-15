@@ -15,9 +15,8 @@ jobs:
 
       - name: Select Xcode
         run: |
-          # Use Xcode 16 — MacOSX.sdk lookup works (actool/ibtool work via xcrun)
-          # Xcode 26 has broken xcodebuild -sdk <absolute-path> -find tool lookup
-          XCODE=$(ls /Applications/ | grep "^Xcode_16" | sort -V | tail -1)
+          # Use Xcode 26 for iOS 26 SDK — we fix the actool lookup via xcrun wrapper
+          XCODE=$(ls /Applications/ | grep "^Xcode_26" | sort -V | tail -1)
           if [ -z "$XCODE" ]; then
             XCODE=$(ls /Applications/ | grep "^Xcode_" | sort -V | tail -1)
           fi
@@ -28,7 +27,29 @@ jobs:
           echo "$DEVELOPER_DIR/usr/bin" >> $GITHUB_PATH
           xcodebuild -version
           echo "XCODE_VERSION=$(xcodebuild -version | head -1 | awk '{print $2}')" >> $GITHUB_ENV
-          echo "actool: $(xcrun --find actool 2>&1)"
+
+          # Wrap xcrun to fix MAUI's broken absolute-path SDK lookup
+          # MAUI calls: xcrun -sdk /path/MacOSX.sdk -find actool  (FAILS in Xcode 26)
+          # We convert to: xcrun -sdk macosx -find actool          (WORKS)
+          mkdir -p /tmp/xcrun-wrapper
+          cat > /tmp/xcrun-wrapper/xcrun << 'XCRUNEOF'
+          #!/bin/bash
+          ARGS=()
+          PREV=""
+          for arg in "$@"; do
+            if [[ "$PREV" == "-sdk" && "$arg" == */MacOSX*.sdk* ]]; then
+              ARGS+=("macosx")
+            else
+              ARGS+=("$arg")
+            fi
+            PREV="$arg"
+          done
+          exec /usr/bin/xcrun "${ARGS[@]}"
+          XCRUNEOF
+          chmod +x /tmp/xcrun-wrapper/xcrun
+          echo "/tmp/xcrun-wrapper" >> $GITHUB_PATH
+          echo "xcrun wrapper installed"
+          echo "actool: $(/tmp/xcrun-wrapper/xcrun --find actool 2>&1)"
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
