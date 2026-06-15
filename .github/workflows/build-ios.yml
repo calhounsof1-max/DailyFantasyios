@@ -27,18 +27,15 @@ jobs:
 
           # Fix macOS SDK CanonicalName so xcodebuild -sdk <path> -find <tool> works
           SDK_DIR="$DEVELOPER_DIR/Platforms/MacOSX.platform/Developer/SDKs"
-          echo "macOS SDKs before fix: $(ls $SDK_DIR 2>/dev/null)"
-          VERSIONED_SDK=$(ls "$SDK_DIR" | grep "^MacOSX[0-9]" | sort -V | tail -1)
-          echo "Versioned SDK: $VERSIONED_SDK"
-          if [ -n "$VERSIONED_SDK" ]; then
-            PLIST="$SDK_DIR/$VERSIONED_SDK/SDKSettings.plist"
-            echo "Current CanonicalName: $(plutil -extract CanonicalName raw "$PLIST" 2>/dev/null)"
-            sudo plutil -replace CanonicalName -string "macosx" "$PLIST"
-            echo "Fixed CanonicalName: $(plutil -extract CanonicalName raw "$PLIST" 2>/dev/null)"
-            sudo rm -f "$SDK_DIR/MacOSX.sdk"
-            sudo ln -sf "$SDK_DIR/$VERSIONED_SDK" "$SDK_DIR/MacOSX.sdk"
-            echo "Symlinked MacOSX.sdk -> $VERSIONED_SDK"
-          fi
+          echo "macOS SDKs: $(ls $SDK_DIR 2>/dev/null)"
+          for SDK in "$SDK_DIR"/MacOSX*.sdk; do
+            PLIST="$SDK/SDKSettings.plist"
+            if [ -f "$PLIST" ]; then
+              NAME=$(plutil -extract CanonicalName raw "$PLIST" 2>/dev/null)
+              echo "Patching $SDK (was: $NAME)"
+              sudo plutil -replace CanonicalName -string "macosx" "$PLIST"
+            fi
+          done
 
           xcodebuild -version
           xcrun -find actool 2>/dev/null && echo "actool: OK" || echo "actool not found"
