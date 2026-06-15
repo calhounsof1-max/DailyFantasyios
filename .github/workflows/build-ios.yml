@@ -15,13 +15,20 @@ jobs:
 
       - name: Select Xcode
         run: |
+          xcodebuild -version
+          xcode-select -p
           ls /Applications/ | grep Xcode
-          XCODE=$(ls /Applications/ | grep "^Xcode_26" | sort -V | tail -1)
-          if [ -z "$XCODE" ]; then
-            XCODE=$(ls /Applications/ | grep "^Xcode_" | sort -V | tail -1)
-          fi
-          echo "Using: $XCODE"
-          sudo xcode-select -s /Applications/$XCODE/Contents/Developer
+          # Find latest Xcode that has the macOS SDK
+          for XCODE in $(ls /Applications/ | grep "^Xcode" | sort -rV); do
+            SDK_PATH="/Applications/$XCODE/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs"
+            if ls "$SDK_PATH" 2>/dev/null | grep -q "MacOSX"; then
+              echo "Using $XCODE (has macOS SDK)"
+              sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
+              break
+            else
+              echo "Skipping $XCODE (no macOS SDK)"
+            fi
+          done
           xcodebuild -version
           echo "XCODE_VERSION=$(xcodebuild -version | head -1 | awk '{print $2}')" >> $GITHUB_ENV
 
