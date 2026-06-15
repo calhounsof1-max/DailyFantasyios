@@ -44,7 +44,6 @@ jobs:
           FIND_TOOL=""
           for arg in "$@"; do
             if [[ "$PREV" == "-sdk" && "$arg" == */MacOSX*.sdk* ]]; then
-              # Replace absolute MacOSX.sdk path with canonical "macosx"
               ARGS+=("macosx")
               HAS_MACOS_SDK=true
             elif [[ "$PREV" == "-sdk" && "$arg" == "macosx"* ]]; then
@@ -53,17 +52,27 @@ jobs:
             else
               ARGS+=("$arg")
             fi
-            # Track what tool is being looked up
             if [[ "$PREV" == "-find" || "$PREV" == "--find" ]]; then
               FIND_TOOL="$arg"
             fi
             PREV="$arg"
           done
-          # When finding a build tool via MacOSX SDK, xcrun internally calls
-          # xcodebuild -sdk /abs/path -find <tool> which fails in Xcode 26.3.
-          # Use --find <tool> (XcodeDefault toolchain) instead.
+          # xcodebuild 26.3 fails: xcodebuild -sdk /abs/path -find <tool>
+          # Even xcrun --find <tool> may use xcodebuild internally and fail.
+          # Solution: look up the tool directly in XcodeDefault toolchain.
           if [[ "$HAS_MACOS_SDK" == "true" && -n "$FIND_TOOL" ]]; then
-            exec /usr/bin/xcrun --find "$FIND_TOOL"
+            DEV="${DEVELOPER_DIR:-$(xcode-select -p 2>/dev/null)}"
+            TOOLBIN="$DEV/Toolchains/XcodeDefault.xctoolchain/usr/bin"
+            if [[ -f "$TOOLBIN/$FIND_TOOL" ]]; then
+              echo "$TOOLBIN/$FIND_TOOL"
+              exit 0
+            fi
+            # Also check usr/bin in the developer dir
+            DEVBIN="$DEV/usr/bin"
+            if [[ -f "$DEVBIN/$FIND_TOOL" ]]; then
+              echo "$DEVBIN/$FIND_TOOL"
+              exit 0
+            fi
           fi
           exec /usr/bin/xcrun "${ARGS[@]}"
           XCRUNEOF
@@ -71,7 +80,8 @@ jobs:
           echo "/tmp/xcrun-wrapper" >> $GITHUB_PATH
           echo "xcrun wrapper installed"
           echo "actool: $(/tmp/xcrun-wrapper/xcrun --find actool 2>&1)"
-          echo "clang: $(/tmp/xcrun-wrapper/xcrun --find clang 2>&1)"
+          echo "clang via wrapper (macos-sdk): $(/tmp/xcrun-wrapper/xcrun -sdk macosx -find clang 2>&1)"
+          echo "clang++ via wrapper (macos-sdk): $(/tmp/xcrun-wrapper/xcrun -sdk macosx -find clang++ 2>&1)"
 
           # The MAUI SDK check looks for a directory named iPhoneOS26.5.sdk.
           # xcrun --sdk iphoneos returns iPhoneOS26.2.sdk (only installed SDK).
