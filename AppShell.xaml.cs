@@ -27,6 +27,32 @@ public partial class AppShell : Shell
 	internal static readonly CheckTicketPage   CheckTicketPageInstance   = new();
 	internal static readonly MyFavoritePage   MyFavoritePageInstance    = new();
 
+#if IOS
+	protected override void OnNavigated(ShellNavigatedEventArgs args)
+	{
+		base.OnNavigated(args);
+		// Walk the ViewController hierarchy from the key window to find and hide
+		// the UINavigationController. This reclaims the ~44pt gray band at the top.
+		UIKit.UIWindow? keyWindow = null;
+		foreach (var w in UIKit.UIApplication.SharedApplication.Windows)
+			if (w.IsKeyWindow) { keyWindow = w; break; }
+		HideNavBar(keyWindow?.RootViewController);
+	}
+
+	static void HideNavBar(UIKit.UIViewController? vc)
+	{
+		if (vc == null) return;
+		if (vc is UIKit.UINavigationController nav)
+		{
+			nav.SetNavigationBarHidden(true, false);
+			return;
+		}
+		HideNavBar(vc.PresentedViewController);
+		foreach (var child in vc.ChildViewControllers)
+			HideNavBar(child);
+	}
+#endif
+
 	public AppShell()
 	{
 		InitializeComponent();

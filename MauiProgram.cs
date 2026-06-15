@@ -25,26 +25,17 @@ public static class MauiProgram
 			});
 
 #if IOS
-		// Force-hide the iOS UINavigationBar at the native level.
-		// MAUI Shell.NavBarIsVisible=False hides bar content but the UINavigationBar
-		// itself still renders as a gray band and steals ~44pt of layout height.
-		// Walk the responder chain from the platform view to find the nav controller.
-		Microsoft.Maui.Handlers.PageHandler.Mapper.AppendToMapping("HideIOSNavBar", (handler, view) =>
-		{
-			if (view is ContentPage && handler.PlatformView is UIKit.UIView platformView)
-			{
-				UIKit.UIResponder? responder = platformView.NextResponder;
-				while (responder != null)
-				{
-					if (responder is UIKit.UINavigationController nav)
-					{
-						nav.SetNavigationBarHidden(true, false);
-						return;
-					}
-					responder = responder.NextResponder;
-				}
-			}
-		});
+		// Color the UINavigationBar to match the app background (#1E2733).
+		// Shell.NavBarIsVisible=False hides the MAUI-managed content but the native
+		// UINavigationBar still renders as a gray band and steals ~44pt of height.
+		// Coloring it dark makes the band invisible; AppShell.OnNavigated hides it.
+		var navAppearance = new UIKit.UINavigationBarAppearance();
+		navAppearance.ConfigureWithOpaqueBackground();
+		navAppearance.BackgroundColor = UIKit.UIColor.FromRGB(0x1E, 0x27, 0x33);
+		navAppearance.ShadowColor = UIKit.UIColor.Clear;
+		UIKit.UINavigationBar.Appearance.StandardAppearance   = navAppearance;
+		UIKit.UINavigationBar.Appearance.ScrollEdgeAppearance = navAppearance;
+		UIKit.UINavigationBar.Appearance.CompactAppearance    = navAppearance;
 #endif
 
 #if DEBUG
