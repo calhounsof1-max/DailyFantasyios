@@ -26,7 +26,7 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Label Grid.Column="0" Text="Daily Fantasy" TextColor="White"
+            <Label Grid.Column="0" Text="Daily Fantasy v9" TextColor="White"
                    FontSize="12" VerticalOptions="Center" LineBreakMode="NoWrap"/>
             <Button Grid.Column="1" x:Name="btnNavDropdown"
                     Text="Games ▾" FontSize="13" FontAttributes="Bold"
