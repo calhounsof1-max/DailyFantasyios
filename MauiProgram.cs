@@ -22,21 +22,14 @@ public static class MauiProgram
 #if ANDROID
 				handlers.AddHandler<Entry, BlackTextEntryHandler>();
 #endif
+#if IOS
+				// ZeroPaddingTextField removes UIKit's internal vertical padding so
+				// HeightRequest values are actually respected (matching Android sizes).
+				handlers.AddHandler<Entry, CompactEntryHandler>();
+#endif
 			});
 
 #if IOS
-		// Fix Entry controls rendering much taller than HeightRequest on iOS.
-		// UITextField adds large internal padding by default. AppendToMapping
-		// runs AFTER all MAUI's own property mappers so our change sticks.
-		EntryHandler.Mapper.AppendToMapping("CompactEntry", (handler, view) =>
-		{
-			if (handler.PlatformView is UIKit.UITextField tf)
-			{
-				tf.BorderStyle = UIKit.UITextBorderStyle.None;
-				tf.VerticalAlignment = UIKit.UIControlContentVerticalAlignment.Center;
-			}
-		});
-
 		// Color the nav bar dark so the gray band is invisible.
 		var navAppearance = new UIKit.UINavigationBarAppearance();
 		navAppearance.ConfigureWithOpaqueBackground();
@@ -46,7 +39,7 @@ public static class MauiProgram
 		UIKit.UINavigationBar.Appearance.ScrollEdgeAppearance = navAppearance;
 		UIKit.UINavigationBar.Appearance.CompactAppearance    = navAppearance;
 
-		// Hide the nav bar after MAUI finishes its own nav bar setup.
+		// Hide the nav bar after MAUI finishes its own setup.
 		PageHandler.Mapper.AppendToMapping("HideIOSNavBar", (handler, view) =>
 		{
 			if (view is ContentPage && handler is PageHandler pageHandler)
