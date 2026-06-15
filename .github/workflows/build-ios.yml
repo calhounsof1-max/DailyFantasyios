@@ -51,7 +51,7 @@ jobs:
             -c Release \
             -p:RuntimeIdentifier=ios-arm64 \
             -p:PublishTrimmed=true \
-            -p:MtouchLink=None \
+            -p:MtouchLink=SdkOnly \
             -p:ValidateXcodeVersion=false \
             -p:EnableCodeSigning=false \
             -p:CodesignKey="" \
