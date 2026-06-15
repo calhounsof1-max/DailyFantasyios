@@ -13,6 +13,12 @@
         <conv:BoolToColorConverter x:Key="BoolToColor"/>
     </ContentPage.Resources>
 
+    <ContentPage.Padding>
+        <OnPlatform x:TypeArguments="Thickness">
+            <On Platform="iOS" Value="0,0,0,34"/>
+        </OnPlatform>
+    </ContentPage.Padding>
+
     <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto">
         <Grid.GestureRecognizers>
             <PanGestureRecognizer PanUpdated="OnPagePan"/>

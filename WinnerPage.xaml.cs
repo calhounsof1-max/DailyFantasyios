@@ -96,6 +96,8 @@ public partial class WinnerPage : ContentPage
 
     private async void BtnGoHome_Clicked(object sender, EventArgs e) => await GoBackWithSlide();
 
+    private async void BtnGames_Clicked(object sender, EventArgs e) => await GameNavHelper.ShowGamesDropdown(this);
+
     private async void BtnGoSL_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;

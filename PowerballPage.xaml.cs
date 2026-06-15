@@ -101,6 +101,8 @@ public partial class PowerballPage : ContentPage
     private async void BtnGoHome_Clicked(object sender, EventArgs e) =>
         await Shell.Current.Navigation.PopToRootAsync(false);
 
+    private async void BtnGames_Clicked(object sender, EventArgs e) => await GameNavHelper.ShowGamesDropdown(this);
+
     private async void BtnGoBack_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;

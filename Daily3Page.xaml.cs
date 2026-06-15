@@ -114,6 +114,8 @@ public partial class Daily3Page : ContentPage
     private async void BtnGoHome_Clicked(object sender, EventArgs e) =>
         await Shell.Current.Navigation.PopToRootAsync(false);
 
+    private async void BtnGames_Clicked(object sender, EventArgs e) => await GameNavHelper.ShowGamesDropdown(this);
+
     private async void BtnGoD4_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;

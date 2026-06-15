@@ -112,6 +112,8 @@ public partial class SuperLottoPage : ContentPage
 
     private async void BtnGoF5_Clicked(object sender, EventArgs e) => await GoBackWithSlide();
 
+    private async void BtnGames_Clicked(object sender, EventArgs e) => await GameNavHelper.ShowGamesDropdown(this);
+
     private async void BtnGoPB_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;

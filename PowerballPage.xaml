@@ -7,6 +7,12 @@
              Shell.NavBarIsVisible="False"
              BackgroundColor="#1E2733">
 
+    <ContentPage.Padding>
+        <OnPlatform x:TypeArguments="Thickness">
+            <On Platform="iOS" Value="0,0,0,34"/>
+        </OnPlatform>
+    </ContentPage.Padding>
+
     <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,Auto,Auto,*,Auto,Auto,1">
         <Grid.GestureRecognizers>
             <PanGestureRecognizer PanUpdated="OnPagePan"/>
@@ -14,16 +20,19 @@
 
         <!-- Row 0: Nav header -->
         <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="14,10"
-              ColumnDefinitions="Auto,*,Auto,Auto">
+              ColumnDefinitions="Auto,*,Auto,Auto,Auto">
             <Button Grid.Column="0" x:Name="btnBack" Text="← SL" FontSize="12" FontAttributes="Bold"
                     BackgroundColor="#7B1FA2" TextColor="White" Padding="10,0"
                     HeightRequest="34" CornerRadius="17" Clicked="BtnGoBack_Clicked"/>
             <Label Grid.Column="1" Text="Powerball" TextColor="White" FontSize="14"
                    FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center"/>
-            <Button Grid.Column="2" Text="⌂" FontSize="14" FontAttributes="Bold"
+            <Button Grid.Column="2" Text="Games ▾" FontSize="12" FontAttributes="Bold"
+                    BackgroundColor="#2D3D50" TextColor="White" Padding="10,0"
+                    HeightRequest="34" CornerRadius="17" Clicked="BtnGames_Clicked" Margin="0,0,6,0"/>
+            <Button Grid.Column="3" Text="⌂" FontSize="14" FontAttributes="Bold"
                     BackgroundColor="#2D3D50" TextColor="White" Padding="10,0"
                     HeightRequest="34" CornerRadius="17" Clicked="BtnGoHome_Clicked" Margin="0,0,6,0"/>
-            <Button Grid.Column="3" Text="MM →" FontSize="12" FontAttributes="Bold"
+            <Button Grid.Column="4" Text="MM →" FontSize="12" FontAttributes="Bold"
                     BackgroundColor="#F57F17" TextColor="White" Padding="10,0"
                     HeightRequest="34" CornerRadius="17" Clicked="BtnGoD3_Clicked"/>
         </Grid>
