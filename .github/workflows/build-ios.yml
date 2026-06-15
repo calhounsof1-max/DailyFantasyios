@@ -15,8 +15,8 @@ jobs:
 
       - name: Select Xcode
         run: |
-          # Use latest Xcode 26.x for iOS 26 SDK support
-          XCODE=$(ls /Applications/ | grep "^Xcode_26" | sort -V | tail -1)
+          # Use Xcode 16 — its macOS SDK has proper MacOSX.sdk symlink that actool needs
+          XCODE=$(ls /Applications/ | grep "^Xcode_16" | sort -V | tail -1)
           if [ -z "$XCODE" ]; then
             XCODE=$(ls /Applications/ | grep "^Xcode_" | sort -V | tail -1)
           fi
@@ -24,40 +24,11 @@ jobs:
           DEVELOPER_DIR="/Applications/$XCODE/Contents/Developer"
           sudo xcode-select -s "$DEVELOPER_DIR"
           echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> $GITHUB_ENV
-
-          # Fix macOS SDK CanonicalName so xcodebuild -sdk <path> -find <tool> works
-          SDK_DIR="$DEVELOPER_DIR/Platforms/MacOSX.platform/Developer/SDKs"
-          echo "macOS SDKs: $(ls $SDK_DIR 2>/dev/null)"
-          for SDK in "$SDK_DIR"/MacOSX*.sdk; do
-            PLIST="$SDK/SDKSettings.plist"
-            if [ -f "$PLIST" ]; then
-              NAME=$(plutil -extract CanonicalName raw "$PLIST" 2>/dev/null)
-              echo "Patching $SDK (was: $NAME)"
-              sudo plutil -replace CanonicalName -string "macosx" "$PLIST"
-            fi
-          done
-
-          # Create MacOSX.sdk symlink if missing (Xcode 26 names it MacOSX26.x.sdk)
-          if [ ! -e "$SDK_DIR/MacOSX.sdk" ]; then
-            REAL_SDK=$(ls "$SDK_DIR" | grep "^MacOSX.*\.sdk$" | sort -V | tail -1)
-            echo "Creating MacOSX.sdk -> $REAL_SDK"
-            sudo ln -sf "$SDK_DIR/$REAL_SDK" "$SDK_DIR/MacOSX.sdk"
-          fi
-          echo "SDKs after fix: $(ls $SDK_DIR)"
-
-          # Add Xcode developer tools to PATH
           echo "$DEVELOPER_DIR/usr/bin" >> $GITHUB_PATH
-
-          # If ibtool missing in Xcode 26, borrow from Xcode 16
-          if [ ! -f "$DEVELOPER_DIR/usr/bin/ibtool" ]; then
-            echo "ibtool not in Xcode 26, borrowing from Xcode 16"
-            XCODE16=$(ls /Applications/ | grep "^Xcode_16" | sort -V | tail -1)
-            sudo ln -sf "/Applications/$XCODE16/Contents/Developer/usr/bin/ibtool" "$DEVELOPER_DIR/usr/bin/ibtool"
-          fi
-
           xcodebuild -version
-          ls "$DEVELOPER_DIR/usr/bin/" | grep -E "actool|ibtool"
           echo "XCODE_VERSION=$(xcodebuild -version | head -1 | awk '{print $2}')" >> $GITHUB_ENV
+          echo "macOS SDKs: $(ls $DEVELOPER_DIR/Platforms/MacOSX.platform/Developer/SDKs/)"
+          xcrun --find actool && echo "actool OK" || echo "actool missing"
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
