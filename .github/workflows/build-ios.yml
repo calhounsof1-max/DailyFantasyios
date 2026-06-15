@@ -51,6 +51,24 @@ jobs:
           echo "xcrun wrapper installed"
           echo "actool: $(/tmp/xcrun-wrapper/xcrun --find actool 2>&1)"
 
+          # Patch iOS SDK plist so xcrun reports 26.5 (belt-and-suspenders; main fix is in patch_xcode.py)
+          IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path 2>/dev/null)
+          echo "iPhoneOS SDK path: $IOS_SDK"
+          echo "iPhoneOS SDK version (before patch): $(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null)"
+          if [ -n "$IOS_SDK" ]; then
+            PLIST="$IOS_SDK/SDKSettings.plist"
+            echo "Plist before patch:"; plutil -p "$PLIST" | grep -E 'Version|CanonicalName|MaximumDeployment' || true
+            sudo plutil -replace MaximumDeploymentTarget -string "26.5" "$PLIST"
+            # Version key: use replace first; if it fails (key missing), insert it
+            sudo plutil -replace Version -string "26.5" "$PLIST" 2>/dev/null \
+              || sudo plutil -insert Version -string "26.5" "$PLIST" 2>/dev/null || true
+            # CanonicalName: xcrun may use this to report --show-sdk-version
+            sudo plutil -replace CanonicalName -string "iphoneos26.5" "$PLIST" 2>/dev/null \
+              || sudo plutil -insert CanonicalName -string "iphoneos26.5" "$PLIST" 2>/dev/null || true
+            echo "Plist after patch:"; plutil -p "$PLIST" | grep -E 'Version|CanonicalName|MaximumDeployment' || true
+            echo "iPhoneOS SDK version (after patch): $(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null)"
+          fi
+
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
