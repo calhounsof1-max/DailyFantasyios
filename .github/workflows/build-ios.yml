@@ -37,8 +37,18 @@ jobs:
             fi
           done
 
+          # Add Xcode developer tools to PATH
+          echo "$DEVELOPER_DIR/usr/bin" >> $GITHUB_PATH
+
+          # If ibtool missing in Xcode 26, borrow from Xcode 16
+          if [ ! -f "$DEVELOPER_DIR/usr/bin/ibtool" ]; then
+            echo "ibtool not in Xcode 26, borrowing from Xcode 16"
+            XCODE16=$(ls /Applications/ | grep "^Xcode_16" | sort -V | tail -1)
+            sudo ln -sf "/Applications/$XCODE16/Contents/Developer/usr/bin/ibtool" "$DEVELOPER_DIR/usr/bin/ibtool"
+          fi
+
           xcodebuild -version
-          xcrun -find actool 2>/dev/null && echo "actool: OK" || echo "actool not found"
+          ls "$DEVELOPER_DIR/usr/bin/" | grep -E "actool|ibtool"
           echo "XCODE_VERSION=$(xcodebuild -version | head -1 | awk '{print $2}')" >> $GITHUB_ENV
 
       - name: Setup .NET 10
