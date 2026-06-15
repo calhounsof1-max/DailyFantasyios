@@ -21,18 +21,27 @@ jobs:
             XCODE=$(ls /Applications/ | grep "^Xcode_" | sort -V | tail -1)
           fi
           echo "Selected: $XCODE"
-          sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
+          DEVELOPER_DIR="/Applications/$XCODE/Contents/Developer"
+          sudo xcode-select -s "$DEVELOPER_DIR"
+          echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> $GITHUB_ENV
 
-          # Fix macOS SDK symlink — Xcode 26 names it MacOSX26.sdk etc.
-          SDK_DIR="/Applications/$XCODE/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs"
-          echo "SDKs available: $(ls $SDK_DIR 2>/dev/null)"
-          ACTUAL_SDK=$(ls "$SDK_DIR" 2>/dev/null | grep "^MacOSX" | sort -V | tail -1)
-          if [ -n "$ACTUAL_SDK" ] && [ "$ACTUAL_SDK" != "MacOSX.sdk" ]; then
-            echo "Creating symlink: MacOSX.sdk -> $ACTUAL_SDK"
-            sudo ln -sfn "$SDK_DIR/$ACTUAL_SDK" "$SDK_DIR/MacOSX.sdk"
+          # Show available macOS SDKs
+          SDK_DIR="$DEVELOPER_DIR/Platforms/MacOSX.platform/Developer/SDKs"
+          echo "macOS SDKs: $(ls $SDK_DIR 2>/dev/null)"
+
+          # Show where actool is
+          ACTOOL=$(find "$DEVELOPER_DIR" -name "actool" -type f 2>/dev/null | head -1)
+          echo "actool found at: $ACTOOL"
+          if [ -n "$ACTOOL" ]; then
+            echo "$(dirname $ACTOOL)" >> $GITHUB_PATH
           fi
 
+          # Show available iOS SDKs
+          IOS_SDK_DIR="$DEVELOPER_DIR/Platforms/iPhoneOS.platform/Developer/SDKs"
+          echo "iOS SDKs: $(ls $IOS_SDK_DIR 2>/dev/null)"
+
           xcodebuild -version
+          xcrun -find actool 2>/dev/null || echo "actool not found via xcrun"
           echo "XCODE_VERSION=$(xcodebuild -version | head -1 | awk '{print $2}')" >> $GITHUB_ENV
 
       - name: Setup .NET 10
