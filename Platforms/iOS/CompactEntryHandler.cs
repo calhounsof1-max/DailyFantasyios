@@ -11,10 +11,11 @@ namespace DailyFantasyMAUI;
 /// </summary>
 class ZeroPaddingTextField : MauiTextField
 {
-    // Tell iOS layout system this control is 34pt tall (standard touch target).
-    // Without this, UITextField reports ~44pt+ which inflates Auto grid rows.
+    // NoIntrinsicMetric lets MAUI/Grid fully control the height via HeightRequest
+    // and fixed row sizes.  The old value of 34 caused the UITextField to leak
+    // outside its 24 pt grid cell, making boxes appear huge.
     public override CGSize IntrinsicContentSize
-        => new CGSize(UIView.NoIntrinsicMetric, 34);
+        => new CGSize(UIView.NoIntrinsicMetric, UIView.NoIntrinsicMetric);
 
     public override CGRect TextRect(CGRect forBounds)
         => forBounds.Inset(8, 0);
@@ -33,6 +34,9 @@ public class CompactEntryHandler : EntryHandler
         var tf = new ZeroPaddingTextField();
         tf.BorderStyle = UITextBorderStyle.None;
         tf.VerticalAlignment = UIControlContentVerticalAlignment.Center;
+        // OneTimeCode prevents iOS from applying the yellow autofill tint
+        // to numeric text fields.
+        tf.TextContentType = UITextContentType.OneTimeCode;
         return tf;
     }
 }
