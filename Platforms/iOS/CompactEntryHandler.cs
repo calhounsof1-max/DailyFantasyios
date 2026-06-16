@@ -34,16 +34,23 @@ public class CompactEntryHandler : EntryHandler
         var tf = new ZeroPaddingTextField();
         tf.BorderStyle = UITextBorderStyle.None;
         tf.VerticalAlignment = UIControlContentVerticalAlignment.Center;
-        // Clip so the text field never visually bleeds outside its grid cell.
         tf.ClipsToBounds = true;
         return tf;
     }
 
     protected override void ConnectHandler(MauiTextField platformView)
     {
-        base.ConnectHandler(platformView); // MAUI's property mappers run here
-        // Set AFTER base so MAUI's keyboard/content-type mapper can't override us.
-        // OneTimeCode prevents iOS from painting the yellow autofill tint.
+        base.ConnectHandler(platformView);
         platformView.TextContentType = UITextContentType.OneTimeCode;
+    }
+
+    // Cap the measured height at HeightRequest so the MAUI layout engine
+    // allocates the correct frame instead of using UITextField's intrinsic size.
+    public override Size GetDesiredSize(double widthConstraint, double heightConstraint)
+    {
+        var result = base.GetDesiredSize(widthConstraint, heightConstraint);
+        if (VirtualView is Microsoft.Maui.Controls.VisualElement ve && ve.HeightRequest > 0)
+            return new Size(result.Width, ve.HeightRequest);
+        return result;
     }
 }
