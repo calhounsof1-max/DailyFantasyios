@@ -32,6 +32,10 @@
 	<string>Assets.xcassets/appicon.appiconset</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Used to photograph lottery tickets and slips</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Used to enter lottery numbers by voice</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Used to recognize spoken lottery numbers for entry</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Used to access photos of lottery tickets</string>
 </dict>

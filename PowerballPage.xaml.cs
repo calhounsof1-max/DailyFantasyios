@@ -486,7 +486,7 @@ public partial class PowerballPage : ContentPage
 
     private void ForceBlackText(object? sender, EventArgs e)
     {
-#if ANDROID
+#if IOS
         if (sender is Entry entry &&
             entry.Handler?.PlatformView is Android.Widget.EditText et)
         {
@@ -729,7 +729,7 @@ public partial class PowerballPage : ContentPage
 
     private void BtnVoice_Clicked(object sender, EventArgs e)
     {
-#if ANDROID
+#if IOS
         if (!Services.VoiceNumberService.IsAvailable) { lblStatus.Text = "Speech recognition not available"; return; }
         if (_voiceOn) StopVoice(); else StartVoice();
 #endif
@@ -743,7 +743,7 @@ public partial class PowerballPage : ContentPage
         _voiceOn = true;
         btnVoice.BackgroundColor = Colors.Red;
         SetVoiceTarget();
-#if ANDROID
+#if IOS
         Services.VoiceNumberService.StatusUpdate += OnVoiceStatus;
         Services.VoiceNumberService.StartContinuous(OnVoiceNumbers);
 #endif
@@ -753,7 +753,7 @@ public partial class PowerballPage : ContentPage
     {
         _voiceOn = false;
         ClearVoiceTarget();
-#if ANDROID
+#if IOS
         Services.VoiceNumberService.StatusUpdate -= OnVoiceStatus;
         Services.VoiceNumberService.Stop();
 #endif
