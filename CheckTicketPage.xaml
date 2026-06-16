@@ -6,7 +6,7 @@
              Title="Check-A-Ticket"
              Shell.NavBarIsVisible="False"
              BackgroundColor="#1E2733"
-             ios:Page.UseSafeArea="true">
+             ios:Page.UseSafeArea="false">
 
     <Grid RowDefinitions="Auto,Auto,*">
 

@@ -31,38 +31,29 @@ public static class MauiProgram
 			});
 
 #if IOS
-		// Color the nav bar dark so the gray band is invisible.
-		var navAppearance = new UIKit.UINavigationBarAppearance();
-		navAppearance.ConfigureWithOpaqueBackground();
-		navAppearance.BackgroundColor = UIKit.UIColor.FromRGB(0x1E, 0x27, 0x33);
-		navAppearance.ShadowColor = UIKit.UIColor.Clear;
-		UIKit.UINavigationBar.Appearance.StandardAppearance   = navAppearance;
-		UIKit.UINavigationBar.Appearance.ScrollEdgeAppearance = navAppearance;
-		UIKit.UINavigationBar.Appearance.CompactAppearance    = navAppearance;
-
-		// Per-page fix: set AdditionalSafeAreaInsets on the page VC itself so MAUI's
-		// UseSafeArea sees the corrected insets regardless of nav-bar state.
-		// We run after a 120 ms delay to ensure MAUI has finished its own safe-area setup.
+		// Per-page: hide the native nav bar and apply ONLY status-bar top padding.
+		// UseSafeArea is "false" on all pages so we control Padding entirely from here.
+		// This removes the extra ~44 pt gray band caused by nav-bar safe-area.
 		PageHandler.Mapper.AppendToMapping("HideIOSNavBar", (handler, view) =>
 		{
-			if (view is ContentPage && handler is PageHandler pageHandler)
+			if (view is ContentPage page && handler is PageHandler pageHandler)
 			{
-				Task.Delay(120).ContinueWith(_ =>
-					Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(() =>
-					{
-						var vc = pageHandler.ViewController;
-						if (vc == null) return;
+				Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(() =>
+				{
+					var vc = pageHandler.ViewController;
+					if (vc == null) return;
+					vc.NavigationController?.SetNavigationBarHidden(true, false);
 
-						// Also hide via the nav controller if available.
-						vc.NavigationController?.SetNavigationBarHidden(true, false);
+					// Status bar height only — no nav bar contribution.
+					nfloat statusBarTop = 0;
+					foreach (var scene in UIKit.UIApplication.SharedApplication.ConnectedScenes)
+						if (scene is UIKit.UIWindowScene ws)
+							{ statusBarTop = ws.StatusBarManager?.StatusBarFrame.Height ?? 0; break; }
 
-						// If the page VC's own safe-area top is > 62 pt the nav bar
-						// (44 pt) is still contributing.  Cancel it on the page VC so
-						// UseSafeArea picks up the corrected value and fires its observer.
-						var safeTop = vc.View?.SafeAreaInsets.Top ?? 0;
-						if (safeTop > 62)
-							vc.AdditionalSafeAreaInsets = new UIKit.UIEdgeInsets(-44, 0, 0, 0);
-					}));
+					// Bottom safe area for home indicator.
+					var safeBottom = vc.View?.SafeAreaInsets.Bottom ?? 0;
+					page.Padding = new Microsoft.Maui.Thickness(0, (double)statusBarTop, 0, (double)safeBottom);
+				});
 			}
 		});
 #endif

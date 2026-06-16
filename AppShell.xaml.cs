@@ -31,34 +31,22 @@ public partial class AppShell : Shell
 	protected override void OnNavigated(ShellNavigatedEventArgs args)
 	{
 		base.OnNavigated(args);
-		// Immediate attempt catches most cases.
-		Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(DoHideNavBars);
-		// Delayed attempt (100 ms) runs after MAUI finishes its own nav-bar restoration.
-		Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(100), DoHideNavBars);
+		Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(HideNavBars);
 	}
 
-	static void DoHideNavBars()
+	static void HideNavBars()
 	{
-		UIKit.UIWindow? keyWindow = null;
 		foreach (var scene in UIKit.UIApplication.SharedApplication.ConnectedScenes)
 			if (scene is UIKit.UIWindowScene ws)
 				foreach (var w in ws.Windows)
-					if (w.IsKeyWindow) { keyWindow = w; break; }
-		HideNavBar(keyWindow?.RootViewController);
+					HideNavBar(w.RootViewController);
 	}
 
-	// Walk the ENTIRE VC tree — don't return early at the first nav controller,
-	// because MAUI Shell nests it inside wrapper VCs and there may be more than one.
 	static void HideNavBar(UIKit.UIViewController? vc, int depth = 0)
 	{
 		if (vc == null || depth > 10) return;
 		if (vc is UIKit.UINavigationController nav)
-		{
 			nav.NavigationBarHidden = true;
-			// Always force -44 so it persists even if MAUI resets AdditionalSafeAreaInsets.
-			nav.AdditionalSafeAreaInsets = new UIKit.UIEdgeInsets(-44, 0, 0, 0);
-			// Don't return — walk nav controller's children too.
-		}
 		HideNavBar(vc.PresentedViewController, depth + 1);
 		foreach (var child in vc.ChildViewControllers)
 			HideNavBar(child, depth + 1);
