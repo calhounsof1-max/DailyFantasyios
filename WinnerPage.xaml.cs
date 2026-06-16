@@ -126,9 +126,11 @@ public partial class WinnerPage : ContentPage
             var ph = Handler as Microsoft.Maui.Handlers.PageHandler;
             var vc = ph?.ViewController;
             var vf = vc?.View?.Frame;
-            var sf = vc?.View?.Superview?.Frame;
+            // Convert view origin to window coordinates = absolute screen position
+            var winPt = vc?.View?.ConvertPointToView(CoreGraphics.CGPoint.Empty, null);
             var safeTop = vc?.View?.SafeAreaInsets.Top ?? -1;
-            lblStatus.Text = $"vY={vf?.Y:F0} vH={vf?.Height:F0} svY={sf?.Y:F0} svH={sf?.Height:F0} safe={safeTop:F0} pad={Padding.Top:F0}";
+            var winH = vc?.View?.Window?.Frame.Height ?? -1;
+            lblStatus.Text = $"winY={winPt?.Y:F0} vH={vf?.Height:F0} winH={winH:F0} safe={safeTop:F0} pad={Padding.Top:F0}";
         });
 #endif
         _ = LoadAllDraws();
