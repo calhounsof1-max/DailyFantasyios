@@ -120,19 +120,6 @@ public partial class WinnerPage : ContentPage
         btnBack.Text = ComingFrom == "results" ? "← RESULTS" : "← HOME";
 
         base.OnAppearing();
-#if IOS
-        Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(200), () =>
-        {
-            var ph = Handler as Microsoft.Maui.Handlers.PageHandler;
-            var vc = ph?.ViewController;
-            var vf = vc?.View?.Frame;
-            // Convert view origin to window coordinates = absolute screen position
-            var winPt = vc?.View?.ConvertPointToView(CoreGraphics.CGPoint.Empty, null);
-            var safeTop = vc?.View?.SafeAreaInsets.Top ?? -1;
-            var winH = vc?.View?.Window?.Frame.Height ?? -1;
-            lblStatus.Text = $"winY={winPt?.Y:F0} vH={vf?.Height:F0} winH={winH:F0} safe={safeTop:F0} pad={Padding.Top:F0}";
-        });
-#endif
         _ = LoadAllDraws();
         Dispatcher.Dispatch(() =>
         {
