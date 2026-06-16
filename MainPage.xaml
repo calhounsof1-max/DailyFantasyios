@@ -8,7 +8,7 @@
              Title="Lottery"
              Shell.NavBarIsVisible="False"
              BackgroundColor="#1E2733"
-             ios:Page.UseSafeArea="true">
+             ios:Page.UseSafeArea="false">
 
     <ContentPage.Resources>
         <conv:BoolToColorConverter x:Key="BoolToColor"/>

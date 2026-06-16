@@ -31,25 +31,33 @@ public static class MauiProgram
 			});
 
 #if IOS
-		// Per-page: hide the native nav bar and cancel its 44pt safe-area contribution.
-		// We hook page.Loaded so the VC is fully in the navigation hierarchy before we act.
-		// UseSafeArea="true" watches for safe-area changes — when AdditionalSafeAreaInsets
-		// changes on the nav controller iOS fires viewSafeAreaInsetsDidChange, MAUI
-		// re-reads the insets and shrinks the top padding to status-bar height only.
+		// Per-page: set page.Padding = (statusBarHeight, homeIndicator) from NavigatedTo.
+		// NavigatedTo fires after the page is fully on-screen so the scene is ready.
+		// UseSafeArea="false" means we own Padding entirely — no MAUI override.
 		PageHandler.Mapper.AppendToMapping("HideIOSNavBar", (handler, view) =>
 		{
-			if (view is ContentPage page && handler is PageHandler pageHandler)
+			if (view is ContentPage page && handler is PageHandler ph)
 			{
-				page.Loaded += (_, _) =>
+				// Hide nav bar immediately when the handler is set up (belt & suspenders).
+				ph.ViewController?.NavigationController?.SetNavigationBarHidden(true, false);
+
+				page.NavigatedTo += (_, _) =>
 					Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(() =>
 					{
-						var vc = pageHandler.ViewController;
+						var vc = ph.ViewController;
 						if (vc == null) return;
-						var nav = vc.NavigationController;
-						if (nav == null) return;
-						nav.SetNavigationBarHidden(true, false);
-						// Subtract the nav bar height so UseSafeArea only accounts for the status bar.
-						nav.AdditionalSafeAreaInsets = new UIKit.UIEdgeInsets(-44, 0, 0, 0);
+						vc.NavigationController?.SetNavigationBarHidden(true, false);
+
+						// Status bar height from the scene (correct on all devices).
+						nfloat statusBarH = 0;
+						foreach (var scene in UIKit.UIApplication.SharedApplication.ConnectedScenes)
+							if (scene is UIKit.UIWindowScene ws)
+							{ statusBarH = ws.StatusBarManager?.StatusBarFrame.Height ?? 0; break; }
+
+						// Home indicator height for the bottom.
+						var safeBottom = vc.View?.SafeAreaInsets.Bottom ?? 0;
+
+						page.Padding = new Microsoft.Maui.Thickness(0, (double)statusBarH, 0, (double)safeBottom);
 					});
 			}
 		});

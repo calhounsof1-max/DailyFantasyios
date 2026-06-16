@@ -5,7 +5,7 @@
              x:Class="DailyFantasyMAUI.GeneratePage"
              Shell.NavBarIsVisible="False"
              BackgroundColor="#0D1117"
-             ios:Page.UseSafeArea="true">
+             ios:Page.UseSafeArea="false">
 
     <Grid RowDefinitions="Auto,*,Auto" x:Name="rootGrid">
 
