@@ -1371,7 +1371,7 @@ namespace DailyFantasyMAUI.Services
         {
             var draws = await GetPastDraws(1);
             if (draws.Count == 0) return (false, string.Empty, Array.Empty<int>());
-            var (date, numbers, _) = draws[0];
+            var (date, _, numbers, _) = draws[0];
             return (true, date, numbers);
         }
 
@@ -1418,13 +1418,13 @@ namespace DailyFantasyMAUI.Services
 
         static void SavePrizeCache(
             string date,
-            List<(string DrawDate, int[] Numbers, DrawPrizeTier[] Prizes)> f5,
-            List<(string DrawDate, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> sl,
-            List<(string DrawDate, int[] MainNumbers, int PBNumber, DrawPrizeTier[] Prizes)> pb,
-            List<(string DrawDate, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> mm,
-            List<(string DrawDate, int[] Horses, string RaceTime, DrawPrizeTier[] Prizes)> dd,
+            List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> f5,
+            List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> sl,
+            List<(string DrawDate, int DrawNumber, int[] MainNumbers, int PBNumber, DrawPrizeTier[] Prizes)> pb,
+            List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> mm,
+            List<(string DrawDate, int DrawNumber, int[] Horses, string RaceTime, DrawPrizeTier[] Prizes)> dd,
             List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> d3,
-            List<(string DrawDate, int[] Numbers, DrawPrizeTier[] Prizes)> d4,
+            List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> d4,
             (decimal? F5, decimal? SL, decimal? PB, decimal? MM, decimal? DD) jp)
         {
             try
