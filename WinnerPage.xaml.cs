@@ -362,10 +362,10 @@ public partial class WinnerPage : ContentPage
             var rowNum = new Label
             {
                 Text = $"{r + 1,2}.",
-                FontSize = 13,
+                FontSize = 10,
                 TextColor = Color.FromArgb("#FF7043"),
                 VerticalOptions = LayoutOptions.Center,
-                WidthRequest = 24,
+                WidthRequest = 18,
             };
             rowNum.GestureRecognizers.Add(new TapGestureRecognizer
             {
@@ -380,12 +380,12 @@ public partial class WinnerPage : ContentPage
                 var entry = new Entry
                 {
                     Keyboard = Keyboard.Numeric,
-                    FontSize = 18,
+                    FontSize = 11,
                     FontAttributes = FontAttributes.Bold,
                     TextColor = Colors.Black,
                     BackgroundColor = Color.FromArgb("#F5F5F5"),
                     HorizontalTextAlignment = TextAlignment.Center,
-                    HeightRequest = 44,
+                    HeightRequest = 22,
                     MaxLength = 2,
                 };
                 entry.HandlerChanged += ForceBlackText;
@@ -414,7 +414,7 @@ public partial class WinnerPage : ContentPage
             var result = new Label
             {
                 Text = "",
-                FontSize = 13,
+                FontSize = 10,
                 FontAttributes = FontAttributes.Bold,
                 TextColor = Color.FromArgb("#888"),
                 VerticalOptions = LayoutOptions.Center,

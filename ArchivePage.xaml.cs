@@ -62,7 +62,7 @@ public partial class ArchivePage : ContentPage
         var btnRestore = new Button
         {
             Text = "Restore",
-            FontSize = 13,
+            FontSize = 10,
             BackgroundColor = Color.FromArgb("#1565C0"),
             TextColor = Colors.White,
             CornerRadius = 18,
@@ -75,7 +75,7 @@ public partial class ArchivePage : ContentPage
         var btnDelete = new Button
         {
             Text = "Delete",
-            FontSize = 13,
+            FontSize = 10,
             BackgroundColor = Color.FromArgb("#B71C1C"),
             TextColor = Colors.White,
             CornerRadius = 18,

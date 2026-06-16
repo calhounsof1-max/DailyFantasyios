@@ -243,7 +243,7 @@ public partial class ResultsPage : ContentPage
         var titleLbl = new Label
         {
             Text = title,
-            FontSize = 13,
+            FontSize = 10,
             FontAttributes = FontAttributes.Bold,
             TextColor = Colors.White,
             VerticalOptions = LayoutOptions.Center

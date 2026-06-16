@@ -81,7 +81,7 @@ public partial class GeneratePage : ContentPage
             var btn = new Button
             {
                 Text = Games[i].Short,
-                FontSize = 13, FontAttributes = FontAttributes.Bold,
+                FontSize = 10, FontAttributes = FontAttributes.Bold,
                 BackgroundColor = i == _gameIdx
                     ? Color.FromArgb(Games[i].AccentColor)
                     : Color.FromArgb("#2D3D50"),
@@ -629,7 +629,7 @@ public partial class GeneratePage : ContentPage
             rowGrid.Children.Add(new Label
             {
                 Text = $"{i + 1}.",
-                FontSize = 12, FontAttributes = FontAttributes.Bold,
+                FontSize = 10, FontAttributes = FontAttributes.Bold,
                 TextColor = Color.FromArgb("#6B7280"),
                 VerticalOptions = LayoutOptions.Center
             });
@@ -661,7 +661,7 @@ public partial class GeneratePage : ContentPage
                 bubbleRow.Children.Add(new Label
                 {
                     Text = $"⏱[{row.Time}]",
-                    FontSize = 13, FontAttributes = FontAttributes.Bold,
+                    FontSize = 10, FontAttributes = FontAttributes.Bold,
                     TextColor = Color.FromArgb("#FFCCBC"),
                     VerticalOptions = LayoutOptions.Center,
                     Margin = new Thickness(6, 0, 0, 0)
@@ -735,7 +735,7 @@ public partial class GeneratePage : ContentPage
             resultsStack.Children.Insert(0, new Label
             {
                 Text = $"Latest draw ({_latestDraw.Label}): {winNums}{winSpecial}{winTime}",
-                FontSize = 12, FontAttributes = FontAttributes.Bold,
+                FontSize = 10, FontAttributes = FontAttributes.Bold,
                 TextColor = Colors.White,
                 BackgroundColor = Color.FromArgb("#0D3B66"),
                 Padding = new Thickness(10, 6),
@@ -758,7 +758,7 @@ public partial class GeneratePage : ContentPage
             Content = new Label
             {
                 Text = text,
-                FontSize = 13, FontAttributes = FontAttributes.Bold,
+                FontSize = 10, FontAttributes = FontAttributes.Bold,
                 TextColor = textColor,
                 HorizontalOptions = LayoutOptions.Center,
                 VerticalOptions   = LayoutOptions.Center
@@ -913,8 +913,8 @@ public partial class GeneratePage : ContentPage
                 Text = row.Main[c].ToString(),
                 Keyboard = Keyboard.Numeric,
                 MaxLength = 2,
-                WidthRequest = 52, HeightRequest = 44,
-                FontSize = 18, FontAttributes = FontAttributes.Bold,
+                WidthRequest = 36, HeightRequest = 22,
+                FontSize = 11, FontAttributes = FontAttributes.Bold,
                 HorizontalTextAlignment = TextAlignment.Center,
                 BackgroundColor = Color.FromArgb("#2D3D50"),
                 TextColor = Colors.White,
@@ -937,8 +937,8 @@ public partial class GeneratePage : ContentPage
             {
                 Text = row.Special.ToString(),
                 Keyboard = Keyboard.Numeric, MaxLength = 2,
-                WidthRequest = 52, HeightRequest = 44,
-                FontSize = 18, FontAttributes = FontAttributes.Bold,
+                WidthRequest = 36, HeightRequest = 22,
+                FontSize = 11, FontAttributes = FontAttributes.Bold,
                 HorizontalTextAlignment = TextAlignment.Center,
                 BackgroundColor = Color.FromArgb("#3B0000"), TextColor = Colors.White,
             };
@@ -954,8 +954,8 @@ public partial class GeneratePage : ContentPage
             {
                 Text = row.Time,
                 Keyboard = Keyboard.Numeric, MaxLength = 3,
-                WidthRequest = 60, HeightRequest = 44,
-                FontSize = 18, FontAttributes = FontAttributes.Bold,
+                WidthRequest = 36, HeightRequest = 22,
+                FontSize = 11, FontAttributes = FontAttributes.Bold,
                 HorizontalTextAlignment = TextAlignment.Center,
                 BackgroundColor = Color.FromArgb("#3E1F00"), TextColor = Colors.White,
                 Placeholder = "000",

@@ -81,7 +81,7 @@ public partial class ScanSlipPage : ContentPage
             var btn = new Button
             {
                 Text = Games[i].Short,
-                FontSize = 13, FontAttributes = FontAttributes.Bold,
+                FontSize = 10, FontAttributes = FontAttributes.Bold,
                 BackgroundColor = idx == _gameIdx
                     ? MColor(Games[i].AccentColor) : MColor("#2D3D50"),
                 TextColor = Microsoft.Maui.Graphics.Colors.White,
@@ -609,7 +609,7 @@ public partial class ScanSlipPage : ContentPage
             int pi = i;
             var del = new Button
             {
-                Text = "✕", FontSize = 13,
+                Text = "✕", FontSize = 10,
                 BackgroundColor = MColor("#C62828"), TextColor = Microsoft.Maui.Graphics.Colors.White,
                 HeightRequest = 32, WidthRequest = 32, CornerRadius = 16, Padding = Thickness.Zero
             };

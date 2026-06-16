@@ -162,7 +162,7 @@ public partial class MyFavoritePage : ContentPage
         var headerLabel = new Label
         {
             Text = set.Label,
-            FontSize = 13,
+            FontSize = 10,
             FontAttributes = FontAttributes.Bold,
             TextColor = Color.FromArgb(cfg.Accent),
             VerticalOptions = LayoutOptions.Center,
@@ -231,12 +231,12 @@ public partial class MyFavoritePage : ContentPage
                 var entry = new Entry
                 {
                     Keyboard = Keyboard.Numeric,
-                    FontSize = 18,
+                    FontSize = 11,
                     FontAttributes = FontAttributes.Bold,
                     TextColor = isSpecial ? Colors.White : Colors.Black,
                     BackgroundColor = Color.FromArgb(isSpecial ? cfg.Accent : "#F5F5F5"),
                     HorizontalTextAlignment = TextAlignment.Center,
-                    HeightRequest = 44,
+                    HeightRequest = 22,
                     MaxLength = 2,
                 };
                 entry.HandlerChanged += ForceBlackText;

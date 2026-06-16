@@ -93,8 +93,8 @@ public partial class ViewSetsPage : ContentPage
                 Keyboard = Keyboard.Numeric,
                 MaxLength = 2,
                 WidthRequest = 52,
-                HeightRequest = 44,
-                FontSize = 18,
+                HeightRequest = 22,
+                FontSize = 11,
                 FontAttributes = FontAttributes.Bold,
                 HorizontalTextAlignment = TextAlignment.Center,
                 BackgroundColor = Color.FromArgb("#F0F4F8"),
@@ -122,8 +122,8 @@ public partial class ViewSetsPage : ContentPage
                 Keyboard = Keyboard.Numeric,
                 MaxLength = 2,
                 WidthRequest = 52,
-                HeightRequest = 44,
-                FontSize = 18,
+                HeightRequest = 22,
+                FontSize = 11,
                 FontAttributes = FontAttributes.Bold,
                 HorizontalTextAlignment = TextAlignment.Center,
                 BackgroundColor = Color.FromArgb("#FFEBEE"),
@@ -147,8 +147,8 @@ public partial class ViewSetsPage : ContentPage
                 Keyboard = Keyboard.Numeric,
                 MaxLength = 3,
                 WidthRequest = 80,
-                HeightRequest = 44,
-                FontSize = 18,
+                HeightRequest = 22,
+                FontSize = 11,
                 FontAttributes = FontAttributes.Bold,
                 HorizontalTextAlignment = TextAlignment.Center,
                 BackgroundColor = Color.FromArgb("#FBE9E7"),
@@ -160,7 +160,7 @@ public partial class ViewSetsPage : ContentPage
             timeRow.Children.Add(new Label
             {
                 Text = "⏱ Time (last 3):",
-                FontSize = 13,
+                FontSize = 10,
                 TextColor = Color.FromArgb("#5D4037"),
                 VerticalOptions = LayoutOptions.Center
             });
@@ -295,7 +295,7 @@ public partial class ViewSetsPage : ContentPage
                 setsContainer.Children.Add(new Label
                 {
                     Text = nonEmptyCount > 0 ? "All sets excluded" : "No sets saved",
-                    FontSize = 13,
+                    FontSize = 10,
                     TextColor = Color.FromArgb("#9CA3AF"),
                     Margin = new Thickness(20, 4, 20, 8),
                     FontAttributes = FontAttributes.Italic

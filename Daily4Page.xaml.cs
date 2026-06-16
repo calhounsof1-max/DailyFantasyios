@@ -557,7 +557,7 @@ public partial class Daily4Page : ContentPage
             var permsLabel = new Label
             {
                 IsVisible = false,
-                FontSize = 13,
+                FontSize = 10,
                 FontAttributes = FontAttributes.Bold,
                 TextColor = Color.FromArgb("#00695C"),
                 BackgroundColor = Color.FromArgb("#E0F2F1"),

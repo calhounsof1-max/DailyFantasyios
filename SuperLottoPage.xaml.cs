@@ -382,10 +382,10 @@ public partial class SuperLottoPage : ContentPage
             var rowNum = new Label
             {
                 Text = $"{r + 1,2}.",
-                FontSize = 13,
+                FontSize = 10,
                 TextColor = Color.FromArgb("#FF7043"),
                 VerticalOptions = LayoutOptions.Center,
-                WidthRequest = 24,
+                WidthRequest = 18,
             };
             rowNum.GestureRecognizers.Add(new TapGestureRecognizer
             {
@@ -438,7 +438,7 @@ public partial class SuperLottoPage : ContentPage
                 FontAttributes = FontAttributes.Bold,
                 TextColor = Color.FromArgb("#888"),
                 VerticalOptions = LayoutOptions.Center,
-                WidthRequest = 40,
+                WidthRequest = 32,
                 HorizontalTextAlignment = TextAlignment.Center,
             };
             _results[r] = result;
@@ -454,12 +454,12 @@ public partial class SuperLottoPage : ContentPage
         var e = new Entry
         {
             Keyboard = Keyboard.Numeric,
-            FontSize = 18,
+            FontSize = 11,
             FontAttributes = FontAttributes.Bold,
             TextColor = Colors.Black,
             BackgroundColor = bg,
             HorizontalTextAlignment = TextAlignment.Center,
-            HeightRequest = 44,
+            HeightRequest = 22,
             MaxLength = 2,
         };
         e.HandlerChanged += ForceBlackText;

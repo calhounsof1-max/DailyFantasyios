@@ -500,7 +500,7 @@ public partial class DailyDerbyPage : ContentPage
             var timeEntry = new Entry
             {
                 Keyboard = Keyboard.Numeric,
-                FontSize = 18,
+                FontSize = 11,
                 FontAttributes = FontAttributes.Bold,
                 TextColor = Colors.Black,
                 BackgroundColor = Color.FromArgb("#F5F5F5"),
@@ -548,7 +548,7 @@ public partial class DailyDerbyPage : ContentPage
             var permsLabel = new Label
             {
                 IsVisible = false,
-                FontSize = 13,
+                FontSize = 10,
                 FontAttributes = FontAttributes.Bold,
                 TextColor = Color.FromArgb("#5D4037"),
                 BackgroundColor = Color.FromArgb("#EFEBE9"),

@@ -565,7 +565,7 @@ public partial class Daily3Page : ContentPage
             var permsLabel = new Label
             {
                 IsVisible = false,
-                FontSize = 13,
+                FontSize = 10,
                 FontAttributes = FontAttributes.Bold,
                 TextColor = Color.FromArgb("#1565C0"),
                 BackgroundColor = Color.FromArgb("#E3F2FD"),
