@@ -449,7 +449,7 @@ public partial class WinnerPage : ContentPage
 
     private void ForceBlackText(object? sender, EventArgs e)
     {
-#if IOS
+#if ANDROID
         if (sender is Entry entry &&
             entry.Handler?.PlatformView is Android.Widget.EditText et)
         {

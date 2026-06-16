@@ -493,7 +493,7 @@ public partial class SuperLottoPage : ContentPage
 
     private void ForceBlackText(object? sender, EventArgs e)
     {
-#if IOS
+#if ANDROID
         if (sender is Entry entry &&
             entry.Handler?.PlatformView is Android.Widget.EditText et)
         {

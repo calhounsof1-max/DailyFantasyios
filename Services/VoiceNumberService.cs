@@ -110,7 +110,7 @@ public static class VoiceNumberService
             inputNode.InstallTapOnBus(0, 1024, format, (buffer, _) => _request?.Append(buffer));
 
             _audioEngine.Prepare();
-            NSError? startErr;
+            Foundation.NSError? startErr;
             _audioEngine.StartAndReturnError(out startErr);
             if (startErr != null)
             {
