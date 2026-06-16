@@ -918,7 +918,6 @@ public partial class Daily4Page : ContentPage
     private void BtnVoice_Clicked(object sender, EventArgs e)
     {
 #if IOS
-        if (!Services.VoiceNumberService.IsAvailable) { lblStatus.Text = "Speech recognition not available"; return; }
         if (_voiceOn) StopVoice(); else StartVoice();
 #endif
     }
