@@ -26,6 +26,7 @@ public static class MauiProgram
 				// ZeroPaddingTextField removes UIKit's internal vertical padding so
 				// HeightRequest values are actually respected (matching Android sizes).
 				handlers.AddHandler<Entry, CompactEntryHandler>();
+				handlers.AddHandler<Button, CompactButtonHandler>();
 #endif
 			});
 
