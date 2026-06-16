@@ -120,6 +120,22 @@ public partial class WinnerPage : ContentPage
         btnBack.Text = ComingFrom == "results" ? "← RESULTS" : "← HOME";
 
         base.OnAppearing();
+#if IOS
+        // DIAGNOSTIC — shows real safe-area values in lblStatus after 200ms
+        Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(200), () =>
+        {
+            var ph = Handler as Microsoft.Maui.Handlers.PageHandler;
+            var vc = ph?.ViewController;
+            nfloat sbH = 0;
+            foreach (var scene in UIKit.UIApplication.SharedApplication.ConnectedScenes)
+                if (scene is UIKit.UIWindowScene ws)
+                    { sbH = ws.StatusBarManager?.StatusBarFrame.Height ?? 0; break; }
+            var safeTop = vc?.View?.SafeAreaInsets.Top ?? -1;
+            var safeBot = vc?.View?.SafeAreaInsets.Bottom ?? 0;
+            var winTop  = vc?.View?.Window?.SafeAreaInsets.Top ?? -1;
+            lblStatus.Text = $"SBH={sbH:F0} vcSafe={safeTop:F0} winSafe={winTop:F0} Pad={Padding.Top:F0}";
+        });
+#endif
         _ = LoadAllDraws();
         Dispatcher.Dispatch(() =>
         {
