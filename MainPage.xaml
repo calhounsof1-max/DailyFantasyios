@@ -14,37 +14,37 @@
         <conv:BoolToColorConverter x:Key="BoolToColor"/>
     </ContentPage.Resources>
 
-    <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,Auto,24,24,24,Auto,Auto,*,Auto,Auto,Auto">
+    <Grid BackgroundColor="#F0F4F8" RowDefinitions="24,Auto,24,24,24,Auto,Auto,*,Auto,Auto,Auto">
         <Grid.GestureRecognizers>
             <PanGestureRecognizer PanUpdated="OnPagePan"/>
         </Grid.GestureRecognizers>
 
-        <!-- Row 0: Header -->
-        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="8,4">
+        <!-- Row 0: Header (fixed 24pt row keeps iOS button inflation in check) -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="4,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Label Grid.Column="0" Text="Daily Fantasy" TextColor="White"
-                   FontSize="10" VerticalOptions="Center" LineBreakMode="NoWrap"/>
+                   FontSize="9" VerticalOptions="Center" LineBreakMode="NoWrap"/>
             <Button Grid.Column="1" x:Name="btnNavDropdown"
-                    Text="Games ▾" FontSize="11" FontAttributes="Bold"
+                    Text="Games ▾" FontSize="9" FontAttributes="Bold"
                     BackgroundColor="#2D3D50" TextColor="White"
-                    Padding="8,0" HeightRequest="22" CornerRadius="11"
+                    Padding="5,0" HeightRequest="16" CornerRadius="8"
                     Clicked="BtnNavDropdown_Clicked"/>
             <Border Grid.Column="2" BackgroundColor="#2D3D50" StrokeThickness="0"
-                    StrokeShape="RoundRectangle 11" Padding="3,1" Margin="6,0,0,0" VerticalOptions="Center">
+                    StrokeShape="RoundRectangle 8" Padding="2,0" Margin="4,0,0,0" VerticalOptions="Center">
                 <HorizontalStackLayout Spacing="2" VerticalOptions="Center">
-                    <Button x:Name="btnModeF5" Text="F5" FontSize="10" FontAttributes="Bold"
-                            BackgroundColor="#FF8F00" TextColor="White" Padding="6,0"
-                            HeightRequest="20" CornerRadius="10" Clicked="BtnModeF5_Clicked"/>
-                    <Button x:Name="btnModeSL" Text="SL" FontSize="10" FontAttributes="Bold"
-                            BackgroundColor="#3D3D5C" TextColor="#8B9DC3" Padding="6,0"
-                            HeightRequest="20" CornerRadius="10" Clicked="BtnModeSL_Clicked"/>
-                    <Button x:Name="btnModeD3" Text="D3" FontSize="10" FontAttributes="Bold"
-                            BackgroundColor="#3D3D5C" TextColor="#8B9DC3" Padding="6,0"
-                            HeightRequest="20" CornerRadius="10" Clicked="BtnModeD3_Clicked"/>
+                    <Button x:Name="btnModeF5" Text="F5" FontSize="9" FontAttributes="Bold"
+                            BackgroundColor="#FF8F00" TextColor="White" Padding="4,0"
+                            HeightRequest="14" CornerRadius="7" Clicked="BtnModeF5_Clicked"/>
+                    <Button x:Name="btnModeSL" Text="SL" FontSize="9" FontAttributes="Bold"
+                            BackgroundColor="#3D3D5C" TextColor="#8B9DC3" Padding="4,0"
+                            HeightRequest="14" CornerRadius="7" Clicked="BtnModeSL_Clicked"/>
+                    <Button x:Name="btnModeD3" Text="D3" FontSize="9" FontAttributes="Bold"
+                            BackgroundColor="#3D3D5C" TextColor="#8B9DC3" Padding="4,0"
+                            HeightRequest="14" CornerRadius="7" Clicked="BtnModeD3_Clicked"/>
                 </HorizontalStackLayout>
             </Border>
         </Grid>
