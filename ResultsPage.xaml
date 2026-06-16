@@ -10,7 +10,7 @@
     <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,Auto,Auto,*,Auto">
 
         <!-- Row 0: Header -->
-        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="10,10">
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="8,6">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -18,48 +18,48 @@
             </Grid.ColumnDefinitions>
 
             <Button Grid.Column="0" Text="← HOME"
-                    FontSize="12" BackgroundColor="#FF8F00" TextColor="White"
-                    Padding="10,0" HeightRequest="34" CornerRadius="17"
+                    FontSize="9" BackgroundColor="#FF8F00" TextColor="White"
+                    Padding="6,0" HeightRequest="28" CornerRadius="14"
                     Clicked="BtnBack_Clicked"/>
 
             <Label Grid.Column="1" Text="RESULTS"
-                   TextColor="White" FontSize="15" FontAttributes="Bold"
+                   TextColor="White" FontSize="13" FontAttributes="Bold"
                    HorizontalOptions="Center" VerticalOptions="Center"/>
 
             <Button Grid.Column="2" Text="REFRESH"
-                    FontSize="11" BackgroundColor="#2D3D50" TextColor="#8B9DC3"
-                    Padding="8,0" HeightRequest="34" CornerRadius="17"
+                    FontSize="9" BackgroundColor="#2D3D50" TextColor="#8B9DC3"
+                    Padding="6,0" HeightRequest="28" CornerRadius="14"
                     Clicked="BtnRefresh_Clicked"/>
         </Grid>
 
         <!-- Row 1: Date picker + Check Tickets button -->
-        <Grid Grid.Row="1" BackgroundColor="White" Padding="12,8"
+        <Grid Grid.Row="1" BackgroundColor="White" Padding="10,5"
               ColumnDefinitions="Auto,*,Auto">
             <Label Grid.Column="0" Text="Date:"
-                   FontSize="13" TextColor="#555"
-                   VerticalOptions="Center" Margin="0,0,6,0"/>
+                   FontSize="11" TextColor="#555"
+                   VerticalOptions="Center" Margin="0,0,4,0"/>
             <DatePicker Grid.Column="1" x:Name="resultDatePicker"
                         Format="ddd MMM d, yyyy"
                         VerticalOptions="Center"
                         DateSelected="DatePicker_DateSelected"/>
             <Button Grid.Column="2" Text="CHECK TICKETS"
-                    FontSize="12" FontAttributes="Bold"
+                    FontSize="9" FontAttributes="Bold"
                     BackgroundColor="#1E2733" TextColor="White"
-                    Padding="12,0" HeightRequest="36" CornerRadius="18"
+                    Padding="8,0" HeightRequest="28" CornerRadius="14"
                     Clicked="BtnCheckTickets_Clicked"/>
         </Grid>
 
         <!-- Row 2: Status / spinner -->
-        <Grid Grid.Row="2" BackgroundColor="#E8ECEF" Padding="12,5"
+        <Grid Grid.Row="2" BackgroundColor="#E8ECEF" Padding="10,4"
               ColumnDefinitions="Auto,*">
             <ActivityIndicator Grid.Column="0" x:Name="spinner"
                                IsVisible="False" IsRunning="False"
                                Color="#FF8F00"
-                               HeightRequest="20" WidthRequest="20"
-                               VerticalOptions="Center" Margin="0,0,8,0"/>
+                               HeightRequest="16" WidthRequest="16"
+                               VerticalOptions="Center" Margin="0,0,6,0"/>
             <Label Grid.Column="1" x:Name="lblStatus"
                    Text="Select a date and tap CHECK TICKETS"
-                   FontSize="12" TextColor="#666" VerticalOptions="Center"/>
+                   FontSize="10" TextColor="#666" VerticalOptions="Center"/>
         </Grid>
 
         <!-- Row 3: Scrollable results -->
@@ -71,7 +71,7 @@
         <!-- Row 4: Bottom bar (tap to copy log) -->
         <Label Grid.Row="4" x:Name="lblBottom" Text=" "
                BackgroundColor="#1E2733" TextColor="#8B9DC3"
-               FontSize="11" Padding="12,5"
+               FontSize="9" Padding="10,4"
                HorizontalTextAlignment="Center">
             <Label.GestureRecognizers>
                 <TapGestureRecognizer Tapped="BottomBar_Tapped"/>

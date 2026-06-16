@@ -10,107 +10,107 @@
     <Grid RowDefinitions="Auto,*,Auto">
 
         <!-- Header -->
-        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="10,10">
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="8,6">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Button Grid.Column="0" Text="←" FontSize="16" TextColor="White"
-                    BackgroundColor="Transparent" Padding="6,0"
-                    HeightRequest="36" MinimumWidthRequest="36"
+            <Button Grid.Column="0" Text="←" FontSize="12" TextColor="White"
+                    BackgroundColor="Transparent" Padding="4,0"
+                    HeightRequest="28" MinimumWidthRequest="28"
                     Clicked="BtnBack_Clicked"/>
             <Label Grid.Column="1" Text="Fantasy 5 Playslip"
-                   TextColor="White" FontSize="14" FontAttributes="Bold"
+                   TextColor="White" FontSize="13" FontAttributes="Bold"
                    VerticalOptions="Center" HorizontalOptions="Center"/>
-            <Button Grid.Column="2" x:Name="btnClearAll" Text="Clear All" FontSize="11"
+            <Button Grid.Column="2" x:Name="btnClearAll" Text="Clear All" FontSize="9"
                     BackgroundColor="#C62828" TextColor="White"
-                    Padding="10,0" HeightRequest="30" CornerRadius="15"
+                    Padding="6,0" HeightRequest="24" CornerRadius="12"
                     Clicked="BtnClearAll_Clicked"/>
         </Grid>
 
-        <VerticalStackLayout Grid.Row="1" Spacing="5" Padding="10,6">
+        <VerticalStackLayout Grid.Row="1" Spacing="4" Padding="8,5">
 
             <!-- Game row -->
-            <HorizontalStackLayout x:Name="stkGames" Spacing="5" HorizontalOptions="Center"/>
+            <HorizontalStackLayout x:Name="stkGames" Spacing="4" HorizontalOptions="Center"/>
             <!-- Panel row -->
-            <HorizontalStackLayout x:Name="stkPanels" Spacing="5" HorizontalOptions="Center"/>
+            <HorizontalStackLayout x:Name="stkPanels" Spacing="4" HorizontalOptions="Center"/>
 
             <!-- Counter + status in one line -->
             <Label x:Name="lblCount" Text="0 / 5 selected"
-                   FontSize="12" FontAttributes="Bold"
+                   FontSize="10" FontAttributes="Bold"
                    TextColor="#FF8F00" HorizontalOptions="Center"/>
 
             <!-- Main number grid + special ball (scrollable for large games) -->
-            <ScrollView MaximumHeightRequest="520">
-                <VerticalStackLayout Spacing="4">
+            <ScrollView MaximumHeightRequest="440">
+                <VerticalStackLayout Spacing="3">
                     <Grid x:Name="grdNumbers"/>
-                    <Label x:Name="lblSpecial" Text="MEGA BALL" FontSize="10" FontAttributes="Bold"
+                    <Label x:Name="lblSpecial" Text="MEGA BALL" FontSize="9" FontAttributes="Bold"
                            TextColor="#CE93D8" CharacterSpacing="1.5"
                            HorizontalOptions="Center" IsVisible="False"/>
                     <Grid x:Name="grdSpecial" IsVisible="False"/>
-                    <Label x:Name="lblTime" Text="RACE TIME  (last 3 digits)" FontSize="10"
+                    <Label x:Name="lblTime" Text="RACE TIME  (last 3 digits)" FontSize="9"
                            FontAttributes="Bold" TextColor="#FFCCBC" CharacterSpacing="1.5"
                            HorizontalOptions="Center" IsVisible="False"/>
                     <HorizontalStackLayout x:Name="stkTimeEntries" HorizontalOptions="Center"
-                                          Spacing="6" IsVisible="False"/>
+                                          Spacing="5" IsVisible="False"/>
                 </VerticalStackLayout>
             </ScrollView>
 
             <!-- Scan + Save on one row -->
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
                 <Button Grid.Column="0" x:Name="btnScan"
                         Text="📷 Scan"
-                        FontSize="13"
+                        FontSize="10"
                         BackgroundColor="#1565C0" TextColor="White"
-                        HeightRequest="38" CornerRadius="10"
+                        HeightRequest="30" CornerRadius="8"
                         Clicked="BtnScan_Clicked"/>
                 <Button Grid.Column="1" x:Name="btnSavePanel"
                         Text="Save A (0/5)"
-                        FontSize="13" FontAttributes="Bold"
+                        FontSize="10" FontAttributes="Bold"
                         BackgroundColor="#FF8F00" TextColor="White"
-                        HeightRequest="38" CornerRadius="10"
+                        HeightRequest="30" CornerRadius="8"
                         IsEnabled="False"
                         Clicked="BtnSavePanel_Clicked"/>
             </Grid>
 
             <!-- OCR preview toggle -->
             <Button x:Name="btnTogglePreview" Text="Show Scanned Image"
-                    FontSize="11" TextColor="#1565C0" BackgroundColor="Transparent"
-                    Padding="0" HeightRequest="22" IsVisible="False"
+                    FontSize="10" TextColor="#1565C0" BackgroundColor="Transparent"
+                    Padding="0" HeightRequest="18" IsVisible="False"
                     Clicked="BtnTogglePreview_Clicked"/>
             <Frame x:Name="frmPreview" IsVisible="False" Padding="0"
                    BorderColor="#1565C0" BackgroundColor="Black"
                    HorizontalOptions="Center">
-                <Image x:Name="imgPreview" Aspect="AspectFit" HeightRequest="130"/>
+                <Image x:Name="imgPreview" Aspect="AspectFit" HeightRequest="110"/>
             </Frame>
 
             <!-- Status -->
-            <Label x:Name="lblStatus" Text="" TextColor="#8B9DC3" FontSize="11"
+            <Label x:Name="lblStatus" Text="" TextColor="#8B9DC3" FontSize="10"
                    HorizontalTextAlignment="Center" HorizontalOptions="Center"
                    LineBreakMode="WordWrap"/>
 
             <!-- Saved panels -->
             <BoxView HeightRequest="1" BackgroundColor="#2D3D50"/>
-            <VerticalStackLayout x:Name="stkSaved" Spacing="4"/>
+            <VerticalStackLayout x:Name="stkSaved" Spacing="3"/>
 
         </VerticalStackLayout>
 
         <!-- Insert bar -->
         <Grid Grid.Row="2" x:Name="grdInsertBar"
-              BackgroundColor="#1E2733" Padding="14,10"
-              ColumnDefinitions="*,Auto" ColumnSpacing="10" IsVisible="False">
+              BackgroundColor="#1E2733" Padding="10,7"
+              ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="False">
             <VerticalStackLayout Grid.Column="0" Spacing="2">
-                <Label Text="SEND TO SET" FontSize="10" FontAttributes="Bold"
+                <Label Text="SEND TO SET" FontSize="9" FontAttributes="Bold"
                        TextColor="#9CA3AF" CharacterSpacing="1"/>
                 <Picker x:Name="pickerSet" Title="Choose set…"
-                        FontSize="13" TextColor="White" TitleColor="#6B7280"/>
+                        FontSize="10" TextColor="White" TitleColor="#6B7280"/>
             </VerticalStackLayout>
             <Button Grid.Column="1" x:Name="btnInsert"
                     Text="Insert↗"
-                    FontSize="14" FontAttributes="Bold"
+                    FontSize="10" FontAttributes="Bold"
                     BackgroundColor="#2E7D32" TextColor="White"
-                    HeightRequest="54" WidthRequest="90" CornerRadius="10"
+                    HeightRequest="40" WidthRequest="70" CornerRadius="8"
                     VerticalOptions="End"
                     Clicked="BtnInsert_Clicked"/>
         </Grid>
@@ -119,10 +119,10 @@
         <Grid Grid.Row="0" Grid.RowSpan="3"
               x:Name="loadingOverlay" IsVisible="False"
               BackgroundColor="#A0000000">
-            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
-                <ActivityIndicator IsRunning="True" Color="White" WidthRequest="48" HeightRequest="48"/>
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="10">
+                <ActivityIndicator IsRunning="True" Color="White" WidthRequest="36" HeightRequest="36"/>
                 <Label x:Name="lblLoading" Text="Detecting bubbles…"
-                       TextColor="White" FontSize="14" HorizontalOptions="Center"/>
+                       TextColor="White" FontSize="12" HorizontalOptions="Center"/>
             </VerticalStackLayout>
         </Grid>
 

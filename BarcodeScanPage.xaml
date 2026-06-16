@@ -11,21 +11,21 @@
     <Grid RowDefinitions="Auto,*,Auto">
 
         <!-- Header -->
-        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="10,10">
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="8,6">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Button Grid.Column="0" Text="◀" FontSize="16" BackgroundColor="Transparent"
-                    TextColor="White" Padding="4,0" HeightRequest="34" WidthRequest="40"
+            <Button Grid.Column="0" Text="◀" FontSize="12" BackgroundColor="Transparent"
+                    TextColor="White" Padding="3,0" HeightRequest="28" WidthRequest="32"
                     Clicked="BtnBack_Clicked"/>
             <Label Grid.Column="1" Text="Scan Ticket" TextColor="White"
-                   FontSize="15" FontAttributes="Bold" VerticalOptions="Center"
+                   FontSize="13" FontAttributes="Bold" VerticalOptions="Center"
                    HorizontalOptions="Center"/>
-            <Button Grid.Column="2" x:Name="btnRescan" Text="Rescan" FontSize="12"
-                    BackgroundColor="#2D3D50" TextColor="White" Padding="12,0"
-                    HeightRequest="34" CornerRadius="17" IsVisible="False"
+            <Button Grid.Column="2" x:Name="btnRescan" Text="Rescan" FontSize="9"
+                    BackgroundColor="#2D3D50" TextColor="White" Padding="6,0"
+                    HeightRequest="28" CornerRadius="14" IsVisible="False"
                     Clicked="BtnRescan_Clicked"/>
         </Grid>
 
@@ -49,73 +49,73 @@
                     <Grid BackgroundColor="#00000000"/>
                 </Border>
                 <Label Text="Point camera at ticket barcode"
-                       TextColor="White" FontSize="13"
+                       TextColor="White" FontSize="11"
                        HorizontalOptions="Center" VerticalOptions="End"
-                       Margin="0,0,0,32"/>
+                       Margin="0,0,0,24"/>
             </Grid>
 
             <!-- Results panel (visible after scan) -->
             <ScrollView x:Name="resultsPanel" IsVisible="False" BackgroundColor="#F0F4F8">
-                <VerticalStackLayout Spacing="12" Padding="14,14,14,14">
+                <VerticalStackLayout Spacing="8" Padding="10,10,10,10">
 
                     <!-- Raw barcode -->
-                    <Frame BackgroundColor="White" CornerRadius="12" BorderColor="#E5E7EB"
-                           Padding="14,10" HasShadow="False">
-                        <VerticalStackLayout Spacing="4">
-                            <Label Text="SCANNED DATA" FontSize="10" FontAttributes="Bold"
+                    <Frame BackgroundColor="White" CornerRadius="10" BorderColor="#E5E7EB"
+                           Padding="10,8" HasShadow="False">
+                        <VerticalStackLayout Spacing="3">
+                            <Label Text="SCANNED DATA" FontSize="9" FontAttributes="Bold"
                                    TextColor="#9CA3AF" CharacterSpacing="1"/>
                             <Label x:Name="lblRawValue" Text="" FontFamily="Monospace"
-                                   FontSize="12" TextColor="#374151" LineBreakMode="CharacterWrap"/>
-                            <Label x:Name="lblBarcodeFormat" Text="" FontSize="11" TextColor="#9CA3AF"/>
+                                   FontSize="11" TextColor="#374151" LineBreakMode="CharacterWrap"/>
+                            <Label x:Name="lblBarcodeFormat" Text="" FontSize="9" TextColor="#9CA3AF"/>
                         </VerticalStackLayout>
                     </Frame>
 
                     <!-- Select game -->
-                    <Frame BackgroundColor="White" CornerRadius="12" BorderColor="#E5E7EB"
-                           Padding="14,10" HasShadow="False">
-                        <VerticalStackLayout Spacing="6">
-                            <Label Text="SELECT GAME" FontSize="10" FontAttributes="Bold"
+                    <Frame BackgroundColor="White" CornerRadius="10" BorderColor="#E5E7EB"
+                           Padding="10,8" HasShadow="False">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="SELECT GAME" FontSize="9" FontAttributes="Bold"
                                    TextColor="#9CA3AF" CharacterSpacing="1"/>
-                            <Picker x:Name="pickerGame" FontSize="14" TextColor="#1E2733"
+                            <Picker x:Name="pickerGame" FontSize="11" TextColor="#1E2733"
                                     SelectedIndexChanged="GamePicker_Changed"/>
                         </VerticalStackLayout>
                     </Frame>
 
                     <!-- Numbers entry rows -->
-                    <Frame BackgroundColor="White" CornerRadius="12" BorderColor="#E5E7EB"
-                           Padding="14,12" HasShadow="False">
-                        <VerticalStackLayout Spacing="8">
-                            <Label Text="NUMBERS ON TICKET" FontSize="10" FontAttributes="Bold"
+                    <Frame BackgroundColor="White" CornerRadius="10" BorderColor="#E5E7EB"
+                           Padding="10,9" HasShadow="False">
+                        <VerticalStackLayout Spacing="5">
+                            <Label Text="NUMBERS ON TICKET" FontSize="9" FontAttributes="Bold"
                                    TextColor="#9CA3AF" CharacterSpacing="1"/>
-                            <VerticalStackLayout x:Name="stkNumberEntries" Spacing="6"/>
+                            <VerticalStackLayout x:Name="stkNumberEntries" Spacing="4"/>
                             <Label x:Name="lblEditNote" Text="Enter each play row (A, B, C…) — tap any box to edit."
-                                   FontSize="11" TextColor="#9CA3AF"/>
-                            <Button x:Name="btnAddRow" Text="+ Add Row" FontSize="12"
+                                   FontSize="10" TextColor="#9CA3AF"/>
+                            <Button x:Name="btnAddRow" Text="+ Add Row" FontSize="9"
                                     BackgroundColor="#374151" TextColor="White"
-                                    CornerRadius="6" Padding="10,4" HeightRequest="34"
+                                    CornerRadius="5" Padding="7,3" HeightRequest="26"
                                     HorizontalOptions="Start"
                                     Clicked="BtnAddRow_Clicked"/>
                         </VerticalStackLayout>
                     </Frame>
 
                     <!-- Check button -->
-                    <Button x:Name="btnCheck" Text="CHECK TICKET" FontSize="14"
+                    <Button x:Name="btnCheck" Text="CHECK TICKET" FontSize="11"
                             FontAttributes="Bold" BackgroundColor="#2E7D32" TextColor="White"
-                            HeightRequest="50" CornerRadius="25" Clicked="BtnCheck_Clicked"/>
+                            HeightRequest="38" CornerRadius="19" Clicked="BtnCheck_Clicked"/>
 
                     <!-- Result card -->
-                    <Frame x:Name="resultCard" BackgroundColor="White" CornerRadius="12"
-                           BorderColor="#E5E7EB" Padding="14,12" HasShadow="False"
+                    <Frame x:Name="resultCard" BackgroundColor="White" CornerRadius="10"
+                           BorderColor="#E5E7EB" Padding="10,9" HasShadow="False"
                            IsVisible="False">
-                        <VerticalStackLayout Spacing="6">
-                            <Label x:Name="lblResultGame" Text="" FontSize="14"
+                        <VerticalStackLayout Spacing="4">
+                            <Label x:Name="lblResultGame" Text="" FontSize="12"
                                    FontAttributes="Bold" TextColor="#1E2733"/>
-                            <Label x:Name="lblResultDraw" Text="" FontSize="11" TextColor="#6B7280"/>
-                            <Label x:Name="lblResultOutcome" Text="" FontSize="18"
+                            <Label x:Name="lblResultDraw" Text="" FontSize="10" TextColor="#6B7280"/>
+                            <Label x:Name="lblResultOutcome" Text="" FontSize="14"
                                    FontAttributes="Bold" TextColor="#1B5E20"/>
-                            <Label x:Name="lblResultPrize" Text="" FontSize="13" TextColor="#6B7280"/>
+                            <Label x:Name="lblResultPrize" Text="" FontSize="11" TextColor="#6B7280"/>
                             <!-- Dynamic per-draw results -->
-                            <VerticalStackLayout x:Name="stkDrawResults" Spacing="3"/>
+                            <VerticalStackLayout x:Name="stkDrawResults" Spacing="2"/>
                         </VerticalStackLayout>
                     </Frame>
 
@@ -127,7 +127,7 @@
         <!-- Status bar -->
         <Label Grid.Row="2" x:Name="lblStatus" Text="Align barcode within the frame"
                BackgroundColor="#1E2733" TextColor="#8B9DC3"
-               FontSize="12" Padding="14,5" LineBreakMode="TailTruncation"/>
+               FontSize="9" Padding="10,3" LineBreakMode="TailTruncation"/>
 
     </Grid>
 </ContentPage>

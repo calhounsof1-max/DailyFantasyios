@@ -11,20 +11,20 @@
     <Grid RowDefinitions="Auto,Auto,*">
 
         <!-- Header -->
-        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="10,10">
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="8,6">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Button Grid.Column="0" Text="◀" FontSize="16" BackgroundColor="Transparent"
-                    TextColor="White" Padding="4,0" HeightRequest="34" WidthRequest="40"
+            <Button Grid.Column="0" Text="◀" FontSize="12" BackgroundColor="Transparent"
+                    TextColor="White" Padding="3,0" HeightRequest="28" WidthRequest="32"
                     Clicked="BtnBack_Clicked"/>
             <Label Grid.Column="1" Text="Check-A-Ticket" TextColor="White"
-                   FontSize="15" FontAttributes="Bold" VerticalOptions="Center"
+                   FontSize="13" FontAttributes="Bold" VerticalOptions="Center"
                    HorizontalOptions="Center"/>
-            <Button Grid.Column="2" Text="⟳" FontSize="18" BackgroundColor="Transparent"
-                    TextColor="White" Padding="4,0" HeightRequest="34" WidthRequest="40"
+            <Button Grid.Column="2" Text="⟳" FontSize="13" BackgroundColor="Transparent"
+                    TextColor="White" Padding="3,0" HeightRequest="28" WidthRequest="32"
                     Clicked="BtnReload_Clicked"/>
         </Grid>
 

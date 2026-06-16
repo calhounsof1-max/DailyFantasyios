@@ -11,44 +11,44 @@
     <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,Auto,Auto,*">
 
         <!-- Header -->
-        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="14,10">
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="8,6">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            <Button Grid.Column="0" Text="← BACK" FontSize="12" FontAttributes="Bold"
+            <Button Grid.Column="0" Text="← BACK" FontSize="9" FontAttributes="Bold"
                     BackgroundColor="#2D3D50" TextColor="White"
-                    Padding="12,0" HeightRequest="34" CornerRadius="17"
+                    Padding="6,0" HeightRequest="28" CornerRadius="14"
                     Clicked="BtnBack_Clicked"/>
             <Label Grid.Column="1" x:Name="lblTitle" Text="Data Viewer" TextColor="White"
-                   FontSize="16" FontAttributes="Bold"
+                   FontSize="14" FontAttributes="Bold"
                    HorizontalOptions="Center" VerticalOptions="Center"/>
         </Grid>
 
         <!-- File picker -->
-        <Grid Grid.Row="1" Padding="12,8" ColumnDefinitions="*,Auto" ColumnSpacing="8"
+        <Grid Grid.Row="1" Padding="10,5" ColumnDefinitions="*,Auto" ColumnSpacing="6"
               BackgroundColor="White">
             <Picker x:Name="filePicker" Grid.Column="0"
-                    Title="Select file..." FontSize="14"
+                    Title="Select file..." FontSize="11"
                     SelectedIndexChanged="FilePicker_SelectedIndexChanged"/>
             <Label Grid.Column="1" x:Name="lblLineCount"
-                   FontSize="12" TextColor="#9CA3AF" VerticalOptions="Center"/>
+                   FontSize="10" TextColor="#9CA3AF" VerticalOptions="Center"/>
         </Grid>
 
         <!-- Date filter -->
-        <Grid Grid.Row="2" Padding="12,6" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8"
+        <Grid Grid.Row="2" Padding="10,4" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="6"
               BackgroundColor="#EEF2F7">
-            <Label Grid.Column="0" Text="Month/Day:" FontSize="12" TextColor="#546E7A"
+            <Label Grid.Column="0" Text="Month/Day:" FontSize="10" TextColor="#546E7A"
                    VerticalOptions="Center"/>
-            <DatePicker x:Name="datePicker" Grid.Column="1" FontSize="13"
+            <DatePicker x:Name="datePicker" Grid.Column="1" FontSize="10"
                         Format="yyyy-MM-dd" VerticalOptions="Center"/>
-            <Button Grid.Column="2" Text="Filter" FontSize="12" FontAttributes="Bold"
+            <Button Grid.Column="2" Text="Filter" FontSize="9" FontAttributes="Bold"
                     BackgroundColor="#1565C0" TextColor="White"
-                    HeightRequest="34" Padding="12,0" CornerRadius="17"
+                    HeightRequest="24" Padding="8,0" CornerRadius="12"
                     Clicked="BtnFilter_Clicked"/>
-            <Button Grid.Column="3" Text="All" FontSize="12"
+            <Button Grid.Column="3" Text="All" FontSize="9"
                     BackgroundColor="#78909C" TextColor="White"
-                    HeightRequest="34" Padding="12,0" CornerRadius="17"
+                    HeightRequest="24" Padding="8,0" CornerRadius="12"
                     Clicked="BtnShowAll_Clicked"/>
         </Grid>
 
@@ -59,27 +59,27 @@
                     <DataTemplate>
                         <Label Text="{Binding .}"
                                FontFamily="Monospace"
-                               FontSize="12"
+                               FontSize="11"
                                TextColor="#1E2A3A"
-                               Padding="12,2"
+                               Padding="10,2"
                                LineBreakMode="NoWrap"/>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
             <!-- Jump buttons -->
-            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="8" Padding="4">
-                <Button Text="▲" FontSize="16" WidthRequest="44" HeightRequest="44"
-                        CornerRadius="22" BackgroundColor="#1565C0" TextColor="White"
+            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="6" Padding="3">
+                <Button Text="▲" FontSize="12" WidthRequest="32" HeightRequest="32"
+                        CornerRadius="16" BackgroundColor="#1565C0" TextColor="White"
                         Clicked="BtnTop_Clicked"/>
-                <Button Text="▼" FontSize="16" WidthRequest="44" HeightRequest="44"
-                        CornerRadius="22" BackgroundColor="#1565C0" TextColor="White"
+                <Button Text="▼" FontSize="12" WidthRequest="32" HeightRequest="32"
+                        CornerRadius="16" BackgroundColor="#1565C0" TextColor="White"
                         Clicked="BtnBottom_Clicked"/>
             </VerticalStackLayout>
             <VerticalStackLayout x:Name="loadingPanel" IsVisible="False"
-                                 VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                                 VerticalOptions="Center" HorizontalOptions="Center" Spacing="8">
                 <ActivityIndicator x:Name="spinner" IsRunning="False" Color="#1E2733"
-                                   WidthRequest="40" HeightRequest="40"/>
-                <Label Text="Loading..." FontSize="14" TextColor="#546E7A"
+                                   WidthRequest="30" HeightRequest="30"/>
+                <Label Text="Loading..." FontSize="11" TextColor="#546E7A"
                        HorizontalOptions="Center"/>
             </VerticalStackLayout>
         </Grid>

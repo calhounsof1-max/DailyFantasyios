@@ -14,29 +14,29 @@
         </Grid.GestureRecognizers>
 
         <!-- Row 0: Nav header -->
-        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="14,10"
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="8,6"
               ColumnDefinitions="Auto,*,Auto,Auto,Auto">
-            <Button Grid.Column="0" x:Name="btnBack" Text="← SL" FontSize="12" FontAttributes="Bold"
-                    BackgroundColor="#7B1FA2" TextColor="White" Padding="10,0"
-                    HeightRequest="34" CornerRadius="17" Clicked="BtnGoBack_Clicked"/>
-            <Label Grid.Column="1" Text="Powerball" TextColor="White" FontSize="14"
+            <Button Grid.Column="0" x:Name="btnBack" Text="← SL" FontSize="9" FontAttributes="Bold"
+                    BackgroundColor="#7B1FA2" TextColor="White" Padding="6,0"
+                    HeightRequest="28" CornerRadius="14" Clicked="BtnGoBack_Clicked"/>
+            <Label Grid.Column="1" Text="Powerball" TextColor="White" FontSize="13"
                    FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center"/>
-            <Button Grid.Column="2" Text="Games ▾" FontSize="12" FontAttributes="Bold"
-                    BackgroundColor="#2D3D50" TextColor="White" Padding="10,0"
-                    HeightRequest="34" CornerRadius="17" Clicked="BtnGames_Clicked" Margin="0,0,6,0"/>
-            <Button Grid.Column="3" Text="⌂" FontSize="14" FontAttributes="Bold"
-                    BackgroundColor="#2D3D50" TextColor="White" Padding="10,0"
-                    HeightRequest="34" CornerRadius="17" Clicked="BtnGoHome_Clicked" Margin="0,0,6,0"/>
-            <Button Grid.Column="4" Text="MM →" FontSize="12" FontAttributes="Bold"
-                    BackgroundColor="#F57F17" TextColor="White" Padding="10,0"
-                    HeightRequest="34" CornerRadius="17" Clicked="BtnGoD3_Clicked"/>
+            <Button Grid.Column="2" Text="Games ▾" FontSize="9" FontAttributes="Bold"
+                    BackgroundColor="#2D3D50" TextColor="White" Padding="6,0"
+                    HeightRequest="28" CornerRadius="14" Clicked="BtnGames_Clicked" Margin="0,0,4,0"/>
+            <Button Grid.Column="3" Text="⌂" FontSize="9" FontAttributes="Bold"
+                    BackgroundColor="#2D3D50" TextColor="White" Padding="6,0"
+                    HeightRequest="28" CornerRadius="14" Clicked="BtnGoHome_Clicked" Margin="0,0,4,0"/>
+            <Button Grid.Column="4" Text="MM →" FontSize="9" FontAttributes="Bold"
+                    BackgroundColor="#F57F17" TextColor="White" Padding="6,0"
+                    HeightRequest="28" CornerRadius="14" Clicked="BtnGoD3_Clicked"/>
         </Grid>
 
         <!-- Row 5: Status bar -->
         <Label Grid.Row="5" x:Name="lblStatus"
                Text="Ready"
                BackgroundColor="#1E2733" TextColor="#8B9DC3"
-               FontSize="12" Padding="14,5" LineBreakMode="TailTruncation">
+               FontSize="9" Padding="10,3" LineBreakMode="TailTruncation">
             <Label.GestureRecognizers>
                 <TapGestureRecognizer Tapped="StatusBar_Tapped"/>
             </Label.GestureRecognizers>
@@ -49,63 +49,63 @@
         <!-- Row 1: Draw banner card -->
         <Border Grid.Row="1" BackgroundColor="White" StrokeThickness="0"
                 StrokeShape="RoundRectangle 0" Margin="0">
-            <VerticalStackLayout Padding="14,10" Spacing="6">
-                <DatePicker x:Name="drawDatePicker" FontSize="13" TextColor="#374151"
-                            Format="ddd MMM d, yyyy" HeightRequest="44"
+            <VerticalStackLayout Padding="10,6" Spacing="4">
+                <DatePicker x:Name="drawDatePicker" FontSize="10" TextColor="#374151"
+                            Format="ddd MMM d, yyyy" HeightRequest="28"
                             DateSelected="DrawDatePicker_DateSelected"/>
                 <Label x:Name="lblDrawDate" Text="Fetching latest draw..."
-                       FontSize="12" TextColor="#6B7A90" HorizontalOptions="Center"/>
-                <HorizontalStackLayout Spacing="6" HorizontalOptions="Center">
+                       FontSize="10" TextColor="#6B7A90" HorizontalOptions="Center"/>
+                <HorizontalStackLayout Spacing="4" HorizontalOptions="Center">
                     <Border x:Name="W1" BackgroundColor="#C62828" StrokeThickness="0"
-                            StrokeShape="RoundRectangle 10" WidthRequest="46" HeightRequest="46">
-                        <Label x:Name="lblW1" Text="?" FontSize="20" FontAttributes="Bold"
+                            StrokeShape="RoundRectangle 8" WidthRequest="32" HeightRequest="32">
+                        <Label x:Name="lblW1" Text="?" FontSize="13" FontAttributes="Bold"
                                TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <Border x:Name="W2" BackgroundColor="#C62828" StrokeThickness="0"
-                            StrokeShape="RoundRectangle 10" WidthRequest="46" HeightRequest="46">
-                        <Label x:Name="lblW2" Text="?" FontSize="20" FontAttributes="Bold"
+                            StrokeShape="RoundRectangle 8" WidthRequest="32" HeightRequest="32">
+                        <Label x:Name="lblW2" Text="?" FontSize="13" FontAttributes="Bold"
                                TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <Border x:Name="W3" BackgroundColor="#C62828" StrokeThickness="0"
-                            StrokeShape="RoundRectangle 10" WidthRequest="46" HeightRequest="46">
-                        <Label x:Name="lblW3" Text="?" FontSize="20" FontAttributes="Bold"
+                            StrokeShape="RoundRectangle 8" WidthRequest="32" HeightRequest="32">
+                        <Label x:Name="lblW3" Text="?" FontSize="13" FontAttributes="Bold"
                                TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <Border x:Name="W4" BackgroundColor="#C62828" StrokeThickness="0"
-                            StrokeShape="RoundRectangle 10" WidthRequest="46" HeightRequest="46">
-                        <Label x:Name="lblW4" Text="?" FontSize="20" FontAttributes="Bold"
+                            StrokeShape="RoundRectangle 8" WidthRequest="32" HeightRequest="32">
+                        <Label x:Name="lblW4" Text="?" FontSize="13" FontAttributes="Bold"
                                TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <Border x:Name="W5" BackgroundColor="#C62828" StrokeThickness="0"
-                            StrokeShape="RoundRectangle 10" WidthRequest="46" HeightRequest="46">
-                        <Label x:Name="lblW5" Text="?" FontSize="20" FontAttributes="Bold"
+                            StrokeShape="RoundRectangle 8" WidthRequest="32" HeightRequest="32">
+                        <Label x:Name="lblW5" Text="?" FontSize="13" FontAttributes="Bold"
                                TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
-                    <Label Text="PB" FontSize="12" TextColor="#9CA3AF" VerticalOptions="Center" FontAttributes="Bold"/>
+                    <Label Text="PB" FontSize="9" TextColor="#9CA3AF" VerticalOptions="Center" FontAttributes="Bold"/>
                     <Border x:Name="WPB" BackgroundColor="#FF6F00" StrokeThickness="0"
-                            StrokeShape="RoundRectangle 10" WidthRequest="46" HeightRequest="46">
-                        <Label x:Name="lblWPB" Text="?" FontSize="20" FontAttributes="Bold"
+                            StrokeShape="RoundRectangle 8" WidthRequest="32" HeightRequest="32">
+                        <Label x:Name="lblWPB" Text="?" FontSize="13" FontAttributes="Bold"
                                TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
                     </Border>
                     <ActivityIndicator x:Name="spinner" IsRunning="False" IsVisible="False"
-                                       Color="#C62828" WidthRequest="28" HeightRequest="28"
+                                       Color="#C62828" WidthRequest="20" HeightRequest="20"
                                        VerticalOptions="Center"/>
                 </HorizontalStackLayout>
             </VerticalStackLayout>
         </Border>
 
         <!-- Row 2: Saved Numbers picker -->
-        <Grid Grid.Row="2" BackgroundColor="White" Padding="12,6"
+        <Grid Grid.Row="2" BackgroundColor="White" Padding="10,4"
               ColumnDefinitions="Auto,*">
-            <BoxView Grid.Column="0" BackgroundColor="#C62828" WidthRequest="4" VerticalOptions="Fill" Margin="0,4,10,4"/>
+            <BoxView Grid.Column="0" BackgroundColor="#C62828" WidthRequest="3" VerticalOptions="Fill" Margin="0,3,8,3"/>
             <Grid Grid.Column="1" ColumnDefinitions="Auto,*,Auto" VerticalOptions="Center">
-                <Label Grid.Column="0" Text="Saved Numbers" FontSize="13" FontAttributes="Bold"
-                       TextColor="#374151" VerticalOptions="Center" Margin="0,0,8,0"/>
-                <Picker Grid.Column="1" x:Name="slotPicker" FontSize="13"
-                        BackgroundColor="#F8F9FA" HeightRequest="36"
+                <Label Grid.Column="0" Text="Saved Numbers" FontSize="11" FontAttributes="Bold"
+                       TextColor="#374151" VerticalOptions="Center" Margin="0,0,6,0"/>
+                <Picker Grid.Column="1" x:Name="slotPicker" FontSize="10"
+                        BackgroundColor="#F8F9FA" HeightRequest="22"
                         SelectedIndexChanged="SlotPicker_Changed"/>
                 <VerticalStackLayout Grid.Column="2" HorizontalOptions="Center"
-                                     VerticalOptions="Center" Spacing="0" Margin="6,0,2,0">
+                                     VerticalOptions="Center" Spacing="0" Margin="4,0,2,0">
                     <Label Text="Excl" FontSize="9" TextColor="#666" HorizontalOptions="Center"/>
                     <CheckBox x:Name="chkExcl" Color="#C62828" HorizontalOptions="Center"
                               CheckedChanged="ChkExcl_CheckedChanged" Margin="0,-4,0,0"/>
@@ -115,33 +115,33 @@
 
         <!-- Row 3: 10 number rows -->
         <ScrollView Grid.Row="3" BackgroundColor="#F0F4F8">
-            <VerticalStackLayout x:Name="rowsContainer" Padding="10,8" Spacing="5"/>
+            <VerticalStackLayout x:Name="rowsContainer" Padding="8,6" Spacing="4"/>
         </ScrollView>
 
         <!-- Row 4: Bottom buttons -->
-        <Grid Grid.Row="4" ColumnDefinitions="*,*,*,*,*,Auto,Auto" ColumnSpacing="6"
-              Padding="10,8" BackgroundColor="#1E2733">
-            <Button Grid.Column="0" Text="CHECK" FontSize="12" FontAttributes="Bold"
-                    BackgroundColor="#F9A825" TextColor="White" HeightRequest="42"
-                    CornerRadius="21" Padding="4,0" Clicked="BtnCheck_Clicked"/>
-            <Button Grid.Column="1" Text="CLEAR" FontSize="12"
-                    BackgroundColor="#FF7043" TextColor="White" HeightRequest="42"
-                    CornerRadius="21" Padding="4,0" Clicked="BtnClearAll_Clicked"/>
-            <Button Grid.Column="2" Text="REFRESH" FontSize="12"
-                    BackgroundColor="#C62828" TextColor="White" HeightRequest="42"
-                    CornerRadius="21" Padding="4,0" Clicked="BtnRefresh_Clicked"/>
-            <Button Grid.Column="3" Text="SAVE" FontSize="12"
-                    BackgroundColor="#2E7D32" TextColor="White" HeightRequest="42"
-                    CornerRadius="21" Padding="4,0" Clicked="BtnSave_Clicked"/>
-            <Button Grid.Column="4" Text="CLR SETS" FontSize="11"
-                    BackgroundColor="#B71C1C" TextColor="White" HeightRequest="42"
-                    CornerRadius="21" Padding="4,0" Clicked="BtnClearSets_Clicked"/>
-            <Button Grid.Column="5" Text="🎲 QP" FontSize="11"
-                    BackgroundColor="#6A1B9A" TextColor="White" HeightRequest="42"
-                    CornerRadius="21" Padding="10,0" Clicked="BtnQuickPick_Clicked"/>
-            <Button Grid.Column="6" x:Name="btnVoice" Text="🎤" FontSize="18"
-                    BackgroundColor="#0277BD" TextColor="White" HeightRequest="42"
-                    CornerRadius="21" Padding="10,0" Clicked="BtnVoice_Clicked"/>
+        <Grid Grid.Row="4" ColumnDefinitions="*,*,*,*,*,Auto,Auto" ColumnSpacing="4"
+              Padding="8,5" BackgroundColor="#1E2733">
+            <Button Grid.Column="0" Text="CHECK" FontSize="9" FontAttributes="Bold"
+                    BackgroundColor="#F9A825" TextColor="White" HeightRequest="28"
+                    CornerRadius="14" Padding="3,0" Clicked="BtnCheck_Clicked"/>
+            <Button Grid.Column="1" Text="CLEAR" FontSize="9"
+                    BackgroundColor="#FF7043" TextColor="White" HeightRequest="28"
+                    CornerRadius="14" Padding="3,0" Clicked="BtnClearAll_Clicked"/>
+            <Button Grid.Column="2" Text="REFRESH" FontSize="9"
+                    BackgroundColor="#C62828" TextColor="White" HeightRequest="28"
+                    CornerRadius="14" Padding="3,0" Clicked="BtnRefresh_Clicked"/>
+            <Button Grid.Column="3" Text="SAVE" FontSize="9"
+                    BackgroundColor="#2E7D32" TextColor="White" HeightRequest="28"
+                    CornerRadius="14" Padding="3,0" Clicked="BtnSave_Clicked"/>
+            <Button Grid.Column="4" Text="CLR SETS" FontSize="9"
+                    BackgroundColor="#B71C1C" TextColor="White" HeightRequest="28"
+                    CornerRadius="14" Padding="3,0" Clicked="BtnClearSets_Clicked"/>
+            <Button Grid.Column="5" Text="🎲 QP" FontSize="9"
+                    BackgroundColor="#6A1B9A" TextColor="White" HeightRequest="28"
+                    CornerRadius="14" Padding="6,0" Clicked="BtnQuickPick_Clicked"/>
+            <Button Grid.Column="6" x:Name="btnVoice" Text="🎤" FontSize="12"
+                    BackgroundColor="#0277BD" TextColor="White" HeightRequest="28"
+                    CornerRadius="14" Padding="6,0" Clicked="BtnVoice_Clicked"/>
         </Grid>
 
     </Grid>

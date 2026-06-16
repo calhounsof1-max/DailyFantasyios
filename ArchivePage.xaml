@@ -11,30 +11,30 @@
     <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,*">
 
         <!-- Header -->
-        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="14,10">
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="8,6">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Button Grid.Column="0" Text="← BACK" FontSize="12" FontAttributes="Bold"
+            <Button Grid.Column="0" Text="← BACK" FontSize="9" FontAttributes="Bold"
                     BackgroundColor="#2D3D50" TextColor="White"
-                    Padding="12,0" HeightRequest="34" CornerRadius="17"
+                    Padding="6,0" HeightRequest="28" CornerRadius="14"
                     Clicked="BtnBack_Clicked"/>
             <Label Grid.Column="1" Text="Set Archives" TextColor="White"
-                   FontSize="16" FontAttributes="Bold"
+                   FontSize="14" FontAttributes="Bold"
                    HorizontalOptions="Center" VerticalOptions="Center"/>
         </Grid>
 
         <!-- Archive list -->
         <ScrollView Grid.Row="1">
-            <VerticalStackLayout x:Name="archiveList" Spacing="0" Padding="12,12,12,20"/>
+            <VerticalStackLayout x:Name="archiveList" Spacing="0" Padding="10,10,10,16"/>
         </ScrollView>
 
         <!-- Empty state -->
         <Label Grid.Row="1" x:Name="lblEmpty"
                Text="No archives yet.&#10;&#10;Tap the Archive button on the main screen&#10;to save your current sets."
-               FontSize="15" TextColor="#9CA3AF"
+               FontSize="12" TextColor="#9CA3AF"
                HorizontalOptions="Center" VerticalOptions="Center"
                HorizontalTextAlignment="Center"
                IsVisible="False"/>

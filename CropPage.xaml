@@ -14,13 +14,14 @@
         </Grid>
 
         <!-- Bottom bar -->
-        <VerticalStackLayout Grid.Row="1" Padding="16,10" BackgroundColor="#1E2733" Spacing="8">
+        <VerticalStackLayout Grid.Row="1" Padding="12,8" BackgroundColor="#1E2733" Spacing="6">
             <Label Text="Drag yellow lines to frame the number rows"
-                   TextColor="#9CA3AF" HorizontalOptions="Center" FontSize="13"/>
+                   TextColor="#9CA3AF" HorizontalOptions="Center" FontSize="11"/>
             <Button x:Name="btnScan" Text="Scan This Area"
                     Clicked="BtnScan_Clicked"
                     BackgroundColor="#2563EB" TextColor="White"
-                    CornerRadius="12" HeightRequest="50" Margin="0,0,0,4"/>
+                    CornerRadius="10" HeightRequest="38" Margin="0,0,0,3"
+                    FontSize="12" FontAttributes="Bold"/>
         </VerticalStackLayout>
 
     </Grid>
