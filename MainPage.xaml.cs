@@ -85,6 +85,23 @@ public partial class MainPage : ContentPage
     {
         base.OnAppearing();
 
+#if IOS
+        // Replace UseSafeArea: read the actual status-bar height (independent of
+        // nav-bar state) and push the header buttons to just below the clock row.
+        // Also add bottom padding so the bottom bar clears the home indicator.
+        Dispatcher.Dispatch(() =>
+        {
+            var scene = UIKit.UIApplication.SharedApplication.ConnectedScenes
+                .OfType<UIKit.UIWindowScene>()
+                .FirstOrDefault();
+            double statusH = scene?.StatusBarManager?.StatusBarFrame.Height ?? 47;
+            double bottomH = (double)(scene?.Windows
+                .FirstOrDefault(w => w.IsKeyWindow)?.SafeAreaInsets.Bottom ?? 0);
+            headerGrid.Padding = new Thickness(4, statusH, 4, 2);
+            Padding = new Thickness(0, 0, 0, bottomH);
+        });
+#endif
+
         if (_initialized)
         {
             // TranslationX was pre-set by the caller before navigating back — just animate in
