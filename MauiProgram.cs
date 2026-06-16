@@ -39,15 +39,29 @@ public static class MauiProgram
 		UIKit.UINavigationBar.Appearance.ScrollEdgeAppearance = navAppearance;
 		UIKit.UINavigationBar.Appearance.CompactAppearance    = navAppearance;
 
-		// Hide the nav bar after MAUI finishes its own setup.
+		// Per-page fix: set AdditionalSafeAreaInsets on the page VC itself so MAUI's
+		// UseSafeArea sees the corrected insets regardless of nav-bar state.
+		// We run after a 120 ms delay to ensure MAUI has finished its own safe-area setup.
 		PageHandler.Mapper.AppendToMapping("HideIOSNavBar", (handler, view) =>
 		{
 			if (view is ContentPage && handler is PageHandler pageHandler)
 			{
-				Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(() =>
-				{
-					pageHandler.ViewController?.NavigationController?.SetNavigationBarHidden(true, false);
-				});
+				Task.Delay(120).ContinueWith(_ =>
+					Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(() =>
+					{
+						var vc = pageHandler.ViewController;
+						if (vc == null) return;
+
+						// Also hide via the nav controller if available.
+						vc.NavigationController?.SetNavigationBarHidden(true, false);
+
+						// If the page VC's own safe-area top is > 62 pt the nav bar
+						// (44 pt) is still contributing.  Cancel it on the page VC so
+						// UseSafeArea picks up the corrected value and fires its observer.
+						var safeTop = vc.View?.SafeAreaInsets.Top ?? 0;
+						if (safeTop > 62)
+							vc.AdditionalSafeAreaInsets = new UIKit.UIEdgeInsets(-44, 0, 0, 0);
+					}));
 			}
 		});
 #endif

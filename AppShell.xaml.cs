@@ -31,28 +31,37 @@ public partial class AppShell : Shell
 	protected override void OnNavigated(ShellNavigatedEventArgs args)
 	{
 		base.OnNavigated(args);
-		// Delay one main-thread tick so MAUI's Shell finishes its own nav bar
-		// setup before we force-hide it. Runs after the current event loop iteration.
-		Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(() =>
-		{
-			UIKit.UIWindow? keyWindow = null;
-			foreach (var w in UIKit.UIApplication.SharedApplication.Windows)
-				if (w.IsKeyWindow) { keyWindow = w; break; }
-			HideNavBar(keyWindow?.RootViewController);
-		});
+		// Immediate attempt catches most cases.
+		Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(DoHideNavBars);
+		// Delayed attempt (100 ms) runs after MAUI finishes its own nav-bar restoration.
+		Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(100), DoHideNavBars);
 	}
 
-	static void HideNavBar(UIKit.UIViewController? vc)
+	static void DoHideNavBars()
 	{
-		if (vc == null) return;
+		UIKit.UIWindow? keyWindow = null;
+		foreach (var scene in UIKit.UIApplication.SharedApplication.ConnectedScenes)
+			if (scene is UIKit.UIWindowScene ws)
+				foreach (var w in ws.Windows)
+					if (w.IsKeyWindow) { keyWindow = w; break; }
+		HideNavBar(keyWindow?.RootViewController);
+	}
+
+	// Walk the ENTIRE VC tree — don't return early at the first nav controller,
+	// because MAUI Shell nests it inside wrapper VCs and there may be more than one.
+	static void HideNavBar(UIKit.UIViewController? vc, int depth = 0)
+	{
+		if (vc == null || depth > 10) return;
 		if (vc is UIKit.UINavigationController nav)
 		{
-			nav.SetNavigationBarHidden(true, false);
-			return;
+			nav.NavigationBarHidden = true;
+			// Always force -44 so it persists even if MAUI resets AdditionalSafeAreaInsets.
+			nav.AdditionalSafeAreaInsets = new UIKit.UIEdgeInsets(-44, 0, 0, 0);
+			// Don't return — walk nav controller's children too.
 		}
-		HideNavBar(vc.PresentedViewController);
+		HideNavBar(vc.PresentedViewController, depth + 1);
 		foreach (var child in vc.ChildViewControllers)
-			HideNavBar(child);
+			HideNavBar(child, depth + 1);
 	}
 #endif
 
