@@ -24,7 +24,7 @@ public partial class Daily3Page : ContentPage
     readonly Dictionary<int, (string entries, string betTypes)> _slotCache = new();
     View? _highlightedView;
 
-    List<(string DateLabel, int[] Midday, int[] Evening)> _draws = new();
+    List<(string DateLabel, int MiddayDrawNum, int[] Midday, int EveningDrawNum, int[] Evening)> _draws = new();
     bool _drawsLoaded = false;
 
     int[]? _winMidday;
@@ -745,8 +745,10 @@ public partial class Daily3Page : ContentPage
                 }
                 var dateLabel = g.Key.ToString("ddd MMM d, yyyy");
                 return (DateLabel: dateLabel,
-                        Midday:  midday.Numbers  ?? Array.Empty<int>(),
-                        Evening: evening.Numbers ?? Array.Empty<int>());
+                        MiddayDrawNum:  midday.Numbers  != null ? midday.DrawNumber  : 0,
+                        Midday:         midday.Numbers  ?? Array.Empty<int>(),
+                        EveningDrawNum: evening.Numbers != null ? evening.DrawNumber : 0,
+                        Evening:        evening.Numbers ?? Array.Empty<int>());
             })
             .ToList();
 
@@ -780,7 +782,10 @@ public partial class Daily3Page : ContentPage
         _winMidday  = match.Midday.Length  > 0 ? match.Midday  : null;
         _winEvening = match.Evening.Length > 0 ? match.Evening : null;
 
-        lblDrawDate.Text = match.DateLabel;
+        string middayNum  = match.MiddayDrawNum  > 0 ? $" Draw #{match.MiddayDrawNum}"  : "";
+        string eveningNum = match.EveningDrawNum > 0 ? $" Draw #{match.EveningDrawNum}" : "";
+        lblDrawDate.Text = match.DateLabel + (middayNum.Length > 0 || eveningNum.Length > 0
+            ? $"  [M{middayNum} / E{eveningNum}]" : "");
 
         for (int i = 0; i < 3; i++)
         {

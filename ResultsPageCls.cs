@@ -10,6 +10,7 @@ public class WinnerEntry
     public string Numbers   { get; set; } = "";
     public string MatchLabel{ get; set; } = "";
     public string Prize     { get; set; } = "";
+    public int    DrawNumber{ get; set; }
 }
 
 public class DateResultData
@@ -18,17 +19,23 @@ public class DateResultData
     public string DateLabel  { get; set; } = "";
 
     public int[]  F5Numbers  { get; set; } = Array.Empty<int>();
+    public int    F5DrawNumber     { get; set; }
     public int[]  SLMain     { get; set; } = Array.Empty<int>();
     public int    SLMega     { get; set; }
+    public int    SLDrawNumber     { get; set; }
     public int[]  PBMain     { get; set; } = Array.Empty<int>();
     public int    PBBall     { get; set; }
+    public int    PBDrawNumber     { get; set; }
     public int[]  MMMain     { get; set; } = Array.Empty<int>();
     public int    MMBall     { get; set; }
+    public int    MMDrawNumber     { get; set; }
     public int[]? D3Midday   { get; set; }
     public int[]? D3Evening  { get; set; }
     public int[]? D4Numbers  { get; set; }
+    public int    D4DrawNumber     { get; set; }
     public int[]? DDHorses   { get; set; }
     public string DDRaceTime { get; set; } = "";
+    public int    DDDrawNumber     { get; set; }
 
     public List<WinnerEntry> Winners { get; set; } = new();
     public string Error { get; set; } = "";
@@ -38,13 +45,13 @@ public static class ResultsPageCls
 {
     const int Rows = 10;
 
-    static List<(string DrawDate, int[] Numbers, DrawPrizeTier[] Prizes)>                          _f5 = new();
-    static List<(string DrawDate, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)>      _sl = new();
-    static List<(string DrawDate, int[] MainNumbers, int PBNumber,   DrawPrizeTier[] Prizes)>      _pb = new();
-    static List<(string DrawDate, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)>      _mm = new();
-    static List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)>          _d3 = new();
-    static List<(string DrawDate, int[] Numbers, DrawPrizeTier[] Prizes)>                          _d4 = new();
-    static List<(string DrawDate, int[] Horses, string RaceTime, DrawPrizeTier[] Prizes)>          _dd = new();
+    static List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)>                          _f5 = new();
+    static List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)>      _sl = new();
+    static List<(string DrawDate, int DrawNumber, int[] MainNumbers, int PBNumber,   DrawPrizeTier[] Prizes)>      _pb = new();
+    static List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)>      _mm = new();
+    static List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)>                          _d3 = new();
+    static List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)>                          _d4 = new();
+    static List<(string DrawDate, int DrawNumber, int[] Horses, string RaceTime, DrawPrizeTier[] Prizes)>          _dd = new();
     static bool _loaded = false;
 
     public static void ClearCache()
@@ -469,30 +476,32 @@ public static class ResultsPageCls
         var f5Draw = _f5
             .Select(d => (
                 Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
-                d.DrawDate, d.Numbers, d.Prizes))
+                d.DrawDate, d.DrawNumber, d.Numbers, d.Prizes))
             .Where(d => d.Date != DateTime.MinValue && d.Date.Date <= date.Date)
             .OrderByDescending(d => d.Date)
             .FirstOrDefault();
 
         if (f5Draw.Numbers != null)
         {
-            result.F5Numbers = f5Draw.Numbers;
-            result.DateLabel  = f5Draw.DrawDate;
+            result.F5Numbers   = f5Draw.Numbers;
+            result.F5DrawNumber = f5Draw.DrawNumber;
+            result.DateLabel   = f5Draw.DrawDate;
         }
 
         // ── Find SL draw on or before selected date ──────────────────────────
         var slDraw = _sl
             .Select(d => (
                 Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
-                d.DrawDate, d.MainNumbers, d.MegaNumber, d.Prizes))
+                d.DrawDate, d.DrawNumber, d.MainNumbers, d.MegaNumber, d.Prizes))
             .Where(d => d.Date != DateTime.MinValue && d.Date.Date <= date.Date)
             .OrderByDescending(d => d.Date)
             .FirstOrDefault();
 
         if (slDraw.MainNumbers != null)
         {
-            result.SLMain = slDraw.MainNumbers;
-            result.SLMega = slDraw.MegaNumber;
+            result.SLMain      = slDraw.MainNumbers;
+            result.SLMega      = slDraw.MegaNumber;
+            result.SLDrawNumber = slDraw.DrawNumber;
             if (string.IsNullOrEmpty(result.DateLabel))
                 result.DateLabel = slDraw.DrawDate;
         }
@@ -501,15 +510,16 @@ public static class ResultsPageCls
         var pbDraw = _pb
             .Select(d => (
                 Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
-                d.DrawDate, d.MainNumbers, d.PBNumber, d.Prizes))
+                d.DrawDate, d.DrawNumber, d.MainNumbers, d.PBNumber, d.Prizes))
             .Where(d => d.Date != DateTime.MinValue && d.Date.Date <= date.Date)
             .OrderByDescending(d => d.Date)
             .FirstOrDefault();
 
         if (pbDraw.MainNumbers != null)
         {
-            result.PBMain = pbDraw.MainNumbers;
-            result.PBBall = pbDraw.PBNumber;
+            result.PBMain      = pbDraw.MainNumbers;
+            result.PBBall      = pbDraw.PBNumber;
+            result.PBDrawNumber = pbDraw.DrawNumber;
             if (string.IsNullOrEmpty(result.DateLabel))
                 result.DateLabel = pbDraw.DrawDate;
         }
@@ -518,15 +528,16 @@ public static class ResultsPageCls
         var mmDraw = _mm
             .Select(d => (
                 Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
-                d.DrawDate, d.MainNumbers, d.MegaNumber, d.Prizes))
+                d.DrawDate, d.DrawNumber, d.MainNumbers, d.MegaNumber, d.Prizes))
             .Where(d => d.Date != DateTime.MinValue && d.Date.Date <= date.Date)
             .OrderByDescending(d => d.Date)
             .FirstOrDefault();
 
         if (mmDraw.MainNumbers != null)
         {
-            result.MMMain = mmDraw.MainNumbers;
-            result.MMBall = mmDraw.MegaNumber;
+            result.MMMain      = mmDraw.MainNumbers;
+            result.MMBall      = mmDraw.MegaNumber;
+            result.MMDrawNumber = mmDraw.DrawNumber;
             if (string.IsNullOrEmpty(result.DateLabel))
                 result.DateLabel = mmDraw.DrawDate;
         }
@@ -557,23 +568,25 @@ public static class ResultsPageCls
 
         // ── Find D4 draw on or before selected date ──────────────────────────
         var d4Draw = _d4
-            .Select(d => (Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue, d.DrawDate, d.Numbers, d.Prizes))
+            .Select(d => (Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue, d.DrawDate, d.DrawNumber, d.Numbers, d.Prizes))
             .Where(d => d.Date != DateTime.MinValue && d.Date.Date <= date.Date)
             .OrderByDescending(d => d.Date)
             .FirstOrDefault();
 
-        result.D4Numbers = d4Draw.Numbers;
+        result.D4Numbers   = d4Draw.Numbers;
+        result.D4DrawNumber = d4Draw.DrawNumber;
         var d4Prizes = d4Draw.Prizes ?? Array.Empty<DrawPrizeTier>();
 
         // ── Find DD draw on or before selected date ──────────────────────────
         var ddDraw = _dd
-            .Select(d => (Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue, d.DrawDate, d.Horses, d.RaceTime, d.Prizes))
+            .Select(d => (Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue, d.DrawDate, d.DrawNumber, d.Horses, d.RaceTime, d.Prizes))
             .Where(d => d.Date != DateTime.MinValue && d.Date.Date <= date.Date)
             .OrderByDescending(d => d.Date)
             .FirstOrDefault();
 
-        result.DDHorses   = ddDraw.Horses;
-        result.DDRaceTime = ddDraw.RaceTime ?? "";
+        result.DDHorses    = ddDraw.Horses;
+        result.DDRaceTime  = ddDraw.RaceTime ?? "";
+        result.DDDrawNumber = ddDraw.DrawNumber;
         var ddPrizes = ddDraw.Prizes ?? Array.Empty<DrawPrizeTier>();
 
         if (string.IsNullOrEmpty(result.DateLabel))

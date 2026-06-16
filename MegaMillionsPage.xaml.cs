@@ -26,7 +26,7 @@ public partial class MegaMillionsPage : ContentPage
 
     int[] _winningMainNums = Array.Empty<int>();
     int   _winningMB       = 0;
-    List<(DateTime Date, string Label, int[] MainNumbers, int MBNumber)> _allDraws = new();
+    List<(DateTime Date, string Label, int DrawNumber, int[] MainNumbers, int MBNumber)> _allDraws = new();
     bool _drawsLoaded = false;
     bool _isPanning   = false;
     bool _voiceOn = false;
@@ -565,6 +565,7 @@ public partial class MegaMillionsPage : ContentPage
             .Select(d => (
                 Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
                 Label: d.DrawDate,
+                DrawNumber:  d.DrawNumber,
                 MainNumbers: d.MainNumbers,
                 MBNumber:    d.MegaNumber))
             .Where(d => d.Date != DateTime.MinValue)
@@ -600,7 +601,7 @@ public partial class MegaMillionsPage : ContentPage
 
         _winningMainNums = match.MainNumbers;
         _winningMB       = match.MBNumber;
-        lblDrawDate.Text = match.Label;
+        lblDrawDate.Text = match.DrawNumber > 0 ? $"{match.Label}  Draw #{match.DrawNumber}" : match.Label;
 
         for (int i = 0; i < _wLabels.Length; i++)
             _wLabels[i].Text = match.MainNumbers[i].ToString();

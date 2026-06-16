@@ -26,45 +26,47 @@ namespace DailyFantasyMAUI.Services
             return Path.Combine(DataDir, name);
         }
 
-        static void SaveF5Cache(IEnumerable<(string DrawDate, int[] Numbers)> draws)
+        static void SaveF5Cache(IEnumerable<(string DrawDate, int DrawNumber, int[] Numbers)> draws)
         {
-            var lines = draws.Take(10).Select(d => $"{d.DrawDate}\t{string.Join(",", d.Numbers)}");
+            var lines = draws.Take(10).Select(d => $"{d.DrawDate}\t{d.DrawNumber}\t{string.Join(",", d.Numbers)}");
             File.WriteAllText(CacheFile("Fantasy_5.txt"), string.Join("\n", lines));
         }
 
-        static List<(string DrawDate, int[] Numbers, DrawPrizeTier[] Prizes)> LoadF5Cache()
+        static List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> LoadF5Cache()
         {
             var path = CacheFile("Fantasy_5.txt");
-            var results = new List<(string, int[], DrawPrizeTier[])>();
-            if (!File.Exists(path)) return results;
-            foreach (var line in File.ReadAllLines(path))
-            {
-                var parts = line.Split('\t');
-                if (parts.Length != 2) continue;
-                var nums = parts[1].Split(',').Select(s => int.TryParse(s, out int n) ? n : -1).Where(n => n >= 0).ToArray();
-                if (nums.Length == 5) results.Add((parts[0], nums, Array.Empty<DrawPrizeTier>()));
-            }
-            return results;
-        }
-
-        static void SavePBCache(IEnumerable<(string DrawDate, int[] MainNumbers, int PBNumber)> draws)
-        {
-            var lines = draws.Take(10).Select(d => $"{d.DrawDate}\t{string.Join(",", d.MainNumbers)}\t{d.PBNumber}");
-            File.WriteAllText(CacheFile("powerball.txt"), string.Join("\n", lines));
-        }
-
-        static List<(string DrawDate, int[] MainNumbers, int PBNumber, DrawPrizeTier[] Prizes)> LoadPBCache()
-        {
-            var path = CacheFile("powerball.txt");
-            var results = new List<(string, int[], int, DrawPrizeTier[])>();
+            var results = new List<(string, int, int[], DrawPrizeTier[])>();
             if (!File.Exists(path)) return results;
             foreach (var line in File.ReadAllLines(path))
             {
                 var parts = line.Split('\t');
                 if (parts.Length != 3) continue;
-                var main = parts[1].Split(',').Select(s => int.TryParse(s, out int n) ? n : -1).Where(n => n >= 0).ToArray();
-                if (main.Length != 5 || !int.TryParse(parts[2], out int pb)) continue;
-                results.Add((parts[0], main, pb, Array.Empty<DrawPrizeTier>()));
+                if (!int.TryParse(parts[1], out int dn)) dn = 0;
+                var nums = parts[2].Split(',').Select(s => int.TryParse(s, out int n) ? n : -1).Where(n => n >= 0).ToArray();
+                if (nums.Length == 5) results.Add((parts[0], dn, nums, Array.Empty<DrawPrizeTier>()));
+            }
+            return results;
+        }
+
+        static void SavePBCache(IEnumerable<(string DrawDate, int DrawNumber, int[] MainNumbers, int PBNumber)> draws)
+        {
+            var lines = draws.Take(10).Select(d => $"{d.DrawDate}\t{d.DrawNumber}\t{string.Join(",", d.MainNumbers)}\t{d.PBNumber}");
+            File.WriteAllText(CacheFile("powerball.txt"), string.Join("\n", lines));
+        }
+
+        static List<(string DrawDate, int DrawNumber, int[] MainNumbers, int PBNumber, DrawPrizeTier[] Prizes)> LoadPBCache()
+        {
+            var path = CacheFile("powerball.txt");
+            var results = new List<(string, int, int[], int, DrawPrizeTier[])>();
+            if (!File.Exists(path)) return results;
+            foreach (var line in File.ReadAllLines(path))
+            {
+                var parts = line.Split('\t');
+                if (parts.Length != 4) continue;
+                if (!int.TryParse(parts[1], out int dn)) dn = 0;
+                var main = parts[2].Split(',').Select(s => int.TryParse(s, out int n) ? n : -1).Where(n => n >= 0).ToArray();
+                if (main.Length != 5 || !int.TryParse(parts[3], out int pb)) continue;
+                results.Add((parts[0], dn, main, pb, Array.Empty<DrawPrizeTier>()));
             }
             return results;
         }
@@ -91,23 +93,24 @@ namespace DailyFantasyMAUI.Services
             return results;
         }
 
-        static void SaveDDCache(IEnumerable<(string DrawDate, int[] Horses, string RaceTime)> draws)
+        static void SaveDDCache(IEnumerable<(string DrawDate, int DrawNumber, int[] Horses, string RaceTime)> draws)
         {
-            var lines = draws.Take(10).Select(d => $"{d.DrawDate}\t{string.Join(",", d.Horses)}\t{d.RaceTime}");
+            var lines = draws.Take(10).Select(d => $"{d.DrawDate}\t{d.DrawNumber}\t{string.Join(",", d.Horses)}\t{d.RaceTime}");
             File.WriteAllText(CacheFile("dailyderby.txt"), string.Join("\n", lines));
         }
 
-        static List<(string DrawDate, int[] Horses, string RaceTime)> LoadDDCache()
+        static List<(string DrawDate, int DrawNumber, int[] Horses, string RaceTime)> LoadDDCache()
         {
             var path = CacheFile("dailyderby.txt");
-            var results = new List<(string, int[], string)>();
+            var results = new List<(string, int, int[], string)>();
             if (!File.Exists(path)) return results;
             foreach (var line in File.ReadAllLines(path))
             {
                 var parts = line.Split('\t');
-                if (parts.Length != 3) continue;
-                var horses = parts[1].Split(',').Select(s => int.TryParse(s, out int n) ? n : -1).Where(n => n >= 0).ToArray();
-                if (horses.Length == 3) results.Add((parts[0], horses, parts[2]));
+                if (parts.Length != 4) continue;
+                if (!int.TryParse(parts[1], out int dn)) dn = 0;
+                var horses = parts[2].Split(',').Select(s => int.TryParse(s, out int n) ? n : -1).Where(n => n >= 0).ToArray();
+                if (horses.Length == 3) results.Add((parts[0], dn, horses, parts[3]));
             }
             return results;
         }
@@ -134,46 +137,48 @@ namespace DailyFantasyMAUI.Services
             return results;
         }
 
-        static void SaveSLCache(IEnumerable<(string DrawDate, int[] MainNumbers, int MegaNumber)> draws)
+        static void SaveSLCache(IEnumerable<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber)> draws)
         {
-            var lines = draws.Take(10).Select(d => $"{d.DrawDate}\t{string.Join(",", d.MainNumbers)}\t{d.MegaNumber}");
+            var lines = draws.Take(10).Select(d => $"{d.DrawDate}\t{d.DrawNumber}\t{string.Join(",", d.MainNumbers)}\t{d.MegaNumber}");
             File.WriteAllText(CacheFile("superlotto.txt"), string.Join("\n", lines));
         }
 
-        static List<(string DrawDate, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> LoadSLCache()
+        static List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> LoadSLCache()
         {
             var path = CacheFile("superlotto.txt");
-            var results = new List<(string, int[], int, DrawPrizeTier[])>();
+            var results = new List<(string, int, int[], int, DrawPrizeTier[])>();
             if (!File.Exists(path)) return results;
             foreach (var line in File.ReadAllLines(path))
             {
                 var parts = line.Split('\t');
-                if (parts.Length != 3) continue;
-                var main = parts[1].Split(',').Select(s => int.TryParse(s, out int n) ? n : -1).Where(n => n >= 0).ToArray();
-                if (main.Length != 5 || !int.TryParse(parts[2], out int mega)) continue;
-                results.Add((parts[0], main, mega, Array.Empty<DrawPrizeTier>()));
+                if (parts.Length != 4) continue;
+                if (!int.TryParse(parts[1], out int dn)) dn = 0;
+                var main = parts[2].Split(',').Select(s => int.TryParse(s, out int n) ? n : -1).Where(n => n >= 0).ToArray();
+                if (main.Length != 5 || !int.TryParse(parts[3], out int mega)) continue;
+                results.Add((parts[0], dn, main, mega, Array.Empty<DrawPrizeTier>()));
             }
             return results;
         }
 
-        static void SaveMMCache(IEnumerable<(string DrawDate, int[] MainNumbers, int MegaNumber)> draws)
+        static void SaveMMCache(IEnumerable<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber)> draws)
         {
-            var lines = draws.Take(10).Select(d => $"{d.DrawDate}\t{string.Join(",", d.MainNumbers)}\t{d.MegaNumber}");
+            var lines = draws.Take(10).Select(d => $"{d.DrawDate}\t{d.DrawNumber}\t{string.Join(",", d.MainNumbers)}\t{d.MegaNumber}");
             File.WriteAllText(CacheFile("megamillions.txt"), string.Join("\n", lines));
         }
 
-        static List<(string DrawDate, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> LoadMMCache()
+        static List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> LoadMMCache()
         {
             var path = CacheFile("megamillions.txt");
-            var results = new List<(string, int[], int, DrawPrizeTier[])>();
+            var results = new List<(string, int, int[], int, DrawPrizeTier[])>();
             if (!File.Exists(path)) return results;
             foreach (var line in File.ReadAllLines(path))
             {
                 var parts = line.Split('\t');
-                if (parts.Length != 3) continue;
-                var main = parts[1].Split(',').Select(s => int.TryParse(s, out int n) ? n : -1).Where(n => n >= 0).ToArray();
-                if (main.Length != 5 || !int.TryParse(parts[2], out int mm)) continue;
-                results.Add((parts[0], main, mm, Array.Empty<DrawPrizeTier>()));
+                if (parts.Length != 4) continue;
+                if (!int.TryParse(parts[1], out int dn)) dn = 0;
+                var main = parts[2].Split(',').Select(s => int.TryParse(s, out int n) ? n : -1).Where(n => n >= 0).ToArray();
+                if (main.Length != 5 || !int.TryParse(parts[3], out int mm)) continue;
+                results.Add((parts[0], dn, main, mm, Array.Empty<DrawPrizeTier>()));
             }
             return results;
         }
@@ -190,13 +195,13 @@ namespace DailyFantasyMAUI.Services
 
         // ── Fetch past draws (self-healing game ID) ───────────────────────────
 
-        public static async Task<List<(string DrawDate, int[] Numbers, DrawPrizeTier[] Prizes)>> GetPastDraws(
+        public static async Task<List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)>> GetPastDraws(
             int count = 30, Func<string, Task<string?>>? fetcher = null)
         {
             int gameId = Preferences.Get(PrefGameId, DefaultId);
             var results = await FetchDraws(gameId, count, "Fantasy 5", fetcher);
             if (results.Count > 0)
-                SaveF5Cache(results.Select(r => (r.DrawDate, r.Numbers)));
+                SaveF5Cache(results.Select(r => (r.DrawDate, r.DrawNumber, r.Numbers)));
             else
             {
                 var cached = LoadF5Cache();
@@ -309,10 +314,10 @@ namespace DailyFantasyMAUI.Services
         }
 
         // Daily 4: one draw per day (evening ~6:30 PM), game ID 14
-        public static async Task<List<(string DrawDate, int[] Numbers, DrawPrizeTier[] Prizes)>> GetDaily4Draws(
+        public static async Task<List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)>> GetDaily4Draws(
             int count = 30, Func<string, Task<string?>>? fetcher = null)
         {
-            var results = new List<(string, int[], DrawPrizeTier[])>();
+            var results = new List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)>();
             try
             {
                 var url = $"https://www.calottery.com/api/DrawGameApi/DrawGamePastDrawResults/{D4GameId}/1/{count}";
@@ -352,6 +357,11 @@ namespace DailyFantasyMAUI.Services
                         string drawDate = DateTime.TryParse(rawDate, out var dt)
                             ? dt.ToString("ddd MMM d, yyyy") : rawDate;
 
+                        int drawNum = 0;
+                        if (draw.TryGetProperty("DrawNumber", out var dnEl))
+                            drawNum = dnEl.ValueKind == JsonValueKind.Number ? dnEl.GetInt32()
+                                      : (int.TryParse(dnEl.GetRawText().Trim('"'), out int dn) ? dn : 0);
+
                         if (!draw.TryGetProperty("WinningNumbers", out var winNums) ||
                             winNums.ValueKind != JsonValueKind.Object) continue;
 
@@ -373,7 +383,7 @@ namespace DailyFantasyMAUI.Services
                         if (numList.Count == 4)
                         {
                             var prizes = ParsePrizeTiers(draw);
-                            results.Add((drawDate, numList.ToArray(), prizes));
+                            results.Add((drawDate, drawNum, numList.ToArray(), prizes));
                         }
                     }
                     catch { }
@@ -383,19 +393,19 @@ namespace DailyFantasyMAUI.Services
             catch (Exception ex) { SetError($"Daily4: {ex.GetType().Name}: {ex.Message}"); }
 
             if (results.Count > 0)
-                SaveD4Cache(results.Select(r => (r.Item1, 0, r.Item2)));
+                SaveD4Cache(results.Select(r => (r.DrawDate, r.DrawNumber, r.Numbers)));
             else
             {
                 var cached = LoadD4Cache();
-                if (cached.Count > 0) { SetError("Offline — showing last cached draws"); return cached.Select(r => (r.DrawDate, r.Numbers, Array.Empty<DrawPrizeTier>())).ToList(); }
+                if (cached.Count > 0) { SetError("Offline — showing last cached draws"); return cached.Select(r => (r.DrawDate, r.DrawNumber, r.Numbers, Array.Empty<DrawPrizeTier>())).ToList(); }
             }
             return results;
         }
 
-        public static async Task<List<(string DrawDate, int[] Horses, string RaceTime, DrawPrizeTier[] Prizes)>> GetDailyDerbyDraws(
+        public static async Task<List<(string DrawDate, int DrawNumber, int[] Horses, string RaceTime, DrawPrizeTier[] Prizes)>> GetDailyDerbyDraws(
             int count = 30, Func<string, Task<string?>>? fetcher = null)
         {
-            var results = new List<(string, int[], string, DrawPrizeTier[])>();
+            var results = new List<(string DrawDate, int DrawNumber, int[] Horses, string RaceTime, DrawPrizeTier[] Prizes)>();
             try
             {
                 var url = $"https://www.calottery.com/api/DrawGameApi/DrawGamePastDrawResults/{DDGameId}/1/{count}";
@@ -426,6 +436,11 @@ namespace DailyFantasyMAUI.Services
                         var rawDate = draw.GetProperty("DrawDate").GetRawText().Trim('"');
                         string drawDate = DateTime.TryParse(rawDate, out var dt) ? dt.ToString("ddd MMM d, yyyy") : rawDate;
 
+                        int drawNum = 0;
+                        if (draw.TryGetProperty("DrawNumber", out var dnEl))
+                            drawNum = dnEl.ValueKind == JsonValueKind.Number ? dnEl.GetInt32()
+                                      : (int.TryParse(dnEl.GetRawText().Trim('"'), out int dn) ? dn : 0);
+
                         string raceTime = "";
                         if (draw.TryGetProperty("RaceTime", out var rtEl))
                             raceTime = rtEl.GetString() ?? "";
@@ -449,7 +464,7 @@ namespace DailyFantasyMAUI.Services
                         if (horses.Count == 3)
                         {
                             var prizes = ParsePrizeTiers(draw);
-                            results.Add((drawDate, horses.ToArray(), raceTime, prizes));
+                            results.Add((drawDate, drawNum, horses.ToArray(), raceTime, prizes));
                         }
                     }
                     catch { }
@@ -459,11 +474,11 @@ namespace DailyFantasyMAUI.Services
             catch (Exception ex) { SetError($"DD: {ex.GetType().Name}: {ex.Message}"); }
 
             if (results.Count > 0)
-                SaveDDCache(results.Select(r => (r.Item1, r.Item2, r.Item3)).ToList());
+                SaveDDCache(results.Select(r => (r.DrawDate, r.DrawNumber, r.Horses, r.RaceTime)).ToList());
             else
             {
                 var cached = LoadDDCache();
-                if (cached.Count > 0) { SetError("Offline — showing last cached draws"); return cached.Select(r => (r.DrawDate, r.Horses, r.RaceTime, Array.Empty<DrawPrizeTier>())).ToList(); }
+                if (cached.Count > 0) { SetError("Offline — showing last cached draws"); return cached.Select(r => (r.DrawDate, r.DrawNumber, r.Horses, r.RaceTime, Array.Empty<DrawPrizeTier>())).ToList(); }
             }
             return results;
         }
@@ -513,10 +528,10 @@ namespace DailyFantasyMAUI.Services
             return cachedId;
         }
 
-        public static async Task<List<(string DrawDate, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)>> GetSuperLottoDraws(
+        public static async Task<List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)>> GetSuperLottoDraws(
             int count = 30, Func<string, Task<string?>>? fetcher = null)
         {
-            var results = new List<(string, int[], int, DrawPrizeTier[])>();
+            var results = new List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)>();
             try
             {
                 int gameId = await GetSuperLottoGameId();
@@ -545,6 +560,11 @@ namespace DailyFantasyMAUI.Services
                     {
                         var rawDate = draw.GetProperty("DrawDate").GetRawText().Trim('"');
                         string drawDate = DateTime.TryParse(rawDate, out var dt) ? dt.ToString("ddd MMM d, yyyy") : rawDate;
+
+                        int drawNum = 0;
+                        if (draw.TryGetProperty("DrawNumber", out var dnEl))
+                            drawNum = dnEl.ValueKind == JsonValueKind.Number ? dnEl.GetInt32()
+                                      : (int.TryParse(dnEl.GetRawText().Trim('"'), out int dn) ? dn : 0);
 
                         if (!draw.TryGetProperty("WinningNumbers", out var winNums) || winNums.ValueKind != JsonValueKind.Object) continue;
 
@@ -579,7 +599,7 @@ namespace DailyFantasyMAUI.Services
                         if (mega == 0 && mainList.Count == 6) { mega = mainList[5]; mainList.RemoveAt(5); }
 
                         if (mainList.Count == 5 && mega > 0)
-                            results.Add((drawDate, mainList.ToArray(), mega, ParsePrizeTiers(draw)));
+                            results.Add((drawDate, drawNum, mainList.ToArray(), mega, ParsePrizeTiers(draw)));
                     }
                     catch { }
                 }
@@ -590,7 +610,7 @@ namespace DailyFantasyMAUI.Services
             }
             catch (Exception ex) { SetError($"SL: {ex.GetType().Name}: {ex.Message}"); }
             if (results.Count > 0)
-                SaveSLCache(results.Select(r => (r.Item1, r.Item2, r.Item3)));
+                SaveSLCache(results.Select(r => (r.DrawDate, r.DrawNumber, r.MainNumbers, r.MegaNumber)));
             else
             {
                 var cached = LoadSLCache();
@@ -599,10 +619,10 @@ namespace DailyFantasyMAUI.Services
             return results;
         }
 
-        public static async Task<List<(string DrawDate, int[] MainNumbers, int PBNumber, DrawPrizeTier[] Prizes)>> GetPowerballDraws(
+        public static async Task<List<(string DrawDate, int DrawNumber, int[] MainNumbers, int PBNumber, DrawPrizeTier[] Prizes)>> GetPowerballDraws(
             int count = 30, Func<string, Task<string?>>? fetcher = null)
         {
-            var results = new List<(string, int[], int, DrawPrizeTier[])>();
+            var results = new List<(string DrawDate, int DrawNumber, int[] MainNumbers, int PBNumber, DrawPrizeTier[] Prizes)>();
             try
             {
                 var url = $"https://www.calottery.com/api/DrawGameApi/DrawGamePastDrawResults/{PBGameId}/1/{count}";
@@ -630,6 +650,11 @@ namespace DailyFantasyMAUI.Services
                     {
                         var rawDate = draw.GetProperty("DrawDate").GetRawText().Trim('"');
                         string drawDate = DateTime.TryParse(rawDate, out var dt) ? dt.ToString("ddd MMM d, yyyy") : rawDate;
+
+                        int drawNum = 0;
+                        if (draw.TryGetProperty("DrawNumber", out var dnEl))
+                            drawNum = dnEl.ValueKind == JsonValueKind.Number ? dnEl.GetInt32()
+                                      : (int.TryParse(dnEl.GetRawText().Trim('"'), out int dn) ? dn : 0);
 
                         if (!draw.TryGetProperty("WinningNumbers", out var winNums) || winNums.ValueKind != JsonValueKind.Object) continue;
 
@@ -662,7 +687,7 @@ namespace DailyFantasyMAUI.Services
                         if (pb == 0 && mainList.Count == 6) { pb = mainList[5]; mainList.RemoveAt(5); }
 
                         if (mainList.Count == 5 && pb > 0)
-                            results.Add((drawDate, mainList.ToArray(), pb, ParsePrizeTiers(draw)));
+                            results.Add((drawDate, drawNum, mainList.ToArray(), pb, ParsePrizeTiers(draw)));
                     }
                     catch { }
                 }
@@ -674,7 +699,7 @@ namespace DailyFantasyMAUI.Services
             catch (Exception ex) { SetError($"PB: {ex.GetType().Name}: {ex.Message}"); }
 
             if (results.Count > 0)
-                SavePBCache(results.Select(r => (r.Item1, r.Item2, r.Item3)));
+                SavePBCache(results.Select(r => (r.DrawDate, r.DrawNumber, r.MainNumbers, r.PBNumber)));
             else
             {
                 var cached = LoadPBCache();
@@ -728,10 +753,10 @@ namespace DailyFantasyMAUI.Services
             return cachedId;
         }
 
-        public static async Task<List<(string DrawDate, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)>> GetMegaMillionsDraws(
+        public static async Task<List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)>> GetMegaMillionsDraws(
             int count = 30, Func<string, Task<string?>>? fetcher = null)
         {
-            var results = new List<(string, int[], int, DrawPrizeTier[])>();
+            var results = new List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)>();
             try
             {
                 int gameId = await GetMegaMillionsGameId();
@@ -759,6 +784,11 @@ namespace DailyFantasyMAUI.Services
                     {
                         var rawDate = draw.GetProperty("DrawDate").GetRawText().Trim('"');
                         string drawDate = DateTime.TryParse(rawDate, out var dt) ? dt.ToString("ddd MMM d, yyyy") : rawDate;
+
+                        int drawNum = 0;
+                        if (draw.TryGetProperty("DrawNumber", out var dnEl))
+                            drawNum = dnEl.ValueKind == JsonValueKind.Number ? dnEl.GetInt32()
+                                      : (int.TryParse(dnEl.GetRawText().Trim('"'), out int dn) ? dn : 0);
 
                         if (!draw.TryGetProperty("WinningNumbers", out var winNums) || winNums.ValueKind != JsonValueKind.Object) continue;
 
@@ -791,7 +821,7 @@ namespace DailyFantasyMAUI.Services
                         if (mega == 0 && mainList.Count == 6) { mega = mainList[5]; mainList.RemoveAt(5); }
 
                         if (mainList.Count == 5 && mega > 0)
-                            results.Add((drawDate, mainList.ToArray(), mega, ParsePrizeTiers(draw)));
+                            results.Add((drawDate, drawNum, mainList.ToArray(), mega, ParsePrizeTiers(draw)));
                     }
                     catch { }
                 }
@@ -803,7 +833,7 @@ namespace DailyFantasyMAUI.Services
             catch (Exception ex) { SetError($"MM: {ex.GetType().Name}: {ex.Message}"); }
 
             if (results.Count > 0)
-                SaveMMCache(results.Select(r => (r.Item1, r.Item2, r.Item3)));
+                SaveMMCache(results.Select(r => (r.DrawDate, r.DrawNumber, r.MainNumbers, r.MegaNumber)));
             else
             {
                 var cached = LoadMMCache();
@@ -882,10 +912,10 @@ namespace DailyFantasyMAUI.Services
             return list.ToArray();
         }
 
-        private static async Task<List<(string DrawDate, int[] Numbers, DrawPrizeTier[] Prizes)>> FetchDraws(
+        private static async Task<List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)>> FetchDraws(
             int gameId, int count, string? expectedName = null, Func<string, Task<string?>>? fetcher = null)
         {
-            var results = new List<(string, int[], DrawPrizeTier[])>();
+            var results = new List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)>();
             try
             {
                 var url = $"https://www.calottery.com/api/DrawGameApi/DrawGamePastDrawResults/{gameId}/1/{count}";
@@ -937,6 +967,11 @@ namespace DailyFantasyMAUI.Services
                         if (DateTime.TryParse(rawDate, out var dt))
                             drawDate = dt.ToString("ddd MMM d, yyyy");
 
+                        int drawNum = 0;
+                        if (draw.TryGetProperty("DrawNumber", out var dnEl))
+                            drawNum = dnEl.ValueKind == JsonValueKind.Number ? dnEl.GetInt32()
+                                      : (int.TryParse(dnEl.GetRawText().Trim('"'), out int dn) ? dn : 0);
+
                         if (!draw.TryGetProperty("WinningNumbers", out var winNums) ||
                             winNums.ValueKind != JsonValueKind.Object) continue;
 
@@ -956,7 +991,7 @@ namespace DailyFantasyMAUI.Services
                             else continue;
                             numList.Add(n);
                         }
-                        if (numList.Count > 0) results.Add((drawDate, numList.ToArray(), ParsePrizeTiers(draw)));
+                        if (numList.Count > 0) results.Add((drawDate, drawNum, numList.ToArray(), ParsePrizeTiers(draw)));
                     }
                     catch { }
                 }

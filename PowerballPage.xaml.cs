@@ -22,7 +22,7 @@ public partial class PowerballPage : ContentPage
 
     int[] _winningMainNums = Array.Empty<int>();
     int   _winningPB       = 0;
-    List<(DateTime Date, string Label, int[] MainNumbers, int PBNumber)> _allDraws = new();
+    List<(DateTime Date, string Label, int DrawNumber, int[] MainNumbers, int PBNumber)> _allDraws = new();
     bool _drawsLoaded = false;
     bool _isPanning   = false;
     bool _voiceOn = false;
@@ -553,6 +553,7 @@ public partial class PowerballPage : ContentPage
             .Select(d => (
                 Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
                 Label: d.DrawDate,
+                DrawNumber:  d.DrawNumber,
                 MainNumbers: d.MainNumbers,
                 PBNumber:    d.PBNumber))
             .Where(d => d.Date != DateTime.MinValue)
@@ -588,7 +589,7 @@ public partial class PowerballPage : ContentPage
 
         _winningMainNums = match.MainNumbers;
         _winningPB       = match.PBNumber;
-        lblDrawDate.Text = match.Label;
+        lblDrawDate.Text = match.DrawNumber > 0 ? $"{match.Label}  Draw #{match.DrawNumber}" : match.Label;
 
         for (int i = 0; i < _wLabels.Length; i++)
             _wLabels[i].Text = match.MainNumbers[i].ToString();

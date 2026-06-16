@@ -20,7 +20,7 @@ public partial class WinnerPage : ContentPage
     View? _highlightedView;
 
     int[] _winningNumbers = Array.Empty<int>();
-    List<(DateTime Date, string Label, int[] Numbers)> _allDraws = new();
+    List<(DateTime Date, string Label, int DrawNumber, int[] Numbers)> _allDraws = new();
     bool _drawsLoaded = false;
     bool _isPanning = false;
     bool _voiceOn = false;
@@ -547,6 +547,7 @@ public partial class WinnerPage : ContentPage
             .Select(d => (
                 Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
                 Label: d.DrawDate,
+                DrawNumber: d.DrawNumber,
                 Numbers: d.Numbers))
             .Where(d => d.Date != DateTime.MinValue)
             .ToList();
@@ -583,7 +584,7 @@ public partial class WinnerPage : ContentPage
         if (match.Numbers == null) return;
 
         _winningNumbers = match.Numbers;
-        lblDrawDate.Text = match.Label;
+        lblDrawDate.Text = match.DrawNumber > 0 ? $"{match.Label}  Draw #{match.DrawNumber}" : match.Label;
         for (int i = 0; i < _wLabels.Length; i++)
             _wLabels[i].Text = match.Numbers[i].ToString();
         CheckAll();
@@ -710,7 +711,6 @@ public partial class WinnerPage : ContentPage
     private void BtnVoice_Clicked(object sender, EventArgs e)
     {
 #if IOS
-        if (!Services.VoiceNumberService.IsAvailable) { lblStatus.Text = "Speech recognition not available"; return; }
         if (_voiceOn) StopVoice(); else StartVoice();
 #endif
     }

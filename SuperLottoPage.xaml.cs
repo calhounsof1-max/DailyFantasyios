@@ -22,7 +22,7 @@ public partial class SuperLottoPage : ContentPage
 
     int[] _winningMainNums = Array.Empty<int>();
     int   _winningMega     = 0;
-    List<(DateTime Date, string Label, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> _allDraws = new();
+    List<(DateTime Date, string Label, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> _allDraws = new();
     DrawPrizeTier[] _currentPrizeTiers = Array.Empty<DrawPrizeTier>();
     bool _drawsLoaded = false;
     bool _isPanning   = false;
@@ -566,12 +566,20 @@ public partial class SuperLottoPage : ContentPage
             return;
         }
 
+        // Build draw number lookup by date from API result
+        var drawNumsByDate = new Dictionary<DateTime, int>();
+        foreach (var d in apiTask.Result)
+            if (DateTime.TryParse(d.DrawDate, out var dt) && d.DrawNumber > 0)
+                drawNumsByDate[dt.Date] = d.DrawNumber;
+
         _allDraws = raw
             .Select(d =>
             {
                 var date = DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue;
                 var prizes = prizesByDate.TryGetValue(date.Date, out var p) ? p : Array.Empty<DrawPrizeTier>();
-                return (Date: date, Label: d.DrawDate, MainNumbers: d.MainNumbers, MegaNumber: d.Mega, Prizes: prizes);
+                int drawNum = d.DrawNumber > 0 ? d.DrawNumber
+                              : drawNumsByDate.TryGetValue(date.Date, out int dn) ? dn : 0;
+                return (Date: date, Label: d.DrawDate, DrawNumber: drawNum, MainNumbers: d.MainNumbers, MegaNumber: d.Mega, Prizes: prizes);
             })
             .Where(d => d.Date != DateTime.MinValue)
             .ToList();
@@ -607,7 +615,7 @@ public partial class SuperLottoPage : ContentPage
         _winningMainNums    = match.MainNumbers;
         _winningMega        = match.MegaNumber;
         _currentPrizeTiers  = match.Prizes;
-        lblDrawDate.Text    = match.Label;
+        lblDrawDate.Text    = match.DrawNumber > 0 ? $"{match.Label}  Draw #{match.DrawNumber}" : match.Label;
 
         for (int i = 0; i < _wLabels.Length; i++)
             _wLabels[i].Text = match.MainNumbers[i].ToString();

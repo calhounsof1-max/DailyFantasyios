@@ -46,7 +46,7 @@ public partial class DailyDerbyPage : ContentPage
 
     int[]?  _winHorses;
     string  _winTime = "";
-    List<(string DateLabel, int[] Horses, string RaceTime)> _draws = new();
+    List<(string DateLabel, int DrawNumber, int[] Horses, string RaceTime)> _draws = new();
     bool _drawsLoaded = false;
     bool _isPanning   = false;
     bool _voiceOn = false;
@@ -674,9 +674,10 @@ public partial class DailyDerbyPage : ContentPage
         _draws = raw
             .Select(d => (d.DrawDate,
                           Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
+                          d.DrawNumber,
                           d.Horses, d.RaceTime))
             .OrderByDescending(d => d.Date)
-            .Select(d => (d.DrawDate, d.Horses, d.RaceTime))
+            .Select(d => (d.DrawDate, d.DrawNumber, d.Horses, d.RaceTime))
             .ToList();
 
         _drawsLoaded = true;
@@ -706,7 +707,7 @@ public partial class DailyDerbyPage : ContentPage
 
         _winHorses = match.Horses;
         _winTime   = match.RaceTime ?? "";
-        lblDrawDate.Text = match.DateLabel;
+        lblDrawDate.Text = match.DrawNumber > 0 ? $"{match.DateLabel}  Draw #{match.DrawNumber}" : match.DateLabel;
 
         for (int i = 0; i < 3; i++)
         {

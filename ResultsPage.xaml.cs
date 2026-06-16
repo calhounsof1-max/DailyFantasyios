@@ -82,8 +82,9 @@ public partial class ResultsPage : ContentPage
         // ── F5 section ───────────────────────────────────────────────────────
         if (ResultsPageCls.HasSets("f5"))
         {
+            string f5DrawLabel = data.F5DrawNumber > 0 ? $"Draw #{data.F5DrawNumber}  " : "";
             string f5Win = data.F5Numbers.Length > 0
-                ? "Winning: " + string.Join("  ", data.F5Numbers.Select(n => n.ToString("D2")))
+                ? f5DrawLabel + "Winning: " + string.Join("  ", data.F5Numbers.Select(n => n.ToString("D2")))
                 : "No draw found for this date";
             BuildSection("FANTASY 5", "#FF8F00", f5Win,
                 data.Winners.Where(w => w.Game == "F5").ToList(), "F5");
@@ -92,8 +93,9 @@ public partial class ResultsPage : ContentPage
         // ── SL section ───────────────────────────────────────────────────────
         if (ResultsPageCls.HasSets("sl"))
         {
+            string slDrawLabel = data.SLDrawNumber > 0 ? $"Draw #{data.SLDrawNumber}  " : "";
             string slWin = data.SLMain.Length > 0
-                ? "Winning: " + string.Join("  ", data.SLMain.Select(n => n.ToString("D2")))
+                ? slDrawLabel + "Winning: " + string.Join("  ", data.SLMain.Select(n => n.ToString("D2")))
                   + "   Mega: " + data.SLMega.ToString("D2")
                 : "No draw found for this date";
             BuildSection("SUPER LOTTO PLUS", "#7B1FA2", slWin,
@@ -103,8 +105,9 @@ public partial class ResultsPage : ContentPage
         // ── PB section ───────────────────────────────────────────────────────
         if (ResultsPageCls.HasSets("pb"))
         {
+            string pbDrawLabel = data.PBDrawNumber > 0 ? $"Draw #{data.PBDrawNumber}  " : "";
             string pbWin = data.PBMain.Length > 0
-                ? "Winning: " + string.Join("  ", data.PBMain.Select(n => n.ToString("D2")))
+                ? pbDrawLabel + "Winning: " + string.Join("  ", data.PBMain.Select(n => n.ToString("D2")))
                   + "   PB: " + data.PBBall.ToString("D2")
                 : "No draw found for this date";
             BuildSection("POWERBALL", "#C62828", pbWin,
@@ -114,8 +117,9 @@ public partial class ResultsPage : ContentPage
         // ── MM section ───────────────────────────────────────────────────────
         if (ResultsPageCls.HasSets("mm"))
         {
+            string mmDrawLabel = data.MMDrawNumber > 0 ? $"Draw #{data.MMDrawNumber}  " : "";
             string mmWin = data.MMMain.Length > 0
-                ? "Winning: " + string.Join("  ", data.MMMain.Select(n => n.ToString("D2")))
+                ? mmDrawLabel + "Winning: " + string.Join("  ", data.MMMain.Select(n => n.ToString("D2")))
                   + "   MB: " + data.MMBall.ToString("D2")
                 : "No draw found for this date";
             BuildSection("MEGA MILLIONS", "#F57F17", mmWin,
@@ -143,8 +147,9 @@ public partial class ResultsPage : ContentPage
         // ── D4 section ───────────────────────────────────────────────────────
         if (ResultsPageCls.HasSets("d4"))
         {
+            string d4DrawLabel = data.D4DrawNumber > 0 ? $"Draw #{data.D4DrawNumber}  " : "";
             string d4Win = data.D4Numbers != null
-                ? "Draw: " + string.Join("-", data.D4Numbers)
+                ? d4DrawLabel + "Draw: " + string.Join("-", data.D4Numbers)
                 : "No draw found for this date";
             BuildSection("DAILY 4", "#00695C", d4Win,
                 data.Winners.Where(w => w.Game == "D4").ToList(), "D4");
@@ -156,7 +161,8 @@ public partial class ResultsPage : ContentPage
             string ddWin;
             if (data.DDHorses != null && data.DDHorses.Length == 3)
             {
-                ddWin = $"1st:{data.DDHorses[0]}  2nd:{data.DDHorses[1]}  3rd:{data.DDHorses[2]}";
+                string ddDrawLabel = data.DDDrawNumber > 0 ? $"Draw #{data.DDDrawNumber}  " : "";
+                ddWin = ddDrawLabel + $"1st:{data.DDHorses[0]}  2nd:{data.DDHorses[1]}  3rd:{data.DDHorses[2]}";
                 if (!string.IsNullOrEmpty(data.DDRaceTime))
                 {
                     string norm = new string(data.DDRaceTime.Where(char.IsDigit).ToArray());

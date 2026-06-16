@@ -23,7 +23,7 @@ public partial class Daily4Page : ContentPage
     readonly Dictionary<int, (string entries, string betTypes)> _slotCache = new();
     View? _highlightedView;
 
-    List<(string DateLabel, int[] Numbers)> _draws = new();
+    List<(string DateLabel, int DrawNumber, int[] Numbers)> _draws = new();
     bool _drawsLoaded = false;
 
     int[]? _winNums;
@@ -715,9 +715,10 @@ public partial class Daily4Page : ContentPage
         _draws = raw
             .Select(d => (d.DrawDate,
                           Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
+                          d.DrawNumber,
                           d.Numbers))
             .OrderByDescending(d => d.Date)
-            .Select(d => (d.DrawDate, d.Numbers))
+            .Select(d => (d.DrawDate, d.DrawNumber, d.Numbers))
             .ToList();
 
         _drawsLoaded = true;
@@ -746,7 +747,7 @@ public partial class Daily4Page : ContentPage
         if (match.DateLabel == null) return;
 
         _winNums = match.Numbers;
-        lblDrawDate.Text = match.DateLabel;
+        lblDrawDate.Text = match.DrawNumber > 0 ? $"{match.DateLabel}  Draw #{match.DrawNumber}" : match.DateLabel;
 
         for (int i = 0; i < 4; i++)
             _wLabels[i].Text = _winNums != null ? _winNums[i].ToString() : "?";
