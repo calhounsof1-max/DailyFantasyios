@@ -120,6 +120,17 @@ public partial class WinnerPage : ContentPage
         btnBack.Text = ComingFrom == "results" ? "← RESULTS" : "← HOME";
 
         base.OnAppearing();
+#if IOS
+        Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(200), () =>
+        {
+            var ph = Handler as Microsoft.Maui.Handlers.PageHandler;
+            var vc = ph?.ViewController;
+            var vf = vc?.View?.Frame;
+            var sf = vc?.View?.Superview?.Frame;
+            var safeTop = vc?.View?.SafeAreaInsets.Top ?? -1;
+            lblStatus.Text = $"vY={vf?.Y:F0} vH={vf?.Height:F0} svY={sf?.Y:F0} svH={sf?.Height:F0} safe={safeTop:F0} pad={Padding.Top:F0}";
+        });
+#endif
         _ = LoadAllDraws();
         Dispatcher.Dispatch(() =>
         {
