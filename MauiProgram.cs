@@ -31,14 +31,14 @@ public static class MauiProgram
 			});
 
 #if IOS
-		// Per-page: set page.Padding = (statusBarHeight, homeIndicator) from NavigatedTo.
-		// NavigatedTo fires after the page is fully on-screen so the scene is ready.
-		// UseSafeArea="false" means we own Padding entirely — no MAUI override.
+		// Per-page: hide the native nav bar.
+		// UseSafeArea="false" + iOS MAUI Shell already positions content at the safe-area
+		// top automatically, so NO top padding is needed from us. We only set bottom
+		// padding for the home indicator.
 		PageHandler.Mapper.AppendToMapping("HideIOSNavBar", (handler, view) =>
 		{
 			if (view is ContentPage page && handler is PageHandler ph)
 			{
-				// Hide nav bar immediately when the handler is set up (belt & suspenders).
 				ph.ViewController?.NavigationController?.SetNavigationBarHidden(true, false);
 
 				page.NavigatedTo += (_, _) =>
@@ -47,17 +47,10 @@ public static class MauiProgram
 						var vc = ph.ViewController;
 						if (vc == null) return;
 						vc.NavigationController?.SetNavigationBarHidden(true, false);
-
-						// Status bar height from the scene (correct on all devices).
-						nfloat statusBarH = 0;
-						foreach (var scene in UIKit.UIApplication.SharedApplication.ConnectedScenes)
-							if (scene is UIKit.UIWindowScene ws)
-							{ statusBarH = ws.StatusBarManager?.StatusBarFrame.Height ?? 0; break; }
-
-						// Home indicator height for the bottom.
+						// Top=0: iOS Shell already puts content below the Dynamic Island.
+						// Bottom=safeAreaInsets.Bottom: protect home indicator.
 						var safeBottom = vc.View?.SafeAreaInsets.Bottom ?? 0;
-
-						page.Padding = new Microsoft.Maui.Thickness(0, (double)statusBarH, 0, (double)safeBottom);
+						page.Padding = new Microsoft.Maui.Thickness(0, 0, 0, (double)safeBottom);
 					});
 			}
 		});
