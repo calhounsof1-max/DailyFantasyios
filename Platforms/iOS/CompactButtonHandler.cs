@@ -19,12 +19,13 @@ public class CompactButtonHandler : ButtonHandler
         return btn;
     }
 
-    protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
+    protected override void ConnectHandler(UIButton platformView)
     {
-        var result = base.MeasureOverride(widthConstraint, heightConstraint);
-        // If the XAML has an explicit HeightRequest, that is the definitive height.
-        if (VirtualView.HeightRequest > 0)
-            return new Size(result.Width, VirtualView.HeightRequest);
-        return result;
+        base.ConnectHandler(platformView);
+        // Remove iOS 15+ UIButtonConfiguration internal insets that inflate button height.
+        platformView.Configuration = null;
+#pragma warning disable CA1422
+        platformView.ContentEdgeInsets = UIEdgeInsets.Zero;
+#pragma warning restore CA1422
     }
 }
