@@ -22,8 +22,9 @@ public class CompactButtonHandler : ButtonHandler
     public override Size GetDesiredSize(double widthConstraint, double heightConstraint)
     {
         var result = base.GetDesiredSize(widthConstraint, heightConstraint);
-        if (VirtualView?.HeightRequest > 0)
-            return new Size(result.Width, VirtualView.HeightRequest);
+        // VirtualView is typed as IButton which lacks HeightRequest; cast to VisualElement.
+        if (VirtualView is Microsoft.Maui.Controls.VisualElement ve && ve.HeightRequest > 0)
+            return new Size(result.Width, ve.HeightRequest);
         return result;
     }
 }
