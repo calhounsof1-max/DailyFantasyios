@@ -190,25 +190,48 @@
                     </VerticalStackLayout>
                 </Frame>
 
-                <!-- Daily 3 -->
-                <Frame x:Name="cardD3" BackgroundColor="White" CornerRadius="10"
+                <!-- Daily 3 Evening -->
+                <Frame x:Name="cardD3Eve" BackgroundColor="White" CornerRadius="10"
                        BorderColor="#E5E7EB" Padding="10,8" HasShadow="False">
                     <Frame.GestureRecognizers>
-                        <TapGestureRecognizer Tapped="OnCardTapped" CommandParameter="D3"/>
+                        <TapGestureRecognizer Tapped="OnCardTapped" CommandParameter="D3E"/>
                     </Frame.GestureRecognizers>
                     <VerticalStackLayout Spacing="3">
                         <Grid ColumnDefinitions="*,Auto">
-                            <Label Grid.Column="0" Text="Daily 3" FontSize="12"
+                            <Label Grid.Column="0" Text="Daily 3  –  Evening" FontSize="12"
                                    FontAttributes="Bold" TextColor="#1976D2"/>
-                            <Label Grid.Column="1" x:Name="lblD3Badge" Text=""
+                            <Label Grid.Column="1" x:Name="lblD3EveBadge" Text=""
                                    FontSize="9" FontAttributes="Bold"
                                    TextColor="White" BackgroundColor="#9CA3AF"
                                    Padding="5,2" VerticalOptions="Center"/>
                         </Grid>
-                        <Label x:Name="lblD3Date" Text="" FontSize="10" TextColor="#6B7280"/>
-                        <Label x:Name="lblD3Numbers" Text="" FontFamily="Monospace"
+                        <Label x:Name="lblD3EveDate" Text="" FontSize="10" TextColor="#6B7280"/>
+                        <Label x:Name="lblD3EveNumbers" Text="" FontFamily="Monospace"
                                FontSize="14" FontAttributes="Bold" TextColor="#1E2733"/>
-                        <Label x:Name="lblD3Result" Text="" FontSize="10" TextColor="#6B7280"/>
+                        <Label x:Name="lblD3EveResult" Text="" FontSize="10" TextColor="#6B7280"/>
+                        <Label Text="Tap to see payout details ▶" FontSize="9" TextColor="#9CA3AF" HorizontalOptions="End"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Daily 3 Midday -->
+                <Frame x:Name="cardD3Mid" BackgroundColor="White" CornerRadius="10"
+                       BorderColor="#E5E7EB" Padding="10,8" HasShadow="False">
+                    <Frame.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnCardTapped" CommandParameter="D3M"/>
+                    </Frame.GestureRecognizers>
+                    <VerticalStackLayout Spacing="3">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="Daily 3  –  Midday" FontSize="12"
+                                   FontAttributes="Bold" TextColor="#1976D2"/>
+                            <Label Grid.Column="1" x:Name="lblD3MidBadge" Text=""
+                                   FontSize="9" FontAttributes="Bold"
+                                   TextColor="White" BackgroundColor="#9CA3AF"
+                                   Padding="5,2" VerticalOptions="Center"/>
+                        </Grid>
+                        <Label x:Name="lblD3MidDate" Text="" FontSize="10" TextColor="#6B7280"/>
+                        <Label x:Name="lblD3MidNumbers" Text="" FontFamily="Monospace"
+                               FontSize="14" FontAttributes="Bold" TextColor="#1E2733"/>
+                        <Label x:Name="lblD3MidResult" Text="" FontSize="10" TextColor="#6B7280"/>
                         <Label Text="Tap to see payout details ▶" FontSize="9" TextColor="#9CA3AF" HorizontalOptions="End"/>
                     </VerticalStackLayout>
                 </Frame>

@@ -15,32 +15,36 @@ public partial class JackpotPage : ContentPage
     List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> _mmDraws = new();
     List<(string DrawDate, int DrawNumber, int[] Horses, string RaceTime, DrawPrizeTier[] Prizes)> _ddDraws = new();
     List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> _d3Draws = new();
+    List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> _d3EveDraws = new();
+    List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> _d3MidDraws = new();
     List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> _d4Draws = new();
 
     // ── Game order ───────────────────────────────────────────────────────────
     const string PrefGameOrder = "jackpot_game_order";
-    static readonly string[] DefaultGameOrder = { "F5", "SL", "PB", "MM", "DD", "D4", "D3" };
+    static readonly string[] DefaultGameOrder = { "F5", "SL", "PB", "MM", "DD", "D4", "D3E", "D3M" };
 
     static readonly Dictionary<string, string> GameDisplayNames = new()
     {
-        ["F5"] = "Fantasy 5",
-        ["SL"] = "Super Lotto Plus",
-        ["PB"] = "Powerball",
-        ["MM"] = "Mega Millions",
-        ["DD"] = "Daily Derby",
-        ["D4"] = "Daily 4",
-        ["D3"] = "Daily 3",
+        ["F5"]  = "Fantasy 5",
+        ["SL"]  = "Super Lotto Plus",
+        ["PB"]  = "Powerball",
+        ["MM"]  = "Mega Millions",
+        ["DD"]  = "Daily Derby",
+        ["D4"]  = "Daily 4",
+        ["D3E"] = "Daily 3 – Evening",
+        ["D3M"] = "Daily 3 – Midday",
     };
 
     static readonly Dictionary<string, Color> GameColors = new()
     {
-        ["F5"] = Color.FromArgb("#FF8F00"),
-        ["SL"] = Color.FromArgb("#7B1FA2"),
-        ["PB"] = Color.FromArgb("#C62828"),
-        ["MM"] = Color.FromArgb("#1565C0"),
-        ["DD"] = Color.FromArgb("#5D4037"),
-        ["D4"] = Color.FromArgb("#00695C"),
-        ["D3"] = Color.FromArgb("#1976D2"),
+        ["F5"]  = Color.FromArgb("#FF8F00"),
+        ["SL"]  = Color.FromArgb("#7B1FA2"),
+        ["PB"]  = Color.FromArgb("#C62828"),
+        ["MM"]  = Color.FromArgb("#1565C0"),
+        ["DD"]  = Color.FromArgb("#5D4037"),
+        ["D4"]  = Color.FromArgb("#00695C"),
+        ["D3E"] = Color.FromArgb("#1976D2"),
+        ["D3M"] = Color.FromArgb("#1976D2"),
     };
 
     List<string> _gameOrder = new();
@@ -78,7 +82,8 @@ public partial class JackpotPage : ContentPage
             _pbDraws = new() { (cpb.DrawDate, 0, cpb.Main, cpb.Special, cpb.Prizes) };
             _mmDraws = new() { (cmm.DrawDate, 0, cmm.Main, cmm.Special, cmm.Prizes) };
             _ddDraws = new() { (cdd.DrawDate, 0, cdd.Horses, cdd.RaceTime, cdd.Prizes) };
-            _d3Draws = new() { (cd3.DrawDate, cd3.DrawNumber, cd3.Numbers, cd3.Prizes) };
+            _d3EveDraws = new() { (cd3.DrawDate, cd3.DrawNumber, cd3.Numbers, cd3.Prizes) };
+            _d3MidDraws = new();
             _d4Draws = new() { (cd4.DrawDate, 0, cd4.Numbers, cd4.Prizes) };
 
             UpdateF5Card(_f5Draws, cjp.F5);
@@ -86,7 +91,8 @@ public partial class JackpotPage : ContentPage
             UpdatePBCard(_pbDraws, cjp.PB);
             UpdateMMCard(_mmDraws, cjp.MM);
             UpdateDDCard(_ddDraws, cjp.DD);
-            UpdateD3Card(_d3Draws);
+            UpdateD3EveCard(_d3EveDraws);
+            UpdateD3MidCard(_d3MidDraws);
             UpdateD4Card(_d4Draws);
 
             lblLastChecked.Text = $"Cached results from {cachedDate}";
@@ -132,13 +138,16 @@ public partial class JackpotPage : ContentPage
         _d3Draws = d3Task.Result;
         _d4Draws = d4Task.Result;
 
+        SplitD3Draws(_d3Draws);
+
         var jp = jpTask.Result;
         UpdateF5Card(_f5Draws,  jp.F5);
         UpdateSLCard(_slDraws,  jp.SL);
         UpdatePBCard(_pbDraws,  jp.PB);
         UpdateMMCard(_mmDraws,  jp.MM);
         UpdateDDCard(_ddDraws, jp.DD);
-        UpdateD3Card(_d3Draws);
+        UpdateD3EveCard(_d3EveDraws);
+        UpdateD3MidCard(_d3MidDraws);
         UpdateD4Card(_d4Draws);
 
         string checkedAt = DateTime.Now.ToString("h:mm tt");
@@ -149,20 +158,20 @@ public partial class JackpotPage : ContentPage
 
     void SetAllLoading()
     {
-        foreach (var lbl in new[] { lblF5Badge, lblSLBadge, lblPBBadge, lblMMBadge, lblDDBadge, lblD3Badge, lblD4Badge })
+        foreach (var lbl in new[] { lblF5Badge, lblSLBadge, lblPBBadge, lblMMBadge, lblDDBadge, lblD3EveBadge, lblD3MidBadge, lblD4Badge })
         {
             lbl.Text = "...";
             lbl.BackgroundColor = Color.FromArgb("#9CA3AF");
         }
-        foreach (var lbl in new[] { lblF5Date, lblSLDate, lblPBDate, lblMMDate, lblDDDate, lblD3Date, lblD4Date })
+        foreach (var lbl in new[] { lblF5Date, lblSLDate, lblPBDate, lblMMDate, lblDDDate, lblD3EveDate, lblD3MidDate, lblD4Date })
             lbl.Text = "";
-        foreach (var lbl in new[] { lblF5Numbers, lblSLNumbers, lblPBNumbers, lblMMNumbers, lblDDNumbers, lblD3Numbers, lblD4Numbers })
+        foreach (var lbl in new[] { lblF5Numbers, lblSLNumbers, lblPBNumbers, lblMMNumbers, lblDDNumbers, lblD3EveNumbers, lblD3MidNumbers, lblD4Numbers })
             lbl.Text = "";
-        foreach (var lbl in new[] { lblF5Result, lblSLResult, lblPBResult, lblMMResult, lblDDResult, lblD3Result, lblD4Result })
+        foreach (var lbl in new[] { lblF5Result, lblSLResult, lblPBResult, lblMMResult, lblDDResult, lblD3EveResult, lblD3MidResult, lblD4Result })
             lbl.Text = "";
         foreach (var lbl in new[] { lblF5Jackpot, lblSLJackpot, lblPBJackpot, lblMMJackpot, lblDDJackpot })
             lbl.Text = "";
-        foreach (var card in new[] { cardF5, cardSL, cardPB, cardMM, cardDD, cardD3, cardD4 })
+        foreach (var card in new[] { cardF5, cardSL, cardPB, cardMM, cardDD, cardD3Eve, cardD3Mid, cardD4 })
             card.BackgroundColor = Colors.White;
     }
 
@@ -237,29 +246,68 @@ public partial class JackpotPage : ContentPage
             lblDDJackpot.Text = "";
     }
 
-    void UpdateD3Card(List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> draws)
+    void SplitD3Draws(List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> all)
     {
-        if (draws.Count == 0) { SetCardError(cardD3, lblD3Badge, lblD3Date, lblD3Numbers, lblD3Result); return; }
+        _d3EveDraws.Clear();
+        _d3MidDraws.Clear();
+        // Within each date group: higher DrawNumber = Evening, lower = Midday
+        foreach (var g in all.GroupBy(d => d.DrawDate))
+        {
+            var sorted = g.OrderByDescending(d => d.DrawNumber).ToList();
+            _d3EveDraws.Add(sorted[0]);
+            if (sorted.Count >= 2) _d3MidDraws.Add(sorted[1]);
+        }
+    }
+
+    void UpdateD3EveCard(List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> draws)
+    {
+        if (draws.Count == 0) { SetCardError(cardD3Eve, lblD3EveBadge, lblD3EveDate, lblD3EveNumbers, lblD3EveResult); return; }
         var d = draws[0];
-        string drawLabel = d.DrawNumber > 0 ? $"  •  Draw #{d.DrawNumber}" : "";
-        lblD3Date.Text    = d.DrawDate + drawLabel;
-        lblD3Numbers.Text = string.Join("  ", d.Numbers);
+        string drawLabel = d.DrawNumber > 0 ? $"  •  Draw #{d.DrawNumber} Evening" : "";
+        lblD3EveDate.Text    = d.DrawDate + drawLabel;
+        lblD3EveNumbers.Text = string.Join("  ", d.Numbers);
         var tier1 = d.Prizes.FirstOrDefault(p => p.Tier == 1);
         if (tier1 != null && tier1.Amount > 0)
         {
-            lblD3Badge.Text            = $"${tier1.Amount:N0} Straight";
-            lblD3Badge.BackgroundColor = Color.FromArgb("#1565C0");
-            lblD3Result.Text           = $"Straight: ${tier1.Amount:N0}  •  {tier1.Count} winner{(tier1.Count != 1 ? "s" : "")}";
-            lblD3Result.TextColor      = Color.FromArgb("#1565C0");
-            cardD3.BackgroundColor     = Color.FromArgb("#E3F2FD");
+            lblD3EveBadge.Text            = $"${tier1.Amount:N0} Straight";
+            lblD3EveBadge.BackgroundColor = Color.FromArgb("#1565C0");
+            lblD3EveResult.Text           = $"Straight: ${tier1.Amount:N0}  •  {tier1.Count} winner{(tier1.Count != 1 ? "s" : "")}";
+            lblD3EveResult.TextColor      = Color.FromArgb("#1565C0");
+            cardD3Eve.BackgroundColor     = Color.FromArgb("#E3F2FD");
         }
         else
         {
-            lblD3Badge.Text            = "N/A";
-            lblD3Badge.BackgroundColor = Color.FromArgb("#9CA3AF");
-            lblD3Result.Text           = "Prize data unavailable";
-            lblD3Result.TextColor      = Color.FromArgb("#6B7280");
-            cardD3.BackgroundColor     = Colors.White;
+            lblD3EveBadge.Text            = "N/A";
+            lblD3EveBadge.BackgroundColor = Color.FromArgb("#9CA3AF");
+            lblD3EveResult.Text           = "Prize data unavailable";
+            lblD3EveResult.TextColor      = Color.FromArgb("#6B7280");
+            cardD3Eve.BackgroundColor     = Colors.White;
+        }
+    }
+
+    void UpdateD3MidCard(List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> draws)
+    {
+        if (draws.Count == 0) { SetCardError(cardD3Mid, lblD3MidBadge, lblD3MidDate, lblD3MidNumbers, lblD3MidResult); return; }
+        var d = draws[0];
+        string drawLabel = d.DrawNumber > 0 ? $"  •  Draw #{d.DrawNumber} Midday" : "";
+        lblD3MidDate.Text    = d.DrawDate + drawLabel;
+        lblD3MidNumbers.Text = string.Join("  ", d.Numbers);
+        var tier1 = d.Prizes.FirstOrDefault(p => p.Tier == 1);
+        if (tier1 != null && tier1.Amount > 0)
+        {
+            lblD3MidBadge.Text            = $"${tier1.Amount:N0} Straight";
+            lblD3MidBadge.BackgroundColor = Color.FromArgb("#1565C0");
+            lblD3MidResult.Text           = $"Straight: ${tier1.Amount:N0}  •  {tier1.Count} winner{(tier1.Count != 1 ? "s" : "")}";
+            lblD3MidResult.TextColor      = Color.FromArgb("#1565C0");
+            cardD3Mid.BackgroundColor     = Color.FromArgb("#E3F2FD");
+        }
+        else
+        {
+            lblD3MidBadge.Text            = "N/A";
+            lblD3MidBadge.BackgroundColor = Color.FromArgb("#9CA3AF");
+            lblD3MidResult.Text           = "Prize data unavailable";
+            lblD3MidResult.TextColor      = Color.FromArgb("#6B7280");
+            cardD3Mid.BackgroundColor     = Colors.White;
         }
     }
 
@@ -408,14 +456,25 @@ public partial class JackpotPage : ContentPage
                 }
                 break;
 
-            case "D3":
-                if (_d3Draws.Count == 0) return;
-                var d3 = _d3Draws[0];
-                gameName  = "Daily 3";
-                drawDate  = d3.DrawNumber > 0 ? $"{d3.DrawDate}  •  Draw #{d3.DrawNumber}" : d3.DrawDate;
+            case "D3E":
+                if (_d3EveDraws.Count == 0) return;
+                var d3e = _d3EveDraws[0];
+                gameName  = "Daily 3 – Evening";
+                drawDate  = d3e.DrawNumber > 0 ? $"{d3e.DrawDate}  •  Draw #{d3e.DrawNumber} Evening" : d3e.DrawDate;
                 gameColor = Color.FromArgb("#1976D2");
-                prizes    = d3.Prizes;
-                foreach (var n in d3.Numbers)
+                prizes    = d3e.Prizes;
+                foreach (var n in d3e.Numbers)
+                    overlayNumbersPanel.Children.Add(MakeNumberBall(n, gameColor, false));
+                break;
+
+            case "D3M":
+                if (_d3MidDraws.Count == 0) return;
+                var d3m = _d3MidDraws[0];
+                gameName  = "Daily 3 – Midday";
+                drawDate  = d3m.DrawNumber > 0 ? $"{d3m.DrawDate}  •  Draw #{d3m.DrawNumber} Midday" : d3m.DrawDate;
+                gameColor = Color.FromArgb("#1976D2");
+                prizes    = d3m.Prizes;
+                foreach (var n in d3m.Numbers)
                     overlayNumbersPanel.Children.Add(MakeNumberBall(n, gameColor, false));
                 break;
 
@@ -663,7 +722,7 @@ public partial class JackpotPage : ContentPage
                 4 => "Consolation",
                 _ => $"Prize Tier {tier}"
             },
-            "D3" => tier switch
+            "D3E" or "D3M" => tier switch
             {
                 1 => "Straight",
                 2 => "Box",
@@ -695,9 +754,16 @@ public partial class JackpotPage : ContentPage
         string saved = Preferences.Get(PrefGameOrder, "");
         if (!string.IsNullOrWhiteSpace(saved))
         {
-            var order = saved.Split(',')
-                .Where(c => DefaultGameOrder.Contains(c))
-                .ToList();
+            // Migrate old "D3" code to "D3E"+"D3M"
+            var parts = saved.Split(',').ToList();
+            int d3Idx = parts.IndexOf("D3");
+            if (d3Idx >= 0)
+            {
+                parts[d3Idx] = "D3E";
+                parts.Insert(d3Idx + 1, "D3M");
+            }
+
+            var order = parts.Where(c => DefaultGameOrder.Contains(c)).ToList();
             foreach (var code in DefaultGameOrder)
                 if (!order.Contains(code)) order.Add(code);
             return order;
@@ -710,13 +776,14 @@ public partial class JackpotPage : ContentPage
 
     Dictionary<string, View> GetCardMap() => new()
     {
-        ["F5"] = cardF5,
-        ["SL"] = cardSL,
-        ["PB"] = cardPB,
-        ["MM"] = cardMM,
-        ["DD"] = cardDD,
-        ["D4"] = cardD4,
-        ["D3"] = cardD3,
+        ["F5"]  = cardF5,
+        ["SL"]  = cardSL,
+        ["PB"]  = cardPB,
+        ["MM"]  = cardMM,
+        ["DD"]  = cardDD,
+        ["D4"]  = cardD4,
+        ["D3E"] = cardD3Eve,
+        ["D3M"] = cardD3Mid,
     };
 
     void ApplyGameOrder()
