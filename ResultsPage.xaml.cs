@@ -4,6 +4,7 @@ public partial class ResultsPage : ContentPage
 {
     private DateResultData? _lastData;
     internal static bool SkipNextRefresh;
+    private View? _highlightedRow;
 
     public ResultsPage()
     {
@@ -27,6 +28,11 @@ public partial class ResultsPage : ContentPage
         AppShell.Daily3PageInstance.ClearHighlight();
         AppShell.Daily4PageInstance.ClearHighlight();
         AppShell.DailyDerbyPageInstance.ClearHighlight();
+        if (_highlightedRow != null)
+        {
+            _highlightedRow.BackgroundColor = Colors.White;
+            _highlightedRow = null;
+        }
         if (SkipNextRefresh) { SkipNextRefresh = false; return; }
         resultDatePicker.Date = DateTime.Today;
         _ = RunCheck(resultDatePicker?.Date ?? DateTime.Today);
@@ -342,7 +348,8 @@ public partial class ResultsPage : ContentPage
                 // Tap to navigate to that set with the row highlighted
                 var tap = new TapGestureRecognizer();
                 var capturedW = w;
-                tap.Tapped += (_, _) => _ = OnWinnerRowTappedAsync(capturedW);
+                var capturedRow = row;
+                tap.Tapped += (_, _) => _ = OnWinnerRowTappedAsync(capturedW, capturedRow);
                 row.GestureRecognizers.Add(tap);
 
                 sectionBody.Children.Add(row);
@@ -361,8 +368,13 @@ public partial class ResultsPage : ContentPage
 
     // ── Winner row tap → navigate to game page at that slot/row ─────────────
 
-    private async Task OnWinnerRowTappedAsync(WinnerEntry w)
+    private async Task OnWinnerRowTappedAsync(WinnerEntry w, View? tappedRow = null)
     {
+        if (tappedRow != null)
+        {
+            tappedRow.BackgroundColor = Color.FromArgb("#FFE0B2");
+            _highlightedRow = tappedRow;
+        }
         PendingHighlight.Game = w.Game;
         PendingHighlight.Slot = w.SetNumber - 1;
         PendingHighlight.Row  = w.RowNumber - 1;
