@@ -86,9 +86,8 @@ public static class VoiceNumberService
     {
         try
         {
-            _recognizer = SFSpeechRecognizer.FromLocale(new Foundation.NSLocale("en-US"))
-                          ?? new SFSpeechRecognizer();
-            if (_recognizer == null)
+            _recognizer = new SFSpeechRecognizer(new Foundation.NSLocale("en-US"));
+            if (_recognizer == null || !_recognizer.Available)
             {
                 StatusUpdate?.Invoke("Speech recognizer not available");
                 return;
