@@ -770,7 +770,7 @@ public partial class MainPage : ContentPage
     {
         string action = await DisplayActionSheet("Advance", "Cancel", null,
             "View Sets", "Archive", "Export Sets", "Refresh Data",
-            "Jackpot Winners", "Voice Settings", "Games Expiration");
+            "Jackpot Winners", "Voice Settings", "Games Expiration", "Notifications");
         switch (action)
         {
             case "View Sets":    BtnViewSets_Clicked(sender, e); break;
@@ -783,6 +783,7 @@ public partial class MainPage : ContentPage
                 break;
             case "Voice Settings":   await ShowVoiceSettingsAsync(); break;
             case "Games Expiration": await Shell.Current.GoToAsync(nameof(AdvanceGamesPage), false); break;
+            case "Notifications":    await Shell.Current.GoToAsync(nameof(NotificationsPage), false); break;
         }
     }
 

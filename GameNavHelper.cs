@@ -9,11 +9,14 @@ static class GameNavHelper
     {
         string? result = await caller.DisplayActionSheet(null, "Cancel", null,
             "Fantasy 5", "Super Lotto", "Daily 3", "Daily 4",
-            "Powerball", "Mega Millions", "Daily Derby", "Jackpot Winners");
+            "Powerball", "Mega Millions", "Daily Derby", "Jackpot Winners", "Notifications");
         if (result == null || result == "Cancel") return;
 
         switch (result)
         {
+            case "Notifications":
+                await Shell.Current.GoToAsync(nameof(NotificationsPage), false);
+                return;
             case "Fantasy 5":
                 AppShell.WinnerPageInstance.PrePosition(true);
                 await Shell.Current.GoToAsync(nameof(WinnerPage), false);

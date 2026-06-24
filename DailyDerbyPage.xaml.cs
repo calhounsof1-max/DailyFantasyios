@@ -44,6 +44,13 @@ public partial class DailyDerbyPage : ContentPage
     readonly Dictionary<int, string> _slotCache = new();
     View? _highlightedView;
 
+    DateTime?[] _playStart = new DateTime?[Rows];
+    DateTime?[] _playEnd   = new DateTime?[Rows];
+    Grid?       _advOverlay;
+    DatePicker? _advStartPicker;
+    DatePicker? _advEndPicker;
+    int         _advRow = -1;
+
     int[]?  _winHorses;
     string  _winTime = "";
     List<(string DateLabel, int DrawNumber, int[] Horses, string RaceTime)> _draws = new();
@@ -65,6 +72,7 @@ public partial class DailyDerbyPage : ContentPage
         _wNameLabels  = new[] { lblWN1, lblWN2, lblWN3 };
         BuildRows();
         BuildSlotPicker();
+        BuildAdvancePlayOverlay();
     }
 
     // ── Pan gesture ──────────────────────────────────────────────────────────
@@ -196,6 +204,7 @@ public partial class DailyDerbyPage : ContentPage
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
+        SaveAdvanceDates(_activeSlot);
         if (_voiceOn) StopVoice();
         if (_highlightedView != null) { _highlightedView.BackgroundColor = Colors.White; _highlightedView = null; }
         SaveEntries();
@@ -266,6 +275,9 @@ public partial class DailyDerbyPage : ContentPage
             _results[r].Text = "";
         }
         if (int.TryParse(fromEntry.Text, out int n)) HighlightRows(n);
+        Array.Clear(_playStart, 0, Rows);
+        Array.Clear(_playEnd,   0, Rows);
+        UpdateAllResultBackgrounds();
     }
 
     private void ClearRow(int r)
@@ -275,6 +287,9 @@ public partial class DailyDerbyPage : ContentPage
         _results[r].Text = "";
         if (_permChks[r] != null) _permChks[r].IsChecked = false;
         _permLabels[r].IsVisible = false;
+        _playStart[r] = null;
+        _playEnd[r]   = null;
+        UpdateResultBackground(r);
         SaveEntries();
     }
 
@@ -299,6 +314,8 @@ public partial class DailyDerbyPage : ContentPage
         LoadFromValues(saved.Split('|'));
         _loading = false;
         CheckAll();
+        LoadAdvanceDates(slot);
+        UpdateAllResultBackgrounds();
     }
 
     private bool SlotHasData(int slot) =>
@@ -351,6 +368,7 @@ public partial class DailyDerbyPage : ContentPage
         // Cache current slot before switching
         if (_activeSlot >= 0)
             _slotCache[_activeSlot] = GetCurrentEntryString();
+        SaveAdvanceDates(_activeSlot);
         _activeSlot = slot;
         Preferences.Set("dd_active_slot", slot);
         ClearAllEntries();
@@ -363,6 +381,7 @@ public partial class DailyDerbyPage : ContentPage
         }
         else if (SlotHasData(slot))
             FillFromSlot(slot);
+        LoadAdvanceDates(slot); UpdateAllResultBackgrounds();
         UpdateSlotPicker();
     }
 
@@ -542,6 +561,11 @@ public partial class DailyDerbyPage : ContentPage
                 LineBreakMode = LineBreakMode.WordWrap,
             };
             _results[r] = result;
+            int ri = r;
+            result.GestureRecognizers.Add(new TapGestureRecognizer
+            {
+                Command = new Command(() => ShowAdvancePlayOverlay(ri))
+            });
             Grid.SetColumn(result, 6);
             row.Children.Add(result);
 
@@ -1053,5 +1077,222 @@ public partial class DailyDerbyPage : ContentPage
             await Task.Delay(1200);
             btn.Text = orig; btn.BackgroundColor = origColor;
         }
+    }
+
+    // ── Advance Play Dates ────────────────────────────────────────────────────
+
+    private void BuildAdvancePlayOverlay()
+    {
+        _advStartPicker = new DatePicker
+        {
+            Format = "MMM d, yyyy", FontSize = 14, Date = DateTime.Today,
+            MinimumDate = new DateTime(2020, 1, 1), MaximumDate = new DateTime(2035, 12, 31),
+            TextColor = Colors.White,
+        };
+        _advEndPicker = new DatePicker
+        {
+            Format = "MMM d, yyyy", FontSize = 14, Date = DateTime.Today,
+            MinimumDate = new DateTime(2020, 1, 1), MaximumDate = new DateTime(2035, 12, 31),
+            TextColor = Colors.White,
+        };
+
+        var btnClear  = new Button { Text = "Clear",  BackgroundColor = Color.FromArgb("#4B5563"), TextColor = Colors.White, CornerRadius = 10, HeightRequest = 42, FontSize = 13 };
+        var btnCancel = new Button { Text = "Cancel", BackgroundColor = Color.FromArgb("#1E293B"), TextColor = Colors.White, CornerRadius = 10, HeightRequest = 42, FontSize = 13 };
+        var btnOk     = new Button { Text = "OK",     BackgroundColor = Color.FromArgb("#2563EB"), TextColor = Colors.White, CornerRadius = 10, HeightRequest = 42, FontSize = 13, FontAttributes = FontAttributes.Bold };
+
+        btnClear.Clicked += (_, _) =>
+        {
+            if (_advRow < 0) return;
+            _playStart[_advRow] = null;
+            _playEnd[_advRow]   = null;
+            UpdateResultBackground(_advRow);
+            SaveAdvanceDates(_activeSlot);
+            _advOverlay!.IsVisible = false;
+        };
+        btnCancel.Clicked += (_, _) => _advOverlay!.IsVisible = false;
+        btnOk.Clicked += (_, _) =>
+        {
+            if (_advRow < 0) return;
+            _playStart[_advRow] = _advStartPicker!.Date;
+            _playEnd[_advRow]   = _advEndPicker!.Date;
+            UpdateResultBackground(_advRow);
+            SaveAdvanceDates(_activeSlot);
+            _advOverlay!.IsVisible = false;
+        };
+
+        var btnRow = new Grid
+        {
+            ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Star) },
+            ColumnSpacing = 8,
+        };
+        Grid.SetColumn(btnClear,  0); btnRow.Children.Add(btnClear);
+        Grid.SetColumn(btnCancel, 1); btnRow.Children.Add(btnCancel);
+        Grid.SetColumn(btnOk,     2); btnRow.Children.Add(btnOk);
+
+        var card = new Border
+        {
+            BackgroundColor = Color.FromArgb("#1E2733"),
+            Stroke = new SolidColorBrush(Color.FromArgb("#334155")),
+            StrokeThickness = 1.5,
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(16) },
+            Padding = new Thickness(20, 18),
+            VerticalOptions = LayoutOptions.Center,
+            HorizontalOptions = LayoutOptions.Center,
+            WidthRequest = 310,
+            Content = new VerticalStackLayout
+            {
+                Spacing = 12,
+                Children =
+                {
+                    new Label { Text = "Advance Play Dates", FontSize = 16, FontAttributes = FontAttributes.Bold, TextColor = Colors.White, HorizontalOptions = LayoutOptions.Center },
+                    new Label { Text = "Play From", FontSize = 11, TextColor = Color.FromArgb("#8B9DC3") },
+                    _advStartPicker,
+                    new Label { Text = "Play To",   FontSize = 11, TextColor = Color.FromArgb("#8B9DC3") },
+                    _advEndPicker,
+                    btnRow,
+                }
+            }
+        };
+
+        _advOverlay = new Grid { BackgroundColor = Color.FromArgb("#CC000000"), IsVisible = false };
+        _advOverlay.Children.Add(card);
+
+        var rootGrid = (Grid)Content;
+        Grid.SetRow(_advOverlay, 0);
+        Grid.SetRowSpan(_advOverlay, 99);
+        rootGrid.Children.Add(_advOverlay);
+    }
+
+    private void ShowAdvancePlayOverlay(int row)
+    {
+        _advRow = row;
+        _advStartPicker!.Date = _playStart[row] ?? DateTime.Today;
+        _advEndPicker!.Date   = _playEnd[row]   ?? DateTime.Today;
+        _advOverlay!.IsVisible = true;
+    }
+
+    private void UpdateResultBackground(int r)
+    {
+        bool hasDate = _playStart[r].HasValue || _playEnd[r].HasValue;
+        _results[r].BackgroundColor = hasDate ? Color.FromArgb("#1A3A8A") : Colors.Transparent;
+        bool showingResult = !string.IsNullOrEmpty(_results[r].Text) && _results[r].Text != "+";
+        if (!showingResult)
+        {
+            _results[r].Text = "+";
+            _results[r].TextColor = hasDate ? Colors.White : Color.FromArgb("#4B6A8A");
+        }
+    }
+
+    private void UpdateAllResultBackgrounds()
+    {
+        for (int r = 0; r < Rows; r++) UpdateResultBackground(r);
+    }
+
+    private void SaveAdvanceDates(int slot)
+    {
+        if (slot < 0) return;
+        var parts = new string[Rows];
+        for (int r = 0; r < Rows; r++)
+        {
+            string s = _playStart[r].HasValue ? _playStart[r]!.Value.ToString("yyyyMMdd") : "";
+            string e = _playEnd[r].HasValue   ? _playEnd[r]!.Value.ToString("yyyyMMdd")   : "";
+            parts[r] = $"{s}~{e}";
+        }
+        Preferences.Set(AdvDatesKey(slot), string.Join("|", parts));
+    }
+
+    public void FlushAdvanceDates()
+    {
+        if (_activeSlot >= 0) SaveAdvanceDates(_activeSlot);
+    }
+
+    private void LoadAdvanceDates(int slot)
+    {
+        Array.Clear(_playStart, 0, Rows);
+        Array.Clear(_playEnd,   0, Rows);
+        if (slot < 0) return;
+        string raw = Preferences.Get(AdvDatesKey(slot), "");
+        if (string.IsNullOrEmpty(raw)) return;
+        var parts = raw.Split('|');
+        for (int r = 0; r < Rows && r < parts.Length; r++)
+        {
+            var pair = parts[r].Split('~');
+            if (pair.Length == 2)
+            {
+                if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null,
+                    System.Globalization.DateTimeStyles.None, out var sd))
+                    _playStart[r] = sd;
+                if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null,
+                    System.Globalization.DateTimeStyles.None, out var ed))
+                    _playEnd[r] = ed;
+            }
+        }
+    }
+
+    private bool SlotHasFutureAdvDate(int slot)
+    {
+        var today = DateTime.Today;
+        if (slot == _activeSlot)
+        {
+            for (int r = 0; r < Rows; r++)
+            {
+                var refDate = _playEnd[r] ?? _playStart[r];
+                if (refDate.HasValue && refDate.Value >= today) return true;
+            }
+            return false;
+        }
+        if (string.IsNullOrEmpty(Preferences.Get(SetKey(slot), ""))) return false;
+        string raw = Preferences.Get(AdvDatesKey(slot), "");
+        if (string.IsNullOrEmpty(raw)) return false;
+        foreach (var part in raw.Split('|'))
+        {
+            var pair = part.Split('~');
+            if (pair.Length != 2) continue;
+            DateTime? end = null, start = null;
+            if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var ed)) end = ed;
+            if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var sd)) start = sd;
+            var refDate = end ?? start;
+            if (refDate.HasValue && refDate.Value >= today) return true;
+        }
+        return false;
+    }
+
+    private string AdvDatesKey(int slot) => $"dd_adv_{slot}";
+    private void PartialClearSlot(int slot)
+    {
+        string raw = Preferences.Get(SetKey(slot), "");
+        if (string.IsNullOrEmpty(raw)) return;
+        var vals = raw.Split('|');
+        string advRaw = Preferences.Get(AdvDatesKey(slot), "");
+        var advParts = string.IsNullOrEmpty(advRaw) ? new string[Rows] : advRaw.Split('|');
+        if (advParts.Length < Rows) Array.Resize(ref advParts, Rows);
+        var today = DateTime.Today;
+        for (int r = 0; r < Rows; r++)
+        {
+            bool keep = false;
+            if (r < advParts.Length && advParts[r] != null)
+            {
+                var pair = advParts[r].Split('~');
+                if (pair.Length == 2)
+                {
+                    DateTime? end = null, start = null;
+                    if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var ed)) end = ed;
+                    if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var sd)) start = sd;
+                    var refDate = end ?? start;
+                    keep = refDate.HasValue && refDate.Value >= today;
+                }
+            }
+            if (!keep)
+            {
+                for (int c = 0; c < 4; c++)
+                    if (r * 4 + c < vals.Length) vals[r * 4 + c] = "";
+                if (r < advParts.Length) advParts[r] = "~";
+            }
+        }
+        string newData = string.Join("|", vals);
+        if (newData.Replace("|", "").Trim().Length == 0)
+        { Preferences.Remove(SetKey(slot)); Preferences.Remove(AdvDatesKey(slot)); }
+        else
+        { Preferences.Set(SetKey(slot), newData); Preferences.Set(AdvDatesKey(slot), string.Join("|", advParts)); }
     }
 }

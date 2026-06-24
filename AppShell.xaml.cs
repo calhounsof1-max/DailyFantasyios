@@ -26,7 +26,8 @@ public partial class AppShell : Shell
 	internal static readonly JackpotPage       JackpotPageInstance       = new();
 	internal static readonly CheckTicketPage   CheckTicketPageInstance   = new();
 	internal static readonly MyFavoritePage   MyFavoritePageInstance    = new();
-	internal static readonly AdvanceGamesPage AdvanceGamesPageInstance  = new();
+	internal static readonly AdvanceGamesPage    AdvanceGamesPageInstance    = new();
+	internal static readonly NotificationsPage   NotificationsPageInstance   = new();
 
 #if IOS
 	protected override void OnNavigated(ShellNavigatedEventArgs args)
@@ -74,6 +75,7 @@ public partial class AppShell : Shell
 		Routing.RegisterRoute(nameof(JackpotPage),       new SingletonRouteFactory(JackpotPageInstance));
 		Routing.RegisterRoute(nameof(CheckTicketPage),   new SingletonRouteFactory(CheckTicketPageInstance));
 		Routing.RegisterRoute(nameof(MyFavoritePage),    new SingletonRouteFactory(MyFavoritePageInstance));
-		Routing.RegisterRoute(nameof(AdvanceGamesPage),  new SingletonRouteFactory(AdvanceGamesPageInstance));
+		Routing.RegisterRoute(nameof(AdvanceGamesPage),   new SingletonRouteFactory(AdvanceGamesPageInstance));
+		Routing.RegisterRoute(nameof(NotificationsPage),  new SingletonRouteFactory(NotificationsPageInstance));
 	}
 }
