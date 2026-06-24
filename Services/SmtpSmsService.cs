@@ -13,7 +13,7 @@ public static class SmtpSmsService
 
     static readonly Dictionary<string, string> Gateways = new()
     {
-        ["att"]       = "txt.att.net",
+        ["att"]       = "mms.att.net",
         ["tmobile"]   = "tmomail.net",
         ["verizon"]   = "vtext.com",
         ["xfinity"]   = "vtext.com",   // Xfinity Mobile runs on Verizon's network
