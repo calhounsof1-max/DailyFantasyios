@@ -650,6 +650,7 @@ public partial class WinnerPage : ContentPage
                 ? Color.FromArgb("#2E7D32")
                 : Color.FromArgb("#C62828");
         }
+        UpdateAllResultBackgrounds();
     }
 
     // ── Button handlers ──────────────────────────────────────────────────────

@@ -2,9 +2,24 @@ namespace DailyFantasyMAUI;
 
 public partial class NotificationsPage : ContentPage
 {
-    const string PrefEnabled = "notif_enabled";
-    const string PrefDays    = "notif_days_ahead";
-    const string PrefTimes   = "notif_times";
+    static readonly (string Display, string Key)[] Carriers =
+    [
+        ("AT&T",        "att"),
+        ("T-Mobile",    "tmobile"),
+        ("Verizon",     "verizon"),
+        ("Sprint",      "sprint"),
+        ("Boost Mobile","boost"),
+        ("Cricket",     "cricket"),
+        ("Metro PCS",   "metro"),
+        ("US Cellular", "uscellular"),
+    ];
+
+    const string PrefEnabled    = "notif_enabled";
+    const string PrefDays       = "notif_days_ahead";
+    const string PrefSmsEnabled = "notif_sms_enabled";
+    const string PrefPhone      = "notif_phone";
+    const string PrefCarrier    = "notif_carrier";
+    const string PrefTimes      = "notif_times";
 
     static readonly (int Hour, string Label)[] TimeOptions =
     [
@@ -28,6 +43,9 @@ public partial class NotificationsPage : ContentPage
 
         switchEnabled.IsToggled = Preferences.Get(PrefEnabled, true);
         btnDaysAhead.Text       = Preferences.Get(PrefDays, 14).ToString();
+        switchSms.IsToggled     = Preferences.Get(PrefSmsEnabled, false);
+        entryPhone.Text         = Preferences.Get(PrefPhone, "");
+        UpdateCarrierButton(Preferences.Get(PrefCarrier, "att"));
         LoadSelectedHours();
         BuildTimeChips();
 
@@ -180,12 +198,55 @@ public partial class NotificationsPage : ContentPage
         UpdateStatus();
     }
 
+    // ── SMS toggle ───────────────────────────────────────────────────────────
+
+    void SwitchSms_Toggled(object sender, ToggledEventArgs e)
+    {
+        if (_loading) return;
+        Preferences.Set(PrefSmsEnabled, e.Value);
+        UpdateStatus();
+    }
+
+    // ── Phone number ─────────────────────────────────────────────────────────
+
+    void EntryPhone_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_loading) return;
+        string digits = new string(e.NewTextValue.Where(char.IsDigit).ToArray());
+        Preferences.Set(PrefPhone, digits);
+        UpdateStatus();
+    }
+
+    // ── Carrier picker ───────────────────────────────────────────────────────
+
+    async void BtnCarrier_Clicked(object sender, EventArgs e)
+    {
+        string? pick = await DisplayActionSheet("Select Carrier", "Cancel", null,
+            Carriers.Select(c => c.Display).ToArray());
+        if (pick == null || pick == "Cancel") return;
+
+        var match = Carriers.FirstOrDefault(c => c.Display == pick);
+        if (match == default) return;
+
+        Preferences.Set(PrefCarrier, match.Key);
+        UpdateCarrierButton(match.Key);
+        UpdateStatus();
+    }
+
+    void UpdateCarrierButton(string key)
+    {
+        var match = Carriers.FirstOrDefault(c => c.Key == key);
+        btnCarrier.Text = match != default ? match.Display : key;
+    }
+
     // ── Status summary ───────────────────────────────────────────────────────
 
     void UpdateStatus()
     {
         bool notifOn = Preferences.Get(PrefEnabled, true);
+        bool smsOn   = Preferences.Get(PrefSmsEnabled, false);
         int  days    = Preferences.Get(PrefDays, 14);
+        string phone = Preferences.Get(PrefPhone, "");
 
         string times = _selectedHours.Count == 0 ? "8 AM"
             : string.Join(", ", _selectedHours.OrderBy(h => h)
@@ -196,9 +257,19 @@ public partial class NotificationsPage : ContentPage
             lblStatus.Text      = "Notifications are OFF";
             lblStatus.TextColor = Color.FromArgb("#EF4444");
         }
+        else if (smsOn && phone.Length < 10)
+        {
+            lblStatus.Text      = $"SMS on — enter a valid phone number · {times}";
+            lblStatus.TextColor = Color.FromArgb("#F59E0B");
+        }
+        else if (smsOn)
+        {
+            lblStatus.Text      = $"ON · SMS to {phone} · {days}-day alert · {times}";
+            lblStatus.TextColor = Color.FromArgb("#059669");
+        }
         else
         {
-            lblStatus.Text      = $"ON · {days}-day alert · {times}";
+            lblStatus.Text      = $"ON · {days}-day alert · {times} · No SMS";
             lblStatus.TextColor = Color.FromArgb("#059669");
         }
     }
