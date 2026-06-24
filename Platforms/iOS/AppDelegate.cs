@@ -13,6 +13,8 @@ public class AppDelegate : MauiUIApplicationDelegate
 		// Request permission and restore any notifications wiped by reinstall
 		_ = iOSNotificationScheduler.RequestPermissionAsync();
 		_ = iOSNotificationScheduler.RescheduleIfEnabledAsync();
+		// Send daily SMS once per day when app is opened (iOS has no background SMS API)
+		_ = DailyFantasyMAUI.Services.SmtpSmsService.TrySendDailyIfNeededAsync();
 		return result;
 	}
 }

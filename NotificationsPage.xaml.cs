@@ -20,6 +20,8 @@ public partial class NotificationsPage : ContentPage
     const string PrefPhone      = "notif_phone";
     const string PrefCarrier    = "notif_carrier";
     const string PrefTimes      = "notif_times";
+    const string PrefGmail      = Services.SmtpSmsService.PrefGmail;
+    const string PrefGmailPw    = Services.SmtpSmsService.PrefGmailPw;
 
     static readonly (int Hour, string Label)[] TimeOptions =
     [
@@ -46,6 +48,8 @@ public partial class NotificationsPage : ContentPage
         switchSms.IsToggled     = Preferences.Get(PrefSmsEnabled, false);
         entryPhone.Text         = Preferences.Get(PrefPhone, "");
         UpdateCarrierButton(Preferences.Get(PrefCarrier, "att"));
+        entryGmail.Text         = Preferences.Get(PrefGmail, "");
+        entryGmailPw.Text       = Preferences.Get(PrefGmailPw, "");
         LoadSelectedHours();
         BuildTimeChips();
 
@@ -243,6 +247,61 @@ public partial class NotificationsPage : ContentPage
     {
         var match = Carriers.FirstOrDefault(c => c.Key == key);
         btnCarrier.Text = match != default ? match.Display : key;
+    }
+
+    // ── Gmail credentials ────────────────────────────────────────────────────
+
+    void EntryGmail_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_loading) return;
+        Preferences.Set(PrefGmail, e.NewTextValue.Trim());
+        UpdateStatus();
+    }
+
+    void EntryGmailPw_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_loading) return;
+        Preferences.Set(PrefGmailPw, e.NewTextValue);
+        UpdateStatus();
+    }
+
+    // ── Test SMS ─────────────────────────────────────────────────────────────
+
+    async void BtnTestSms_Clicked(object sender, EventArgs e)
+    {
+        string phone   = Preferences.Get(PrefPhone, "");
+        string carrier = Preferences.Get(PrefCarrier, "att");
+        string gmail   = Preferences.Get(PrefGmail, "");
+        string pw      = Preferences.Get(PrefGmailPw, "");
+
+        if (phone.Length < 10)
+        {
+            await DisplayAlert("Missing Info", "Enter a 10-digit phone number first.", "OK");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(gmail) || string.IsNullOrWhiteSpace(pw))
+        {
+            await DisplayAlert("Missing Info", "Enter your Gmail address and App Password first.", "OK");
+            return;
+        }
+
+        lblStatus.Text      = "Sending test SMS…";
+        lblStatus.TextColor = Color.FromArgb("#6B7280");
+
+        var (ok, error) = await Services.SmtpSmsService.SendAsync(
+            gmail, pw, phone, carrier, "Lottery Test SMS — your texts are working!");
+
+        if (ok)
+        {
+            lblStatus.Text      = "Test SMS sent! Check your messages in a few minutes.";
+            lblStatus.TextColor = Color.FromArgb("#059669");
+        }
+        else
+        {
+            lblStatus.Text      = $"SMS failed: {error}";
+            lblStatus.TextColor = Color.FromArgb("#EF4444");
+            await DisplayAlert("SMS Failed", $"{error}\n\nMake sure you're using a Gmail App Password, not your Gmail login.", "OK");
+        }
     }
 
     // ── Status summary ───────────────────────────────────────────────────────

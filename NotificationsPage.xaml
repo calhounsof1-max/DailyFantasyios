@@ -144,6 +144,43 @@
                                     Clicked="BtnCarrier_Clicked"/>
                         </Grid>
 
+                        <BoxView HeightRequest="1" BackgroundColor="#F3F4F6" Margin="0,2"/>
+
+                        <!-- Gmail address -->
+                        <Grid ColumnDefinitions="Auto,*" Padding="0,10" ColumnSpacing="10">
+                            <Label Grid.Column="0" Text="Gmail" FontSize="15"
+                                   TextColor="#1F2937" VerticalOptions="Center" WidthRequest="64"/>
+                            <Entry Grid.Column="1" x:Name="entryGmail"
+                                   Keyboard="Email" FontSize="15"
+                                   TextColor="#111827" BackgroundColor="#F9FAFB"
+                                   Placeholder="you@gmail.com" PlaceholderColor="#9CA3AF"
+                                   HeightRequest="40"
+                                   TextChanged="EntryGmail_TextChanged"/>
+                        </Grid>
+
+                        <BoxView HeightRequest="1" BackgroundColor="#F3F4F6" Margin="0,2"/>
+
+                        <!-- Gmail App Password -->
+                        <Grid ColumnDefinitions="Auto,*" Padding="0,10" ColumnSpacing="10">
+                            <Label Grid.Column="0" Text="App PW" FontSize="13"
+                                   TextColor="#1F2937" VerticalOptions="Center" WidthRequest="64"/>
+                            <Entry Grid.Column="1" x:Name="entryGmailPw"
+                                   IsPassword="True" FontSize="15"
+                                   TextColor="#111827" BackgroundColor="#F9FAFB"
+                                   Placeholder="Gmail App Password" PlaceholderColor="#9CA3AF"
+                                   HeightRequest="40"
+                                   TextChanged="EntryGmailPw_TextChanged"/>
+                        </Grid>
+
+                        <Label Text="Use a Gmail App Password (not your Gmail login). Go to myaccount.google.com → Security → App Passwords."
+                               FontSize="10" TextColor="#9CA3AF" Margin="0,0,0,6"/>
+
+                        <!-- Test SMS button -->
+                        <Button Text="Send Test SMS" FontSize="13" FontAttributes="Bold"
+                                BackgroundColor="#059669" TextColor="White"
+                                CornerRadius="8" HeightRequest="38" Margin="0,4,0,2"
+                                Clicked="BtnTestSms_Clicked"/>
+
                     </VerticalStackLayout>
                 </Frame>
 
