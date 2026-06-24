@@ -93,7 +93,7 @@
 
                 <!-- SMS Card -->
                 <Frame BackgroundColor="White" CornerRadius="12" BorderColor="#E5E7EB"
-                       Padding="16,12" HasShadow="False">
+                       Padding="16,12" HasShadow="False" IsVisible="False">
                     <VerticalStackLayout Spacing="0" x:Name="smsSection">
 
                         <Label Text="SMS TEXT ALERTS — DAILY" FontSize="11" FontAttributes="Bold"
