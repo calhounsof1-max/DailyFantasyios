@@ -53,9 +53,7 @@ public static class iOSNotificationScheduler
             var trigger = UNCalendarNotificationTrigger.CreateTrigger(dateComponents, repeats: true);
             var request = UNNotificationRequest.FromIdentifier($"{IdPrefix}{hour}", content, trigger);
 
-            var error = await center.AddNotificationRequestAsync(request);
-            if (error != null)
-                System.Diagnostics.Debug.WriteLine($"[iOS Notif] Error scheduling {hour}:00 — {error.LocalizedDescription}");
+            await center.AddNotificationRequestAsync(request);
         }
     }
 
