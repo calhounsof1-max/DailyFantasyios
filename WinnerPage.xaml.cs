@@ -165,6 +165,8 @@ public partial class WinnerPage : ContentPage
                     LoadEntries();
             }
             UpdateSlotPicker();
+            LoadAdvanceDates(_activeSlot);
+            UpdateAllResultBackgrounds();
             if (pendingRow >= 0)
                 _ = HighlightRow(pendingRow);
         });

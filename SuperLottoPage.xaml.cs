@@ -192,6 +192,8 @@ public partial class SuperLottoPage : ContentPage
                     LoadEntries();
             }
             UpdateSlotPicker();
+            LoadAdvanceDates(_activeSlot);
+            UpdateAllResultBackgrounds();
             if (pendingRow >= 0)
                 _ = HighlightRow(pendingRow);
         });
