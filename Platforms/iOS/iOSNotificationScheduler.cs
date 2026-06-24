@@ -4,14 +4,52 @@ using DailyFantasyMAUI.Services;
 
 namespace DailyFantasyMAUI;
 
+// Shows notifications even when the app is in the foreground
+class LotteryNotificationDelegate : UNUserNotificationCenterDelegate
+{
+    public override void WillPresentNotification(UNUserNotificationCenter center,
+        UNNotification notification, Action<UNNotificationPresentationOptions> completionHandler)
+        => completionHandler(UNNotificationPresentationOptions.Banner
+                           | UNNotificationPresentationOptions.Sound
+                           | UNNotificationPresentationOptions.Badge);
+}
+
 public static class iOSNotificationScheduler
 {
     const string IdPrefix = "lottery_daily_";
+    const string PrefEnabled = "notif_enabled";
+    const string PrefTimes   = "notif_times";
+
+    static readonly LotteryNotificationDelegate _delegate = new();
 
     public static async Task RequestPermissionAsync()
     {
+        UNUserNotificationCenter.Current.Delegate = _delegate;
         var (_, _) = await UNUserNotificationCenter.Current.RequestAuthorizationAsync(
             UNAuthorizationOptions.Alert | UNAuthorizationOptions.Sound | UNAuthorizationOptions.Badge);
+    }
+
+    /// Call on every app launch to restore scheduled notifications (wiped on reinstall).
+    public static async Task RescheduleIfEnabledAsync()
+    {
+        UNUserNotificationCenter.Current.Delegate = _delegate;
+        if (!Preferences.Get(PrefEnabled, true)) return;
+
+        bool enabled = await AreNotificationsEnabledAsync();
+        if (!enabled) return;
+
+        string raw = Preferences.Get(PrefTimes, "8");
+        var hours = raw.Split(',')
+            .Select(s => int.TryParse(s.Trim(), out int h) ? h : -1)
+            .Where(h => h >= 0)
+            .ToList();
+        if (hours.Count == 0) hours.Add(8);
+
+        // Only reschedule if no lottery notifications are already pending
+        var pending = await UNUserNotificationCenter.Current.GetPendingNotificationRequestsAsync();
+        bool alreadyScheduled = pending.Any(r => r.Identifier.StartsWith(IdPrefix));
+        if (!alreadyScheduled)
+            await ScheduleNotificationsAsync(hours);
     }
 
     public static async Task<bool> AreNotificationsEnabledAsync()
@@ -19,6 +57,11 @@ public static class iOSNotificationScheduler
         var settings = await UNUserNotificationCenter.Current.GetNotificationSettingsAsync();
         return settings.AuthorizationStatus == UNAuthorizationStatus.Authorized
             || settings.AuthorizationStatus == UNAuthorizationStatus.Provisional;
+    }
+
+    public static void CancelAll()
+    {
+        UNUserNotificationCenter.Current.RemoveAllPendingNotificationRequests();
     }
 
     /// Cancel all existing lottery alarms then schedule one daily repeating notification per hour.

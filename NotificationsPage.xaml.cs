@@ -74,11 +74,17 @@ public partial class NotificationsPage : ContentPage
 
     // ── Notification toggle ──────────────────────────────────────────────────
 
-    void SwitchEnabled_Toggled(object sender, ToggledEventArgs e)
+    async void SwitchEnabled_Toggled(object sender, ToggledEventArgs e)
     {
         if (_loading) return;
         Preferences.Set(PrefEnabled, e.Value);
         UpdateStatus();
+#if IOS
+        if (e.Value)
+            await iOSNotificationScheduler.ScheduleNotificationsAsync(_selectedHours);
+        else
+            iOSNotificationScheduler.CancelAll();
+#endif
     }
 
     // ── Days ahead ───────────────────────────────────────────────────────────

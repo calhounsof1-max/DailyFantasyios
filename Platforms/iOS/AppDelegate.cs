@@ -10,8 +10,9 @@ public class AppDelegate : MauiUIApplicationDelegate
 	public override bool FinishedLaunching(UIKit.UIApplication application, NSDictionary launchOptions)
 	{
 		var result = base.FinishedLaunching(application, launchOptions);
-		// Request notification permission silently on first launch
+		// Request permission and restore any notifications wiped by reinstall
 		_ = iOSNotificationScheduler.RequestPermissionAsync();
+		_ = iOSNotificationScheduler.RescheduleIfEnabledAsync();
 		return result;
 	}
 }
