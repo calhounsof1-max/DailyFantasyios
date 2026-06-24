@@ -41,14 +41,30 @@ jobs:
           echo "clang++ via wrapped xcodebuild: $(xcrun -sdk macosx -find clang++ 2>&1)"
 
           # The MAUI SDK check looks for a directory named iPhoneOS26.5.sdk.
-          # xcrun --sdk iphoneos returns iPhoneOS26.2.sdk (only installed SDK).
-          # Solution: symlink iPhoneOS26.5.sdk → iPhoneOS26.2.sdk so the check passes.
+          # Xcode 26.3: xcrun returns iPhoneOS26.2.sdk; we symlink iPhoneOS26.5.sdk → iPhoneOS26.2.sdk.
+          # Xcode 26.5: xcrun returns iPhoneOS26.5.sdk (a self-referential symlink we created), but
+          #             the REAL SDK is iPhoneOS.sdk — so we symlink iPhoneOS26.5.sdk → iPhoneOS.sdk.
           IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path 2>/dev/null)
           echo "iPhoneOS SDK path: $IOS_SDK"
           if [ -n "$IOS_SDK" ]; then
             SDK_PARENT=$(dirname "$IOS_SDK")
-            sudo ln -sfn "$IOS_SDK" "$SDK_PARENT/iPhoneOS26.5.sdk"
-            echo "Created symlink: $SDK_PARENT/iPhoneOS26.5.sdk -> $IOS_SDK"
+            TARGET="$SDK_PARENT/iPhoneOS26.5.sdk"
+            # Find the real (non-symlink) SDK directory to point at
+            BASE_SDK=""
+            for candidate in "$SDK_PARENT/iPhoneOS.sdk" "$IOS_SDK"; do
+              if [ -d "$candidate" ] && [ ! -L "$candidate" ] && [ "$candidate" != "$TARGET" ]; then
+                BASE_SDK="$candidate"
+                break
+              fi
+            done
+            echo "Real SDK to link: $BASE_SDK"
+            if [ -n "$BASE_SDK" ]; then
+              sudo rm -f "$TARGET"
+              sudo ln -sfn "$BASE_SDK" "$TARGET"
+              echo "Created symlink: $TARGET -> $BASE_SDK"
+            else
+              echo "Warning: could not find a real (non-circular) SDK to link to"
+            fi
             ls -la "$SDK_PARENT/" | grep iPhoneOS
           fi
 
