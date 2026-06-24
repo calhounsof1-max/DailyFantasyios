@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using DailyFantasyMAUI.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Application = Microsoft.Maui.Controls.Application;
 
 namespace DailyFantasyMAUI;
@@ -14,6 +15,10 @@ public partial class App : Application
 
 	protected override Window CreateWindow(IActivationState? activationState)
 	{
-		return new Window(new AppShell());
+		var window = new Window(new AppShell());
+		// Fire advance-play check after the window is ready
+		window.Created += (_, _) =>
+			Task.Run(() => AdvancePlayNotificationService.CheckAndNotify());
+		return window;
 	}
 }

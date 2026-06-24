@@ -144,6 +144,14 @@ public partial class MainPage : ContentPage
         HowMany.Unfocus();
         HideKeyboard();
 
+        // Show in-app alert for advance tickets expiring today or tomorrow (launch only)
+        if (AdvancePlayNotificationService.PendingLaunchTitle != null)
+        {
+            string title = AdvancePlayNotificationService.PendingLaunchTitle;
+            string body  = AdvancePlayNotificationService.PendingLaunchBody ?? "";
+            AdvancePlayNotificationService.ClearLaunchAlert();
+            await DisplayAlert(title, body, "OK");
+        }
     }
 
     protected override void OnDisappearing()
@@ -742,29 +750,39 @@ public partial class MainPage : ContentPage
     private void TabRecurrence_Clicked(object sender, EventArgs e) => vm.ActiveTab = 1;
     private void TabCombos_Clicked(object sender, EventArgs e) => vm.ActiveTab = 2;
 
-    private async void BtnMore_Clicked(object sender, EventArgs e)
+    private async void BtnOptions_Clicked(object sender, EventArgs e)
     {
-        string action = await DisplayActionSheet("More", "Cancel", null,
-            "History", "Recurrence", "Combos", "View Sets", "Archive", "Data Files", "Export Sets", "My Favorites", "Load Picks", "Refresh Data", "Jackpot Winners", "Voice Settings");
+        string action = await DisplayActionSheet("Options", "Cancel", null,
+            "History", "Recurrence", "Combos",
+            "Data Files", "My Favorites", "Load Picks");
         switch (action)
         {
-            case "History":      vm.ActiveTab = 0; break;
-            case "Recurrence":   vm.ActiveTab = 1; break;
-            case "Combos":       vm.ActiveTab = 2; break;
+            case "History":    vm.ActiveTab = 0; break;
+            case "Recurrence": vm.ActiveTab = 1; break;
+            case "Combos":     vm.ActiveTab = 2; break;
+            case "Data Files":   await Shell.Current.GoToAsync(nameof(DataViewerPage), false); break;
+            case "My Favorites": await Shell.Current.GoToAsync(nameof(MyFavoritePage), false); break;
+            case "Load Picks":   await Task.Delay(300); await LoadPicksFromFileAsync(); break;
+        }
+    }
+
+    private async void BtnAdvance_Clicked(object sender, EventArgs e)
+    {
+        string action = await DisplayActionSheet("Advance", "Cancel", null,
+            "View Sets", "Archive", "Export Sets", "Refresh Data",
+            "Jackpot Winners", "Voice Settings", "Games Expiration");
+        switch (action)
+        {
             case "View Sets":    BtnViewSets_Clicked(sender, e); break;
             case "Archive":      BtnArchive_Clicked(sender, e); break;
-            case "Data Files":   await Shell.Current.GoToAsync(nameof(DataViewerPage), false); break;
-            case "Export Sets":            await Task.Delay(300); await ExportAllSetsAsync(); break;
-            case "My Favorites":           await Shell.Current.GoToAsync(nameof(MyFavoritePage), false); break;
-            case "Load Picks":             await Task.Delay(300); await LoadPicksFromFileAsync(); break;
+            case "Export Sets":  await Task.Delay(300); await ExportAllSetsAsync(); break;
             case "Refresh Data": await vm.RefreshAllDataAsync(); break;
             case "Jackpot Winners":
                 AppShell.JackpotPageInstance.PrePosition(true);
                 await Shell.Current.GoToAsync(nameof(JackpotPage), false);
                 break;
-            case "Voice Settings":
-                await ShowVoiceSettingsAsync();
-                break;
+            case "Voice Settings":   await ShowVoiceSettingsAsync(); break;
+            case "Games Expiration": await Shell.Current.GoToAsync(nameof(AdvanceGamesPage), false); break;
         }
     }
 

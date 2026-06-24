@@ -303,20 +303,23 @@
         </Label>
 
         <!-- Row 9: Bottom bar -->
-        <Grid Grid.Row="9" ColumnDefinitions="*,*,*,*,*" HeightRequest="28" BackgroundColor="#1E2733">
+        <Grid Grid.Row="9" ColumnDefinitions="*,*,*,*,*,*" HeightRequest="28" BackgroundColor="#1E2733">
             <Button Grid.Column="0" Text="Results" FontSize="9" Padding="0" HeightRequest="28"
                     BackgroundColor="#2E7D32" TextColor="White"
                     Clicked="BtnResults_Clicked"/>
-            <Button Grid.Column="1" Text="☰ More" FontSize="9" Padding="0" HeightRequest="28"
+            <Button Grid.Column="1" Text="☰ Options" FontSize="9" Padding="0" HeightRequest="28"
                     BackgroundColor="#37474F" TextColor="White"
-                    Clicked="BtnMore_Clicked"/>
-            <Button Grid.Column="2" Text="💾 Save" FontSize="9" Padding="0" HeightRequest="28"
+                    Clicked="BtnOptions_Clicked"/>
+            <Button Grid.Column="2" Text="☰ Advance" FontSize="9" Padding="0" HeightRequest="28"
+                    BackgroundColor="#37474F" TextColor="#A78BFA"
+                    Clicked="BtnAdvance_Clicked"/>
+            <Button Grid.Column="3" Text="💾 Save" FontSize="9" Padding="0" HeightRequest="28"
                     BackgroundColor="#1565C0" TextColor="White"
                     Clicked="BtnSave_Clicked"/>
-            <Button Grid.Column="3" Text="🎲 Gen" FontSize="9" Padding="0" HeightRequest="28"
+            <Button Grid.Column="4" Text="🎲 Gen" FontSize="9" Padding="0" HeightRequest="28"
                     BackgroundColor="#5D4037" TextColor="White"
                     Clicked="BtnGenerateNumbers_Clicked"/>
-            <Button Grid.Column="4" Text="💰 Jack" FontSize="9" Padding="0" HeightRequest="28"
+            <Button Grid.Column="5" Text="💰 Jack" FontSize="9" Padding="0" HeightRequest="28"
                     BackgroundColor="#FF8F00" TextColor="White"
                     Clicked="BtnJackpot_Clicked"/>
         </Grid>
