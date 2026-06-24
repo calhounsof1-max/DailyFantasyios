@@ -161,7 +161,7 @@
                         <BoxView HeightRequest="1" BackgroundColor="#F3F4F6" Margin="0,2"/>
 
                         <!-- Gmail App Password -->
-                        <Grid ColumnDefinitions="Auto,*" Padding="0,10" ColumnSpacing="10">
+                        <Grid ColumnDefinitions="Auto,*,Auto" Padding="0,10" ColumnSpacing="10">
                             <Label Grid.Column="0" Text="App PW" FontSize="13"
                                    TextColor="#1F2937" VerticalOptions="Center" WidthRequest="64"/>
                             <Entry Grid.Column="1" x:Name="entryGmailPw"
@@ -170,6 +170,11 @@
                                    Placeholder="Gmail App Password" PlaceholderColor="#9CA3AF"
                                    HeightRequest="40"
                                    TextChanged="EntryGmailPw_TextChanged"/>
+                            <Button Grid.Column="2" x:Name="btnShowPw"
+                                    Text="👁" FontSize="16"
+                                    BackgroundColor="Transparent" TextColor="#6B7280"
+                                    WidthRequest="40" HeightRequest="40" Padding="0"
+                                    Clicked="BtnShowPw_Clicked"/>
                         </Grid>
 
                         <Label Text="Use a Gmail App Password (not your Gmail login). Go to myaccount.google.com → Security → App Passwords."

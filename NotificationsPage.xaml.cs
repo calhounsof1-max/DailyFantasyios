@@ -266,6 +266,12 @@ public partial class NotificationsPage : ContentPage
         UpdateStatus();
     }
 
+    void BtnShowPw_Clicked(object sender, EventArgs e)
+    {
+        entryGmailPw.IsPassword = !entryGmailPw.IsPassword;
+        btnShowPw.Text = entryGmailPw.IsPassword ? "👁" : "🙈";
+    }
+
     // ── Test SMS ─────────────────────────────────────────────────────────────
 
     async void BtnTestSms_Clicked(object sender, EventArgs e)
