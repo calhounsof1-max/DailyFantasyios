@@ -7,6 +7,7 @@ public partial class NotificationsPage : ContentPage
         ("AT&T",        "att"),
         ("T-Mobile",    "tmobile"),
         ("Verizon",     "verizon"),
+        ("Xfinity Mobile","xfinity"),
         ("Sprint",      "sprint"),
         ("Boost Mobile","boost"),
         ("Cricket",     "cricket"),

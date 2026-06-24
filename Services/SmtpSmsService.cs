@@ -16,6 +16,7 @@ public static class SmtpSmsService
         ["att"]       = "txt.att.net",
         ["tmobile"]   = "tmomail.net",
         ["verizon"]   = "vtext.com",
+        ["xfinity"]   = "vtext.com",   // Xfinity Mobile runs on Verizon's network
         ["sprint"]    = "messaging.sprintpcs.com",
         ["boost"]     = "sms.myboostmobile.com",
         ["cricket"]   = "sms.cricketwireless.net",
