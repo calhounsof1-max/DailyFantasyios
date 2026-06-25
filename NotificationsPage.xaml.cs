@@ -24,6 +24,25 @@ public partial class NotificationsPage : ContentPage
     const string PrefGmail      = Services.SmtpSmsService.PrefGmail;
     const string PrefGmailPw    = Services.SmtpSmsService.PrefGmailPw;
 
+    const string PrefWinEnabled         = "win_alert_enabled";
+    const string PrefWinTimes           = "win_check_times";
+    const string PrefWinMinAmount       = "win_min_amount";
+    const string PrefWinIntervalEnabled = "win_interval_enabled";
+    const string PrefWinIntervalStart   = "win_interval_start";
+    const string PrefWinIntervalMinutes = "win_interval_minutes";
+    const string PrefWinIntervalEnd     = "win_interval_end";
+
+    static readonly (int Minutes, string Label)[] IntervalOptions =
+    [
+        (15, "15 min"), (20, "20 min"), (30, "30 min"), (45, "45 min"), (60, "1 hr")
+    ];
+
+    static readonly (int Hour, string Label)[] IntervalHours =
+    [
+        (12,"12 PM"),(13,"1 PM"),(14,"2 PM"),(15,"3 PM"),(16,"4 PM"),(17,"5 PM"),
+        (18,"6 PM"),(19,"7 PM"),(20,"8 PM"),(21,"9 PM"),(22,"10 PM"),(23,"11 PM"),
+    ];
+
     static readonly (int Hour, string Label)[] TimeOptions =
     [
         ( 6,"6 AM"),( 7,"7 AM"),( 8,"8 AM"),( 9,"9 AM"),(10,"10 AM"),(11,"11 AM"),
@@ -31,7 +50,8 @@ public partial class NotificationsPage : ContentPage
         (18,"6 PM"),(19,"7 PM"),(20,"8 PM"),(21,"9 PM"),
     ];
 
-    HashSet<int> _selectedHours = [];
+    HashSet<int> _selectedHours    = [];
+    HashSet<int> _winSelectedHours = [];
     bool _loading = true;
 
     public NotificationsPage()
@@ -53,6 +73,16 @@ public partial class NotificationsPage : ContentPage
         entryGmailPw.Text       = Preferences.Get(PrefGmailPw, "");
         LoadSelectedHours();
         BuildTimeChips();
+
+        switchWinAlert.IsToggled    = Preferences.Get(PrefWinEnabled, true);
+        btnWinMinAmount.Text        = "$" + Preferences.Get(PrefWinMinAmount, 100).ToString();
+        LoadWinSelectedHours();
+        UpdateWinTimesSummary();
+
+        bool intervalOn             = Preferences.Get(PrefWinIntervalEnabled, false);
+        switchWinInterval.IsToggled = intervalOn;
+        intervalSettings.IsVisible  = intervalOn;
+        UpdateIntervalButtons();
 
         _loading = false;
         UpdateStatus();
@@ -309,6 +339,181 @@ public partial class NotificationsPage : ContentPage
             lblStatus.TextColor = Color.FromArgb("#EF4444");
             await DisplayAlert("SMS Failed", $"{error}\n\nMake sure you're using a Gmail App Password, not your Gmail login.", "OK");
         }
+    }
+
+    // ── Win alert settings ───────────────────────────────────────────────────
+
+    void SwitchWinAlert_Toggled(object sender, ToggledEventArgs e)
+    {
+        if (_loading) return;
+        Preferences.Set(PrefWinEnabled, e.Value);
+        UpdateStatus();
+    }
+
+    async void BtnWinMinAmount_Clicked(object sender, EventArgs e)
+    {
+        string? pick = await DisplayActionSheet("Alert when I win at least...", "Cancel", null,
+            "$10", "$25", "$50", "$100", "$200", "$500", "$1,000");
+        if (pick == null || pick == "Cancel") return;
+        string digits = new string(pick.Where(char.IsDigit).ToArray());
+        if (int.TryParse(digits, out int amount))
+        {
+            Preferences.Set(PrefWinMinAmount, amount);
+            btnWinMinAmount.Text = pick;
+            UpdateStatus();
+        }
+    }
+
+    void LoadWinSelectedHours()
+    {
+        string raw = Preferences.Get(PrefWinTimes, "18,19,20,21");
+        _winSelectedHours = [.. raw.Split(',')
+            .Select(s => int.TryParse(s.Trim(), out int h) ? h : -1)
+            .Where(h => h >= 0)];
+        if (_winSelectedHours.Count == 0)
+            _winSelectedHours = [18, 19, 20, 21];
+    }
+
+    void SaveWinSelectedHours()
+    {
+        Preferences.Set(PrefWinTimes, string.Join(",", _winSelectedHours.OrderBy(h => h)));
+    }
+
+    void UpdateWinTimesSummary()
+    {
+        lblWinTimesSummary.Text = string.Join(", ", _winSelectedHours.OrderBy(h => h)
+            .Select(h => TimeOptions.FirstOrDefault(t => t.Hour == h).Label ?? $"{h}:00"));
+    }
+
+    void WinTimesHeader_Tapped(object sender, TappedEventArgs e)
+    {
+        bool expanding = !winTimesChips.IsVisible;
+        winTimesChips.IsVisible = expanding;
+        lblWinTimesChevron.Text = expanding ? "▼" : "▶";
+        if (expanding) BuildWinTimeChips();
+    }
+
+    void BuildWinTimeChips()
+    {
+        winTimesChips.Children.Clear();
+        foreach (var (hour, label) in TimeOptions)
+        {
+            bool active = _winSelectedHours.Contains(hour);
+            var btn = new Button
+            {
+                Text             = label,
+                FontSize         = 12,
+                CornerRadius     = 16,
+                HeightRequest    = 32,
+                Padding          = new Thickness(10, 0),
+                Margin           = new Thickness(3, 3),
+                BackgroundColor  = active ? Color.FromArgb("#059669") : Color.FromArgb("#E5E7EB"),
+                TextColor        = active ? Colors.White : Color.FromArgb("#374151"),
+                CommandParameter = hour,
+            };
+            btn.Clicked += WinTimeChip_Clicked;
+            winTimesChips.Children.Add(btn);
+        }
+    }
+
+    void WinTimeChip_Clicked(object? sender, EventArgs e)
+    {
+        if (sender is not Button btn) return;
+        int hour = (int)btn.CommandParameter!;
+
+        if (_winSelectedHours.Contains(hour))
+        {
+            if (_winSelectedHours.Count <= 1) return;
+            _winSelectedHours.Remove(hour);
+            btn.BackgroundColor = Color.FromArgb("#E5E7EB");
+            btn.TextColor       = Color.FromArgb("#374151");
+        }
+        else
+        {
+            _winSelectedHours.Add(hour);
+            btn.BackgroundColor = Color.FromArgb("#059669");
+            btn.TextColor       = Colors.White;
+        }
+
+        SaveWinSelectedHours();
+        UpdateWinTimesSummary();
+        UpdateStatus();
+    }
+
+    async void BtnTestWinAlert_Clicked(object sender, EventArgs e)
+    {
+        int minAmt = Preferences.Get(PrefWinMinAmount, 100);
+        string title = "You Won $250 Today! 🎉";
+        string body  = $"• F5 S1R3: $250\n(Test — fires when you win ${minAmt}+)";
+
+#if IOS
+        var center = UserNotifications.UNUserNotificationCenter.Current;
+        var content = new UserNotifications.UNMutableNotificationContent
+        {
+            Title = title,
+            Body  = body,
+            Sound = UserNotifications.UNNotificationSound.Default,
+        };
+        var trigger = UserNotifications.UNTimeIntervalNotificationTrigger.CreateTrigger(2, repeats: false);
+        var request = UserNotifications.UNNotificationRequest.FromIdentifier("lottery_win_test", content, trigger);
+        await center.AddNotificationRequestAsync(request);
+#endif
+
+        await DisplayAlert("Test Sent", "Win alert notification will appear in ~2 seconds.", "OK");
+    }
+
+    // ── Interval check ───────────────────────────────────────────────────────
+
+    void UpdateIntervalButtons()
+    {
+        int start = Preferences.Get(PrefWinIntervalStart, 19);
+        int every = Preferences.Get(PrefWinIntervalMinutes, 30);
+        int end   = Preferences.Get(PrefWinIntervalEnd, 21);
+
+        btnIntervalStart.Text = IntervalHours.FirstOrDefault(h => h.Hour == start).Label ?? $"{start}:00";
+        btnIntervalEvery.Text = IntervalOptions.FirstOrDefault(o => o.Minutes == every).Label ?? $"{every} min";
+        btnIntervalEnd.Text   = IntervalHours.FirstOrDefault(h => h.Hour == end).Label ?? $"{end}:00";
+    }
+
+    void SwitchWinInterval_Toggled(object sender, ToggledEventArgs e)
+    {
+        if (_loading) return;
+        Preferences.Set(PrefWinIntervalEnabled, e.Value);
+        intervalSettings.IsVisible = e.Value;
+        UpdateStatus();
+    }
+
+    async void BtnIntervalStart_Clicked(object sender, EventArgs e)
+    {
+        string? pick = await DisplayActionSheet("Check from...", "Cancel", null,
+            IntervalHours.Select(h => h.Label).ToArray());
+        if (pick == null || pick == "Cancel") return;
+        var match = IntervalHours.FirstOrDefault(h => h.Label == pick);
+        if (match == default) return;
+        Preferences.Set(PrefWinIntervalStart, match.Hour);
+        btnIntervalStart.Text = match.Label;
+    }
+
+    async void BtnIntervalEvery_Clicked(object sender, EventArgs e)
+    {
+        string? pick = await DisplayActionSheet("Check every...", "Cancel", null,
+            IntervalOptions.Select(o => o.Label).ToArray());
+        if (pick == null || pick == "Cancel") return;
+        var match = IntervalOptions.FirstOrDefault(o => o.Label == pick);
+        if (match == default) return;
+        Preferences.Set(PrefWinIntervalMinutes, match.Minutes);
+        btnIntervalEvery.Text = match.Label;
+    }
+
+    async void BtnIntervalEnd_Clicked(object sender, EventArgs e)
+    {
+        string? pick = await DisplayActionSheet("Check until...", "Cancel", null,
+            IntervalHours.Select(h => h.Label).ToArray());
+        if (pick == null || pick == "Cancel") return;
+        var match = IntervalHours.FirstOrDefault(h => h.Label == pick);
+        if (match == default) return;
+        Preferences.Set(PrefWinIntervalEnd, match.Hour);
+        btnIntervalEnd.Text = match.Label;
     }
 
     // ── Status summary ───────────────────────────────────────────────────────
