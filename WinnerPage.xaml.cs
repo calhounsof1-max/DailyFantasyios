@@ -1006,13 +1006,14 @@ public partial class WinnerPage : ContentPage
 
     private bool SlotHasFutureAdvDate(int slot)
     {
-        var today = DateTime.Today;
+        var now   = DateTime.Now;
+        var today = now.Date;
         if (slot == _activeSlot)
         {
             for (int r = 0; r < Rows; r++)
             {
                 var refDate = _playEnd[r] ?? _playStart[r];
-                if (refDate.HasValue && refDate.Value >= today) return true;
+                if (refDate.HasValue && (refDate.Value.Date > today || (refDate.Value.Date == today && now.TimeOfDay < TimeSpan.FromHours(20)))) return true;
             }
             return false;
         }
@@ -1027,7 +1028,7 @@ public partial class WinnerPage : ContentPage
             if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var ed)) end = ed;
             if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var sd)) start = sd;
             var refDate = end ?? start;
-            if (refDate.HasValue && refDate.Value >= today) return true;
+            if (refDate.HasValue && (refDate.Value.Date > today || (refDate.Value.Date == today && now.TimeOfDay < TimeSpan.FromHours(20)))) return true;
         }
         return false;
     }
@@ -1041,7 +1042,8 @@ public partial class WinnerPage : ContentPage
         string advRaw = Preferences.Get(AdvDatesKey(slot), "");
         var advParts = string.IsNullOrEmpty(advRaw) ? new string[Rows] : advRaw.Split('|');
         if (advParts.Length < Rows) Array.Resize(ref advParts, Rows);
-        var today = DateTime.Today;
+        var now   = DateTime.Now;
+        var today = now.Date;
         for (int r = 0; r < Rows; r++)
         {
             bool keep = false;
@@ -1054,7 +1056,7 @@ public partial class WinnerPage : ContentPage
                     if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var ed)) end = ed;
                     if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var sd)) start = sd;
                     var refDate = end ?? start;
-                    keep = refDate.HasValue && refDate.Value >= today;
+                    keep = refDate.HasValue && (refDate.Value.Date > today || (refDate.Value.Date == today && now.TimeOfDay < TimeSpan.FromHours(20)));
                 }
             }
             if (!keep)

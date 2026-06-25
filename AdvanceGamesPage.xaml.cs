@@ -32,12 +32,13 @@ public partial class AdvanceGamesPage : ContentPage
     void BuildCards()
     {
         _container.Children.Clear();
-        var today = DateTime.Today;
+        var now   = DateTime.Now;
+        var today = now.Date;
         bool anyData = false;
 
         foreach (var game in Games)
         {
-            var entries = new List<(int Slot, int Row, DateTime? Start, DateTime? End, string[] Numbers)>();
+            var entries = new List<(int Slot, int Row, DateTime? Start, DateTime? End, string[] Numbers, string DrawFilter)>();
 
             for (int slot = 0; slot < 10; slot++)
             {
@@ -50,6 +51,15 @@ public partial class AdvanceGamesPage : ContentPage
                     : setRaw.Split('|');
                 if (setVals.Length < game.Cols * 10)
                     Array.Resize(ref setVals, game.Cols * 10);
+
+                // For Daily 3: read per-row draw filters to determine 1pm vs 8pm cutoff
+                string[] d3DfParts = Array.Empty<string>();
+                if (game.Prefix == "d3")
+                {
+                    string dfRaw = Preferences.Get($"d3_drawfilters_{slot}", "");
+                    if (!string.IsNullOrEmpty(dfRaw))
+                        d3DfParts = dfRaw.Split('|');
+                }
 
                 string[] advRows = advRaw.Split('|');
                 for (int r = 0; r < 10 && r < advRows.Length; r++)
@@ -73,13 +83,16 @@ public partial class AdvanceGamesPage : ContentPage
                         nums[c] = idx < setVals.Length ? (setVals[idx] ?? "").Trim() : "";
                     }
 
-                    entries.Add((slot, r, start, end, nums));
+                    string drawFilter = game.Prefix == "d3" && r < d3DfParts.Length
+                        ? (d3DfParts[r] ?? "B") : "B";
+
+                    entries.Add((slot, r, start, end, nums, drawFilter));
                 }
             }
 
             if (entries.Count == 0) continue;
             anyData = true;
-            _container.Children.Add(BuildGameCard(game, entries, today));
+            _container.Children.Add(BuildGameCard(game, entries, today, now));
         }
 
         if (!anyData)
@@ -96,11 +109,17 @@ public partial class AdvanceGamesPage : ContentPage
     }
 
     Frame BuildGameCard(GameDef game,
-        List<(int Slot, int Row, DateTime? Start, DateTime? End, string[] Numbers)> entries,
-        DateTime today)
+        List<(int Slot, int Row, DateTime? Start, DateTime? End, string[] Numbers, string DrawFilter)> entries,
+        DateTime today, DateTime now)
     {
+        TimeSpan CutoffFor(string df) =>
+            game.Prefix == "d3" && df == "M" ? TimeSpan.FromHours(13) : TimeSpan.FromHours(20);
+        bool IsActive(DateTime? refDate, string df) =>
+            refDate.HasValue && (refDate.Value.Date > today ||
+                (refDate.Value.Date == today && now.TimeOfDay < CutoffFor(df)));
+
         var accentColor = Color.FromArgb(game.AccentHex);
-        int active  = entries.Count(e => (e.End ?? e.Start) >= today);
+        int active  = entries.Count(e => IsActive(e.End ?? e.Start, e.DrawFilter));
         int expired = entries.Count - active;
 
         var stack    = new VerticalStackLayout { Spacing = 0 };
@@ -162,7 +181,7 @@ public partial class AdvanceGamesPage : ContentPage
 
         // ── Entry rows ─────────────────────────────────────────────────────
         bool first = true;
-        foreach (var (slot, row, start, end, nums) in entries
+        foreach (var (slot, row, start, end, nums, drawFilter) in entries
             .OrderBy(e => e.Slot).ThenBy(e => e.Row))
         {
             if (!first)
@@ -179,8 +198,8 @@ public partial class AdvanceGamesPage : ContentPage
             first = false;
 
             var refDate   = end ?? start;
-            bool isActive = refDate.HasValue && refDate.Value >= today;
-            int daysLeft  = refDate.HasValue ? (int)(refDate.Value - today).TotalDays : int.MinValue;
+            bool isActive = IsActive(refDate, drawFilter);
+            int daysLeft  = refDate.HasValue ? (int)(refDate.Value.Date - today).TotalDays : int.MinValue;
 
             string fromText = start.HasValue ? start.Value.ToString("M/d/yy") : "—";
             string toText   = end.HasValue   ? end.Value.ToString("M/d/yy")   : "—";

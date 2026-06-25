@@ -1258,33 +1258,47 @@ public partial class Daily3Page : ContentPage
 
     private bool SlotHasFutureAdvDate(int slot)
     {
-        var today = DateTime.Today;
+        var now   = DateTime.Now;
+        var today = now.Date;
         if (slot == _activeSlot)
         {
+            string dfRaw = Preferences.Get(DfKey(slot), "");
+            var dfParts = string.IsNullOrEmpty(dfRaw) ? new string[Rows] : dfRaw.Split('|');
             for (int r = 0; r < Rows; r++)
             {
                 var refDate = _playEnd[r] ?? _playStart[r];
-                if (refDate.HasValue && refDate.Value >= today) return true;
+                string df = r < dfParts.Length ? (dfParts[r] ?? "B") : "B";
+                TimeSpan cutoff = df == "M" ? TimeSpan.FromHours(13) : TimeSpan.FromHours(20);
+                if (refDate.HasValue && (refDate.Value.Date > today ||
+                    (refDate.Value.Date == today && now.TimeOfDay < cutoff))) return true;
             }
             return false;
         }
         if (string.IsNullOrEmpty(Preferences.Get(SetKey(slot), ""))) return false;
         string raw = Preferences.Get(AdvDatesKey(slot), "");
         if (string.IsNullOrEmpty(raw)) return false;
+        string dfRaw2 = Preferences.Get(DfKey(slot), "");
+        var dfParts2 = string.IsNullOrEmpty(dfRaw2) ? new string[Rows] : dfRaw2.Split('|');
+        int idx = 0;
         foreach (var part in raw.Split('|'))
         {
             var pair = part.Split('~');
-            if (pair.Length != 2) continue;
+            if (pair.Length != 2) { idx++; continue; }
             DateTime? end = null, start = null;
             if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var ed)) end = ed;
             if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var sd)) start = sd;
             var refDate = end ?? start;
-            if (refDate.HasValue && refDate.Value >= today) return true;
+            string df = idx < dfParts2.Length ? (dfParts2[idx] ?? "B") : "B";
+            TimeSpan cutoff = df == "M" ? TimeSpan.FromHours(13) : TimeSpan.FromHours(20);
+            if (refDate.HasValue && (refDate.Value.Date > today ||
+                (refDate.Value.Date == today && now.TimeOfDay < cutoff))) return true;
+            idx++;
         }
         return false;
     }
 
     private string AdvDatesKey(int slot) => $"d3_adv_{slot}";
+    private string DfKey(int slot)      => $"d3_drawfilters_{slot}";
     private void PartialClearSlot(int slot)
     {
         string raw = Preferences.Get(SetKey(slot), "");
@@ -1293,7 +1307,10 @@ public partial class Daily3Page : ContentPage
         string advRaw = Preferences.Get(AdvDatesKey(slot), "");
         var advParts = string.IsNullOrEmpty(advRaw) ? new string[Rows] : advRaw.Split('|');
         if (advParts.Length < Rows) Array.Resize(ref advParts, Rows);
-        var today = DateTime.Today;
+        var now   = DateTime.Now;
+        var today = now.Date;
+        string dfRaw = Preferences.Get(DfKey(slot), "");
+        var dfParts = string.IsNullOrEmpty(dfRaw) ? new string[Rows] : dfRaw.Split('|');
         for (int r = 0; r < Rows; r++)
         {
             bool keep = false;
@@ -1306,7 +1323,10 @@ public partial class Daily3Page : ContentPage
                     if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var ed)) end = ed;
                     if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var sd)) start = sd;
                     var refDate = end ?? start;
-                    keep = refDate.HasValue && refDate.Value >= today;
+                    string df = r < dfParts.Length ? (dfParts[r] ?? "B") : "B";
+                    TimeSpan cutoff = df == "M" ? TimeSpan.FromHours(13) : TimeSpan.FromHours(20);
+                    keep = refDate.HasValue && (refDate.Value.Date > today ||
+                        (refDate.Value.Date == today && now.TimeOfDay < cutoff));
                 }
             }
             if (!keep)
