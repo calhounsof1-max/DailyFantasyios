@@ -1,45 +1,43 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:ios="clr-namespace:Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;assembly=Microsoft.Maui.Controls"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="DailyFantasyMAUI.ViewSetsPage"
              Title="View Sets"
              Shell.NavBarIsVisible="False"
-             BackgroundColor="#1E2733"
-             ios:Page.UseSafeArea="false">
+             BackgroundColor="#F0F4F8">
 
-    <Grid BackgroundColor="#F0F4F8" RowDefinitions="Auto,*,Auto" x:Name="rootGrid">
+    <Grid RowDefinitions="Auto,*,Auto" x:Name="rootGrid">
 
         <!-- Header -->
-        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="8,6">
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="14,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Button Grid.Column="0" x:Name="btnBack" Text="← Back"
-                    FontSize="9" FontAttributes="Bold"
+                    FontSize="13" FontAttributes="Bold"
                     BackgroundColor="#FF8F00" TextColor="White"
-                    Padding="6,0" HeightRequest="28" CornerRadius="14"
+                    Padding="14,0" HeightRequest="34" CornerRadius="17"
                     Clicked="BtnBack_Clicked"/>
             <Label Grid.Column="1" Text="All Saved Sets"
-                   TextColor="White" FontSize="13" FontAttributes="Bold"
+                   TextColor="White" FontSize="15" FontAttributes="Bold"
                    VerticalOptions="Center" HorizontalOptions="Center"/>
             <Button Grid.Column="2" x:Name="btnCollapseAll" Text="⊟"
-                    FontSize="11" BackgroundColor="#2D3D50" TextColor="White"
-                    Padding="6,0" HeightRequest="28" CornerRadius="14"
+                    FontSize="14" BackgroundColor="#2D3D50" TextColor="White"
+                    Padding="10,0" HeightRequest="34" CornerRadius="17"
                     Clicked="BtnCollapseAll_Clicked"/>
         </Grid>
 
         <!-- Scrollable content -->
         <ScrollView Grid.Row="1">
-            <VerticalStackLayout x:Name="setsContainer" Spacing="0" Padding="0,4,0,4"/>
+            <VerticalStackLayout x:Name="setsContainer" Spacing="0" Padding="0,6,0,6"/>
         </ScrollView>
 
         <!-- Loading overlay -->
         <Grid Grid.Row="1" x:Name="loadingOverlay" IsVisible="False" BackgroundColor="#F0F4F8">
             <ActivityIndicator x:Name="loadingSpinner" IsRunning="False"
-                               Color="#1E2733" WidthRequest="36" HeightRequest="36"
+                               Color="#1E2733" WidthRequest="48" HeightRequest="48"
                                HorizontalOptions="Center" VerticalOptions="Center"/>
         </Grid>
 
@@ -47,37 +45,35 @@
         <Grid Grid.Row="2" BackgroundColor="#1E2733" ColumnDefinitions="*,Auto">
             <Label Grid.Column="0" x:Name="lblStatus"
                    Text="Sets loaded"
-                   TextColor="#8B9DC3" FontSize="9" Padding="10,4"
+                   TextColor="#8B9DC3" FontSize="12" Padding="14,5"
                    VerticalOptions="Center"/>
             <Button Grid.Column="1" Text="🎲 Generate"
-                    FontSize="9" FontAttributes="Bold"
+                    FontSize="12" FontAttributes="Bold"
                     BackgroundColor="#5D4037" TextColor="White"
-                    Padding="10,0" HeightRequest="36" CornerRadius="0"
+                    Padding="14,0" HeightRequest="46" CornerRadius="0"
                     Clicked="BtnGenerate_Clicked"/>
         </Grid>
 
         <!-- Edit row overlay -->
         <Grid Grid.Row="0" Grid.RowSpan="3" x:Name="editOverlay"
               BackgroundColor="#C0000000" IsVisible="False">
-            <Border BackgroundColor="White" Padding="16"
+            <Border BackgroundColor="White" Padding="20"
                     VerticalOptions="Center" HorizontalOptions="Fill"
-                    Margin="16,0" StrokeThickness="0"
-                    StrokeShape="RoundRectangle 14">
-                <VerticalStackLayout Spacing="10">
+                    Margin="20,0" StrokeThickness="0"
+                    StrokeShape="RoundRectangle 16">
+                <VerticalStackLayout Spacing="14">
                     <Label x:Name="editTitle" Text="Edit Row"
-                           FontSize="13" FontAttributes="Bold"
+                           FontSize="16" FontAttributes="Bold"
                            TextColor="#1E2733" HorizontalOptions="Center"/>
-                    <VerticalStackLayout x:Name="editFields" Spacing="6"/>
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8" Margin="0,3,0,0">
+                    <VerticalStackLayout x:Name="editFields" Spacing="8"/>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,4,0,0">
                         <Button Grid.Column="0" Text="Cancel"
                                 BackgroundColor="#78909C" TextColor="White"
-                                CornerRadius="16" HeightRequest="34"
-                                FontSize="9"
+                                CornerRadius="20" HeightRequest="44"
                                 Clicked="BtnEditCancel_Clicked"/>
                         <Button Grid.Column="1" Text="Save"
                                 BackgroundColor="#2E7D32" TextColor="White"
-                                CornerRadius="16" HeightRequest="34"
-                                FontSize="9"
+                                CornerRadius="20" HeightRequest="44"
                                 Clicked="BtnEditSave_Clicked"/>
                     </Grid>
                 </VerticalStackLayout>

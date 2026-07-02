@@ -1,13 +1,15 @@
+using DailyFantasyMAUI.Services;
+
 namespace DailyFantasyMAUI;
 
 public partial class NotificationsPage : ContentPage
 {
+    // Carrier display names → gateway domain keys (matches notify.ps1 list)
     static readonly (string Display, string Key)[] Carriers =
     [
         ("AT&T",        "att"),
         ("T-Mobile",    "tmobile"),
         ("Verizon",     "verizon"),
-        ("Xfinity Mobile","xfinity"),
         ("Sprint",      "sprint"),
         ("Boost Mobile","boost"),
         ("Cricket",     "cricket"),
@@ -15,22 +17,20 @@ public partial class NotificationsPage : ContentPage
         ("US Cellular", "uscellular"),
     ];
 
-    const string PrefEnabled    = "notif_enabled";
-    const string PrefDays       = "notif_days_ahead";
-    const string PrefSmsEnabled = "notif_sms_enabled";
-    const string PrefPhone      = "notif_phone";
-    const string PrefCarrier    = "notif_carrier";
-    const string PrefTimes      = "notif_times";
-    const string PrefGmail      = Services.SmtpSmsService.PrefGmail;
-    const string PrefGmailPw    = Services.SmtpSmsService.PrefGmailPw;
-
+    // Pref keys
+    const string PrefEnabled      = "notif_enabled";
+    const string PrefDays         = "notif_days_ahead";
+    const string PrefSmsEnabled   = "notif_sms_enabled";
+    const string PrefPhone        = "notif_phone";
+    const string PrefCarrier      = "notif_carrier";
+    const string PrefTimes        = "notif_times";       // comma-separated 24h hours e.g. "8,18"
     const string PrefWinEnabled         = "win_alert_enabled";
-    const string PrefWinTimes           = "win_check_times";
-    const string PrefWinMinAmount       = "win_min_amount";
-    const string PrefWinIntervalEnabled = "win_interval_enabled";
-    const string PrefWinIntervalStart   = "win_interval_start";
-    const string PrefWinIntervalMinutes = "win_interval_minutes";
-    const string PrefWinIntervalEnd     = "win_interval_end";
+    const string PrefWinTimes           = "win_check_times";      // default "18,19,20,21"
+    const string PrefWinMinAmount       = "win_min_amount";       // default 100
+    const string PrefWinIntervalEnabled = "win_interval_enabled"; // default false
+    const string PrefWinIntervalStart   = "win_interval_start";   // hour, default 19 (7 PM)
+    const string PrefWinIntervalMinutes = "win_interval_minutes"; // default 30
+    const string PrefWinIntervalEnd     = "win_interval_end";     // hour, default 21 (9 PM)
 
     static readonly (int Minutes, string Label)[] IntervalOptions =
     [
@@ -64,15 +64,13 @@ public partial class NotificationsPage : ContentPage
         base.OnAppearing();
         _loading = true;
 
-        switchEnabled.IsToggled = Preferences.Get(PrefEnabled, true);
-        btnDaysAhead.Text       = Preferences.Get(PrefDays, 14).ToString();
-        switchSms.IsToggled     = Preferences.Get(PrefSmsEnabled, false);
-        entryPhone.Text         = Preferences.Get(PrefPhone, "");
+        switchEnabled.IsToggled   = Preferences.Get(PrefEnabled, true);
+        btnDaysAhead.Text         = Preferences.Get(PrefDays, 14).ToString();
+        switchSms.IsToggled       = Preferences.Get(PrefSmsEnabled, false);
+        entryPhone.Text           = Preferences.Get(PrefPhone, "");
         UpdateCarrierButton(Preferences.Get(PrefCarrier, "att"));
-        entryGmail.Text         = Preferences.Get(PrefGmail, "");
-        entryGmailPw.Text       = Preferences.Get(PrefGmailPw, "");
         LoadSelectedHours();
-        BuildTimeChips();
+        UpdateNotifTimesSummary();
 
         switchWinAlert.IsToggled    = Preferences.Get(PrefWinEnabled, true);
         btnWinMinAmount.Text        = "$" + Preferences.Get(PrefWinMinAmount, 100).ToString();
@@ -86,40 +84,38 @@ public partial class NotificationsPage : ContentPage
 
         _loading = false;
         UpdateStatus();
-        _ = CheckPermissionBannerAsync();
+        CheckPermissionBanner();
     }
 
-    async Task CheckPermissionBannerAsync()
+    void CheckPermissionBanner()
     {
-#if IOS
-        bool enabled = await iOSNotificationScheduler.AreNotificationsEnabledAsync();
-        permBanner.IsVisible = !enabled;
+#if ANDROID
+        var nm = AndroidX.Core.App.NotificationManagerCompat.From(
+            Android.App.Application.Context);
+        permBanner.IsVisible = !nm.AreNotificationsEnabled();
 #endif
     }
 
     async void PermBanner_Tapped(object sender, TappedEventArgs e)
     {
-#if IOS
-        await UIKit.UIApplication.SharedApplication.OpenUrlAsync(
-            Foundation.NSUrl.FromString(UIKit.UIApplication.OpenSettingsUrlString)!,
-            new UIKit.UIApplicationOpenUrlOptions());
+#if ANDROID
+        var intent = new Android.Content.Intent(
+            Android.Provider.Settings.ActionAppNotificationSettings);
+        intent.PutExtra(Android.Provider.Settings.ExtraAppPackage,
+            Android.App.Application.Context.PackageName);
+        intent.AddFlags(Android.Content.ActivityFlags.NewTask);
+        Android.App.Application.Context.StartActivity(intent);
 #endif
         await Task.CompletedTask;
     }
 
     // ── Notification toggle ──────────────────────────────────────────────────
 
-    async void SwitchEnabled_Toggled(object sender, ToggledEventArgs e)
+    void SwitchEnabled_Toggled(object sender, ToggledEventArgs e)
     {
         if (_loading) return;
         Preferences.Set(PrefEnabled, e.Value);
         UpdateStatus();
-#if IOS
-        if (e.Value)
-            await iOSNotificationScheduler.ScheduleNotificationsAsync(_selectedHours);
-        else
-            iOSNotificationScheduler.CancelAll();
-#endif
     }
 
     // ── Days ahead ───────────────────────────────────────────────────────────
@@ -147,96 +143,56 @@ public partial class NotificationsPage : ContentPage
             return;
         }
 
-#if IOS
-        bool enabled = await iOSNotificationScheduler.AreNotificationsEnabledAsync();
-        if (!enabled)
+#if ANDROID
+        // Check if system-level notification permission is granted
+        var nmCompat = AndroidX.Core.App.NotificationManagerCompat.From(
+            Android.App.Application.Context);
+        if (!nmCompat.AreNotificationsEnabled())
         {
             bool goSettings = await DisplayAlert(
                 "Permission Required",
-                "Notifications are blocked by iOS.\n\nGo to Settings → Lottery → Notifications and turn them ON.",
+                "Notifications are blocked by Android.\n\nGo to Settings → Apps → Lottery → Notifications and turn them ON.",
                 "Open Settings", "Cancel");
             if (goSettings)
-                await UIKit.UIApplication.SharedApplication.OpenUrlAsync(
-                    Foundation.NSUrl.FromString(UIKit.UIApplication.OpenSettingsUrlString)!,
-                    new UIKit.UIApplicationOpenUrlOptions());
+            {
+                var intent = new Android.Content.Intent(
+                    Android.Provider.Settings.ActionAppNotificationSettings);
+                intent.PutExtra(Android.Provider.Settings.ExtraAppPackage,
+                    Android.App.Application.Context.PackageName);
+                intent.AddFlags(Android.Content.ActivityFlags.NewTask);
+                Android.App.Application.Context.StartActivity(intent);
+            }
             return;
         }
-
-        await iOSNotificationScheduler.ShowTestNotificationAsync();
 #endif
 
+        const string testMsg = "✓ Notifications are working!\nYou'll be alerted when advance play dates expire.";
+
+#if ANDROID
+        NotificationHelper.Show("Lottery — Test Notification", testMsg);
+#endif
+
+        // Always show an in-app confirmation so user knows the code ran
         await DisplayAlert("Notification Sent",
-            "A test notification will appear in ~2 seconds.\n\nIf you don't see it, check Settings → Lottery → Notifications.",
+            "A test notification was just posted.\n\nIf you don't see it:\n• Pull down from the top of your screen\n• Check Lottery is ON in Android Settings → Apps → Lottery → Notifications",
             "OK");
 
-        lblStatus.Text      = "Test notification sent — check your notification bar.";
-        lblStatus.TextColor = Color.FromArgb("#059669");
-    }
-
-    // ── Notification times ───────────────────────────────────────────────────
-
-    void LoadSelectedHours()
-    {
-        string raw = Preferences.Get(PrefTimes, "8");
-        _selectedHours = [.. raw.Split(',')
-            .Select(s => int.TryParse(s.Trim(), out int h) ? h : -1)
-            .Where(h => h >= 0)];
-        if (_selectedHours.Count == 0) _selectedHours.Add(8);
-    }
-
-    void SaveSelectedHours()
-    {
-        Preferences.Set(PrefTimes, string.Join(",", _selectedHours.OrderBy(h => h)));
-    }
-
-    void BuildTimeChips()
-    {
-        timesChips.Children.Clear();
-        foreach (var (hour, label) in TimeOptions)
+        // Also send a test SMS if enabled
+        bool smsOn = Preferences.Get(PrefSmsEnabled, false);
+        string phone = Preferences.Get(PrefPhone, "");
+        if (smsOn && phone.Length >= 10)
         {
-            bool active = _selectedHours.Contains(hour);
-            var btn = new Button
-            {
-                Text            = label,
-                FontSize        = 12,
-                CornerRadius    = 16,
-                HeightRequest   = 32,
-                Padding         = new Thickness(10, 0),
-                Margin          = new Thickness(3, 3),
-                BackgroundColor = active ? Color.FromArgb("#1E3A8A") : Color.FromArgb("#E5E7EB"),
-                TextColor       = active ? Colors.White : Color.FromArgb("#374151"),
-                CommandParameter = hour,
-            };
-            btn.Clicked += TimeChip_Clicked;
-            timesChips.Children.Add(btn);
-        }
-    }
-
-    async void TimeChip_Clicked(object? sender, EventArgs e)
-    {
-        if (sender is not Button btn) return;
-        int hour = (int)btn.CommandParameter!;
-
-        if (_selectedHours.Contains(hour))
-        {
-            if (_selectedHours.Count <= 1) return;
-            _selectedHours.Remove(hour);
-            btn.BackgroundColor = Color.FromArgb("#E5E7EB");
-            btn.TextColor       = Color.FromArgb("#374151");
+#if ANDROID
+            bool sent = SmsHelper.SendSms(phone, $"Lottery Test:\n{testMsg}");
+            lblStatus.Text      = sent ? $"Notification + SMS sent to {phone}!"
+                                       : "Notification sent. SMS failed — check Send SMS permission in Android settings.";
+#endif
         }
         else
         {
-            _selectedHours.Add(hour);
-            btn.BackgroundColor = Color.FromArgb("#1E3A8A");
-            btn.TextColor       = Colors.White;
+            lblStatus.Text = "Test notification sent — check your notification bar.";
         }
-
-        SaveSelectedHours();
-#if IOS
-        if (Preferences.Get(PrefEnabled, true))
-            await iOSNotificationScheduler.ScheduleNotificationsAsync(_selectedHours);
-#endif
-        UpdateStatus();
+        lblStatus.TextColor = Color.FromArgb("#059669");
     }
 
     // ── SMS toggle ───────────────────────────────────────────────────────────
@@ -280,65 +236,84 @@ public partial class NotificationsPage : ContentPage
         btnCarrier.Text = match != default ? match.Display : key;
     }
 
-    // ── Gmail credentials ────────────────────────────────────────────────────
+    // ── Notification times ───────────────────────────────────────────────────
 
-    void EntryGmail_TextChanged(object sender, TextChangedEventArgs e)
+    void LoadSelectedHours()
     {
-        if (_loading) return;
-        Preferences.Set(PrefGmail, e.NewTextValue.Trim());
-        UpdateStatus();
+        string raw = Preferences.Get(PrefTimes, "8");
+        _selectedHours = [.. raw.Split(',')
+            .Select(s => int.TryParse(s.Trim(), out int h) ? h : -1)
+            .Where(h => h >= 0)];
+        if (_selectedHours.Count == 0) _selectedHours.Add(8);
     }
 
-    void EntryGmailPw_TextChanged(object sender, TextChangedEventArgs e)
+    void SaveSelectedHours()
     {
-        if (_loading) return;
-        Preferences.Set(PrefGmailPw, e.NewTextValue);
-        UpdateStatus();
+        Preferences.Set(PrefTimes, string.Join(",", _selectedHours.OrderBy(h => h)));
     }
 
-    void BtnShowPw_Clicked(object sender, EventArgs e)
+    void UpdateNotifTimesSummary()
     {
-        entryGmailPw.IsPassword = !entryGmailPw.IsPassword;
-        btnShowPw.Text = entryGmailPw.IsPassword ? "👁" : "🙈";
+        lblNotifTimesSummary.Text = string.Join(", ", _selectedHours.OrderBy(h => h)
+            .Select(h => TimeOptions.FirstOrDefault(t => t.Hour == h).Label ?? $"{h}:00"));
     }
 
-    // ── Test SMS ─────────────────────────────────────────────────────────────
-
-    async void BtnTestSms_Clicked(object sender, EventArgs e)
+    void NotifTimesHeader_Tapped(object sender, TappedEventArgs e)
     {
-        string phone   = Preferences.Get(PrefPhone, "");
-        string carrier = Preferences.Get(PrefCarrier, "att");
-        string gmail   = Preferences.Get(PrefGmail, "");
-        string pw      = Preferences.Get(PrefGmailPw, "");
+        bool expanding = !timesChips.IsVisible;
+        timesChips.IsVisible = expanding;
+        lblNotifTimesChevron.Text = expanding ? "▼" : "▶";
+        if (expanding) BuildTimeChips();
+    }
 
-        if (phone.Length < 10)
+    void BuildTimeChips()
+    {
+        timesChips.Children.Clear();
+        foreach (var (hour, label) in TimeOptions)
         {
-            await DisplayAlert("Missing Info", "Enter a 10-digit phone number first.", "OK");
-            return;
+            bool active = _selectedHours.Contains(hour);
+            var btn = new Button
+            {
+                Text             = label,
+                FontSize         = 12,
+                CornerRadius     = 16,
+                HeightRequest    = 32,
+                Padding          = new Thickness(10, 0),
+                Margin           = new Thickness(3, 3),
+                BackgroundColor  = active ? Color.FromArgb("#1E3A8A") : Color.FromArgb("#E5E7EB"),
+                TextColor        = active ? Colors.White : Color.FromArgb("#374151"),
+                CommandParameter = hour,
+            };
+            btn.Clicked += TimeChip_Clicked;
+            timesChips.Children.Add(btn);
         }
-        if (string.IsNullOrWhiteSpace(gmail) || string.IsNullOrWhiteSpace(pw))
+    }
+
+    void TimeChip_Clicked(object? sender, EventArgs e)
+    {
+        if (sender is not Button btn) return;
+        int hour = (int)btn.CommandParameter!;
+
+        if (_selectedHours.Contains(hour))
         {
-            await DisplayAlert("Missing Info", "Enter your Gmail address and App Password first.", "OK");
-            return;
-        }
-
-        lblStatus.Text      = "Sending test SMS…";
-        lblStatus.TextColor = Color.FromArgb("#6B7280");
-
-        var (ok, error) = await Services.SmtpSmsService.SendAsync(
-            gmail, pw, phone, carrier, "Lottery Test SMS — your texts are working!");
-
-        if (ok)
-        {
-            lblStatus.Text      = "Test SMS sent! Check your messages in a few minutes.";
-            lblStatus.TextColor = Color.FromArgb("#059669");
+            if (_selectedHours.Count <= 1) return;
+            _selectedHours.Remove(hour);
+            btn.BackgroundColor = Color.FromArgb("#E5E7EB");
+            btn.TextColor       = Color.FromArgb("#374151");
         }
         else
         {
-            lblStatus.Text      = $"SMS failed: {error}";
-            lblStatus.TextColor = Color.FromArgb("#EF4444");
-            await DisplayAlert("SMS Failed", $"{error}\n\nMake sure you're using a Gmail App Password, not your Gmail login.", "OK");
+            _selectedHours.Add(hour);
+            btn.BackgroundColor = Color.FromArgb("#1E3A8A");
+            btn.TextColor       = Colors.White;
         }
+
+        SaveSelectedHours();
+        UpdateNotifTimesSummary();
+#if ANDROID
+        AlarmScheduler.ScheduleAlarms(_selectedHours);
+#endif
+        UpdateStatus();
     }
 
     // ── Win alert settings ───────────────────────────────────────────────────
@@ -377,6 +352,9 @@ public partial class NotificationsPage : ContentPage
     void SaveWinSelectedHours()
     {
         Preferences.Set(PrefWinTimes, string.Join(",", _winSelectedHours.OrderBy(h => h)));
+#if ANDROID
+        WinCheckScheduler.ScheduleAlarms();
+#endif
     }
 
     void UpdateWinTimesSummary()
@@ -446,20 +424,24 @@ public partial class NotificationsPage : ContentPage
         string title = "You Won $250 Today! 🎉";
         string body  = $"• F5 S1R3: $250\n(Test — fires when you win ${minAmt}+)";
 
-#if IOS
-        var center = UserNotifications.UNUserNotificationCenter.Current;
-        var content = new UserNotifications.UNMutableNotificationContent
-        {
-            Title = title,
-            Body  = body,
-            Sound = UserNotifications.UNNotificationSound.Default,
-        };
-        var trigger = UserNotifications.UNTimeIntervalNotificationTrigger.CreateTrigger(2, repeats: false);
-        var request = UserNotifications.UNNotificationRequest.FromIdentifier("lottery_win_test", content, trigger);
-        await center.AddNotificationRequestAsync(request);
-#endif
+#if ANDROID
+        NotificationHelper.ShowWin(title, body);
 
-        await DisplayAlert("Test Sent", "Win alert notification will appear in ~2 seconds.", "OK");
+        bool smsOn = Preferences.Get(PrefSmsEnabled, false);
+        string phone = Preferences.Get(PrefPhone, "");
+        if (smsOn && phone.Length >= 10)
+        {
+            bool sent = SmsHelper.SendSms(phone, $"Lottery Win Alert!\n{title}\n{body}");
+            await DisplayAlert("Test Sent",
+                sent ? $"Notification + SMS sent to {phone}!"
+                     : "Notification sent. SMS failed — check Send SMS permission in Android settings.",
+                "OK");
+            return;
+        }
+#endif
+        await DisplayAlert("Test Sent",
+            "Notification posted.\n\nTo also get SMS: enable 'Send SMS Texts' and enter your phone number in the SMS section.",
+            "OK");
     }
 
     // ── Interval check ───────────────────────────────────────────────────────
@@ -480,6 +462,9 @@ public partial class NotificationsPage : ContentPage
         if (_loading) return;
         Preferences.Set(PrefWinIntervalEnabled, e.Value);
         intervalSettings.IsVisible = e.Value;
+#if ANDROID
+        WinCheckScheduler.ScheduleAlarms();
+#endif
         UpdateStatus();
     }
 
@@ -492,6 +477,9 @@ public partial class NotificationsPage : ContentPage
         if (match == default) return;
         Preferences.Set(PrefWinIntervalStart, match.Hour);
         btnIntervalStart.Text = match.Label;
+#if ANDROID
+        WinCheckScheduler.ScheduleAlarms();
+#endif
     }
 
     async void BtnIntervalEvery_Clicked(object sender, EventArgs e)
@@ -503,6 +491,9 @@ public partial class NotificationsPage : ContentPage
         if (match == default) return;
         Preferences.Set(PrefWinIntervalMinutes, match.Minutes);
         btnIntervalEvery.Text = match.Label;
+#if ANDROID
+        WinCheckScheduler.ScheduleAlarms();
+#endif
     }
 
     async void BtnIntervalEnd_Clicked(object sender, EventArgs e)
@@ -514,6 +505,9 @@ public partial class NotificationsPage : ContentPage
         if (match == default) return;
         Preferences.Set(PrefWinIntervalEnd, match.Hour);
         btnIntervalEnd.Text = match.Label;
+#if ANDROID
+        WinCheckScheduler.ScheduleAlarms();
+#endif
     }
 
     // ── Status summary ───────────────────────────────────────────────────────

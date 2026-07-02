@@ -10,7 +10,10 @@ public partial class MainPage : ContentPage
     bool _isRestoring = false;
     bool _initialized = false;
     bool _isPanning = false;
+    bool _boxesDirty = false; // true only after user edits a box; cleared after Save adds to list
+    bool _savingPick = false; // suppresses History_SelectionChanged during Save
     Entry[] _boxes = null!;
+    System.Collections.ObjectModel.ObservableCollection<string>? _picksRef;
 
     public MainPage()
     {
@@ -19,7 +22,7 @@ public partial class MainPage : ContentPage
         cmbRecurrence.SelectedIndex = 0;
 
         foreach (var entry in new[] { Box1, Box2, Box3, Box4, Box5, Box6, Box7,
-                                      Box8, Box9, Box10, Box11, Box12,
+                                      Box8, Box9, Box10, Box11, Box12, Box13, Box14, Box15,
                                       MaxNum, HowMany })
             entry.HandlerChanged += ForceBlackText;
     }
@@ -65,6 +68,23 @@ public partial class MainPage : ContentPage
 #endif
     }
 
+    string PicksAutoSavePath => Path.Combine(FileSystem.AppDataDirectory,
+        $"_autosave_{(_mode == 1 ? "SL" : _mode == 2 ? "D3" : "F5")}.txt");
+
+    void ReHookPicksAutoSave()
+    {
+        if (_picksRef != null)
+            _picksRef.CollectionChanged -= OnPicksAutoSave;
+        _picksRef = vm.Picks;
+        _picksRef.CollectionChanged += OnPicksAutoSave;
+    }
+
+    void OnPicksAutoSave(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        if (_showingDraws) return;
+        try { File.WriteAllLines(PicksAutoSavePath, vm.Picks); } catch { }
+    }
+
     static void HideKeyboard()
     {
 #if ANDROID
@@ -94,13 +114,28 @@ public partial class MainPage : ContentPage
         }
         _initialized = true;
 
-        _boxes = new[] { Box1, Box2, Box3, Box4, Box5, Box6, Box7, Box8, Box9, Box10, Box11, Box12 };
+        // Auto-purge expired advance plays on every app open
+        _ = CheckAutoPurgeOnStartupAsync();
+
+        // One-time: clear old bundled/hardcoded picks from autosave files
+        if (!Preferences.Get("picks_cleared_v2", false))
+        {
+            foreach (var name in new[] { "_autosave_F5.txt", "_autosave_SL.txt", "_autosave_D3.txt" })
+            {
+                var path = Path.Combine(FileSystem.AppDataDirectory, name);
+                if (File.Exists(path)) File.Delete(path);
+            }
+            Preferences.Set("picks_cleared_v2", true);
+        }
+
+        _boxes = new[] { Box1, Box2, Box3, Box4, Box5, Box6, Box7, Box8, Box9, Box10, Box11, Box12, Box13, Box14, Box15 };
         for (int i = 0; i < _boxes.Length; i++)
         {
             int idx = i;
             _boxes[i].TextChanged += (_, _) =>
             {
                 if (_isRestoring) return;
+                _boxesDirty = true;
                 SavePreferences();
                 int advanceLen = _mode == 2 ? 1 : 2;
                 if (_boxes[idx].Text?.Length == advanceLen && idx + 1 < _boxes.Length)
@@ -113,22 +148,18 @@ public partial class MainPage : ContentPage
         RestorePreferences();
         _isRestoring = false;
         await vm.LoadDataAsync();
-        await vm.LoadPicksAsync(_mode);
-        var comboMeta = await vm.LoadSavedCombosAsync();
-        if (comboMeta is { } meta)
+        // Pre-warm Results cache in background so Results page loads instantly
+        _ = ResultsPageCls.LoadAllDrawsAsync();
+        // Load only the user's previously saved picks (autosave); start empty if none
+        if (File.Exists(PicksAutoSavePath))
         {
-            _isRestoring = true;
-            try
-            {
-                for (int i = 0; i < meta.Boxes.Length && i < _boxes.Length; i++)
-                    _boxes[i].Text = meta.Boxes[i];
-                MaxNum.Text = meta.MaxNum;
-            }
-            finally { _isRestoring = false; }
+            var saved = await File.ReadAllLinesAsync(PicksAutoSavePath);
+            vm.Picks = new System.Collections.ObjectModel.ObservableCollection<string>(saved);
         }
-        // Enforce mode-correct PICK/FROM — combos restore may have overwritten them
-        if (_mode == 2) { MaxNum.Text = "3"; if (string.IsNullOrEmpty(Preferences.Get("howmany", ""))) HowMany.Text = "9"; }
-        else if (_mode == 1) { MaxNum.Text = "6"; if (string.IsNullOrEmpty(Preferences.Get("howmany", ""))) HowMany.Text = "47"; }
+        ReHookPicksAutoSave();
+        // Enforce mode-correct PICK/FROM
+        if (_mode == 2) { MaxNum.Text = "3"; }
+        else if (_mode == 1) { MaxNum.Text = "6"; }
         UpdateBoxMaxLength(_mode);
         UpdateCombosLabel();
         if (int.TryParse(HowMany.Text, out int from)) HighlightBoxes(from);
@@ -145,12 +176,13 @@ public partial class MainPage : ContentPage
         HideKeyboard();
 
         // Show in-app alert for advance tickets expiring today or tomorrow (launch only)
+        AdvancePlayNotificationService.CheckAndNotify();
         if (AdvancePlayNotificationService.PendingLaunchTitle != null)
         {
             string title = AdvancePlayNotificationService.PendingLaunchTitle;
             string body  = AdvancePlayNotificationService.PendingLaunchBody ?? "";
             AdvancePlayNotificationService.ClearLaunchAlert();
-            await DisplayAlert(title, body, "OK");
+            try { await DisplayAlert(title, body, "OK"); } catch { }
         }
     }
 
@@ -158,6 +190,7 @@ public partial class MainPage : ContentPage
     {
         base.OnDisappearing();
         SavePreferences();
+        try { File.WriteAllLines(PicksAutoSavePath, vm.Picks); } catch { }
     }
 
     private void SavePreferences()
@@ -211,7 +244,6 @@ public partial class MainPage : ContentPage
         if (_mode == mode) return;
         _mode = mode;
         MaxNum.Text  = mode == 2 ? "3" : mode == 1 ? "6" : "5";
-        HowMany.Text = mode == 0 ? "39" : mode == 1 ? "47" : "9";
         Preferences.Set("gameMode", _mode);
         UpdateModeButtons();
         UpdateRecurrencePicker(mode);
@@ -219,7 +251,16 @@ public partial class MainPage : ContentPage
         btnInsertToWinner.Text = mode == 0 ? "Insert Combos → F5 Winner"
                                 : mode == 1 ? "Insert Combos → SL Winner"
                                 :              "Insert Combos → Daily 3";
-        await vm.LoadPicksAsync(_mode);
+        if (File.Exists(PicksAutoSavePath))
+        {
+            var saved = await File.ReadAllLinesAsync(PicksAutoSavePath);
+            vm.Picks = new System.Collections.ObjectModel.ObservableCollection<string>(saved);
+        }
+        else
+        {
+            vm.Picks = new System.Collections.ObjectModel.ObservableCollection<string>();
+        }
+        ReHookPicksAutoSave();
         UpdateCombosLabel();
     }
 
@@ -231,6 +272,13 @@ public partial class MainPage : ContentPage
 
     private void History_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_savingPick) return;
+        if (_deleteMode)
+        {
+            int count = lstHistory.SelectedItems?.Count ?? 0;
+            lblDeleteCount.Text = count == 0 ? "Tap items to select" : $"{count} selected";
+            return;
+        }
         if (e.CurrentSelection?.Count == 0) return;
         var selected = e.CurrentSelection[0]?.ToString();
         if (selected == null) return;
@@ -247,6 +295,7 @@ public partial class MainPage : ContentPage
             int count = _mode == 1 ? 6 : isFiveNum ? 5 : 3;
             for (int i = 0; i < count && i < _boxes.Length && i < parts.Length; i++)
                 _boxes[i].Text = parts[i];
+            _boxesDirty = false; // selecting an item to view doesn't arm Save
         }
 
         int idx = vm.Picks.IndexOf(selected);
@@ -272,6 +321,12 @@ public partial class MainPage : ContentPage
 
     private void Combos_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_deletingCombos)
+        {
+            int count = lstCombos.SelectedItems?.Count ?? 0;
+            lblDeleteCount.Text = count == 0 ? "Tap items to select" : $"{count} selected";
+            return;
+        }
         if (e.CurrentSelection?.Count == 0) return;
         var selected = e.CurrentSelection[0]?.ToString();
         if (selected == null) return;
@@ -368,6 +423,99 @@ public partial class MainPage : ContentPage
         }
     }
 
+    // ── Delete from overlay (single item) ────────────────────────────────────
+
+    private void DeleteFromOverlay_Clicked(object sender, EventArgs e)
+    {
+        if (_reorderCollection != null && _reorderListIdx >= 0 && _reorderListIdx < _reorderCollection.Count)
+        {
+            string deleted = _reorderCollection[_reorderListIdx];
+            _reorderCollection.RemoveAt(_reorderListIdx);
+            vm.StatusMessage = $"Deleted: {deleted.Trim()}";
+        }
+        reorderOverlay.IsVisible = false;
+        _reorderSourceList?.ClearValue(CollectionView.SelectedItemProperty);
+    }
+
+    // ── Multi-delete mode ─────────────────────────────────────────────────────
+
+    bool _deleteMode = false;
+    bool _deletingCombos = false;
+
+    void EnterDeleteMode()
+    {
+        if (_showingDraws) { vm.StatusMessage = "Switch to My Picks to delete items"; return; }
+        _deleteMode = true;
+        _deletingCombos = vm.ActiveTab == 2;
+        if (_deletingCombos)
+        {
+            lstCombos.SelectionMode = SelectionMode.Multiple;
+        }
+        else
+        {
+            vm.ActiveTab = 0;
+            lstHistory.SelectionMode = SelectionMode.Multiple;
+        }
+        lblDeleteCount.Text = "Tap items to select";
+        deleteModeBar.IsVisible = true;
+    }
+
+    private void ExitDeleteMode_Clicked(object sender, EventArgs e)
+    {
+        _deleteMode = false;
+        if (_deletingCombos)
+        {
+            lstCombos.SelectionMode = SelectionMode.Single;
+            lstCombos.ClearValue(CollectionView.SelectedItemsProperty);
+        }
+        else
+        {
+            lstHistory.SelectionMode = SelectionMode.Single;
+            lstHistory.ClearValue(CollectionView.SelectedItemsProperty);
+        }
+        _deletingCombos = false;
+        deleteModeBar.IsVisible = false;
+    }
+
+    private async void DeleteSelectedItems_Clicked(object sender, EventArgs e)
+    {
+        if (_deletingCombos)
+        {
+            var selected = lstCombos.SelectedItems?.Cast<string>().ToList();
+            if (selected == null || selected.Count == 0)
+            {
+                vm.StatusMessage = "Tap items in the list to select them first";
+                return;
+            }
+            bool confirm = await DisplayAlert("Delete", $"Delete {selected.Count} combo(s)?", "Delete", "Cancel");
+            if (!confirm) return;
+
+            foreach (var item in selected)
+                vm.Combinations.Remove(item);
+
+            vm.StatusMessage = $"Deleted {selected.Count} combo(s) — {vm.Combinations.Count} remaining";
+            lstCombos.ClearValue(CollectionView.SelectedItemsProperty);
+            lblDeleteCount.Text = "Tap items to select";
+            return;
+        }
+
+        var selectedPicks = lstHistory.SelectedItems?.Cast<string>().ToList();
+        if (selectedPicks == null || selectedPicks.Count == 0)
+        {
+            vm.StatusMessage = "Tap items in the list to select them first";
+            return;
+        }
+        bool confirmPicks = await DisplayAlert("Delete", $"Delete {selectedPicks.Count} item(s)?", "Delete", "Cancel");
+        if (!confirmPicks) return;
+
+        foreach (var item in selectedPicks)
+            vm.Picks.Remove(item);
+
+        vm.StatusMessage = $"Deleted {selectedPicks.Count} item(s) — {vm.Picks.Count} remaining";
+        lstHistory.ClearValue(CollectionView.SelectedItemsProperty);
+        lblDeleteCount.Text = "Tap items to select";
+    }
+
     private void ReorderCancel_Clicked(object sender, EventArgs e)
     {
         reorderOverlay.IsVisible = false;
@@ -397,11 +545,18 @@ public partial class MainPage : ContentPage
 
     private void HowMany_TextChanged(object sender, TextChangedEventArgs e)
     {
-        UpdateCombosLabel();
         if (int.TryParse(HowMany.Text, out int n))
+        {
+            if (n > 15)
+            {
+                HowMany.Text = "15";
+                return;
+            }
             HighlightBoxes(n);
+        }
         else
             HighlightBoxes(0);
+        UpdateCombosLabel();
     }
 
     private void UpdateCombosLabel()
@@ -415,7 +570,10 @@ public partial class MainPage : ContentPage
     {
         if (_boxes == null) return;
         for (int i = 0; i < _boxes.Length; i++)
-            _boxes[i].BackgroundColor = (i < count) ? Color.FromArgb("#FFF176") : Colors.White;
+        {
+            _boxes[i].BackgroundColor = (i < count) ? Color.FromArgb("#FFF176") : Color.FromArgb("#D6E8FF");
+            _boxes[i].TextColor       = Colors.Black;
+        }
     }
 
     // ── Clear ─────────────────────────────────────────────────────────────────
@@ -424,33 +582,112 @@ public partial class MainPage : ContentPage
     {
         if (_boxes == null) return;
         foreach (var box in _boxes) box.Text = "";
-        HighlightBoxes(0);
+        int.TryParse(HowMany.Text, out int from);
+        HighlightBoxes(from);
     }
 
-    // ── Quick Pick ────────────────────────────────────────────────────────────
+    // ── Smart Quick Pick ──────────────────────────────────────────────────────
 
-    private async void BtnQuickPick_Clicked(object sender, EventArgs e)
+    int _qpStrategy = 0; // 0=Hot, 1=Cold, 2=MostFreq, 3=LeastFreq, 4=Gap
+
+    private void BtnQuickPick_Clicked(object sender, EventArgs e)
     {
         if (_boxes == null) return;
         string gameName = _mode == 0 ? "Fantasy 5" : _mode == 1 ? "Super Lotto" : "Daily 3";
-        bool ok = await DisplayAlert("Quick Pick", $"Fill boxes with random {gameName} numbers?", "Yes", "Cancel");
-        if (!ok) return;
-        var rng = Random.Shared;
-        if (_mode == 0) // Fantasy 5: 5 unique from 1-39
+        qpTitle.Text = $"🎲 Smart Quick Pick — {gameName}";
+        _qpStrategy = 0;
+        UpdateQpStrategyButtons();
+        // FROM box drives how many numbers to generate — mirror it into the dialog
+        qpFrom.Text = HowMany.Text;
+        qpProgressArea.IsVisible = false;
+        qpSpinner.IsRunning = false;
+        qpGenerateBtn.IsEnabled = true;
+        qpCancelBtn.IsEnabled = true;
+        qpOverlay.IsVisible = true;
+    }
+
+    private void UpdateQpStrategyButtons()
+    {
+        var btns = new[] { qpBtnHot, qpBtnCold, qpBtnFreq, qpBtnRare, qpBtnGap };
+        for (int i = 0; i < btns.Length; i++)
         {
-            var nums = Enumerable.Range(1, 39).OrderBy(_ => rng.Next()).Take(5).OrderBy(n => n).ToList();
-            for (int i = 0; i < 5 && i < _boxes.Length; i++) _boxes[i].Text = nums[i].ToString();
+            btns[i].BackgroundColor = i == _qpStrategy
+                ? Color.FromArgb("#6D28D9") : Color.FromArgb("#1E3A5F");
+            btns[i].TextColor = i == _qpStrategy
+                ? Colors.White : Color.FromArgb("#94B8D8");
         }
-        else if (_mode == 1) // Super Lotto: 5 from 1-47 + Mega from 1-27
+        qpLastNRow.IsVisible = (_qpStrategy == 0);
+    }
+
+    private void QpStrategy_Hot(object sender, EventArgs e)  { _qpStrategy = 0; UpdateQpStrategyButtons(); }
+    private void QpStrategy_Cold(object sender, EventArgs e) { _qpStrategy = 1; UpdateQpStrategyButtons(); }
+    private void QpStrategy_Freq(object sender, EventArgs e) { _qpStrategy = 2; UpdateQpStrategyButtons(); }
+    private void QpStrategy_Rare(object sender, EventArgs e) { _qpStrategy = 3; UpdateQpStrategyButtons(); }
+    private void QpStrategy_Gap(object sender, EventArgs e)  { _qpStrategy = 4; UpdateQpStrategyButtons(); }
+
+    private void QpCancel_Clicked(object sender, EventArgs e) => qpOverlay.IsVisible = false;
+
+    private async void QpGenerate_Clicked(object sender, EventArgs e)
+    {
+        qpGenerateBtn.IsEnabled = false;
+        qpCancelBtn.IsEnabled  = false;
+        qpProgressArea.IsVisible = true;
+        qpSpinner.IsRunning = true;
+
+        // FROM box = how many numbers to generate; game range is always fixed (F5=39, SL=47, D3=9)
+        if (!int.TryParse(qpFrom.Text, out int pickCount) || pickCount <= 0)
+            pickCount = _mode == 2 ? 3 : _mode == 1 ? 6 : 5;
+        int gameMax = _mode == 1 ? 47 : _mode == 2 ? 9 : 39;
+        pickCount = Math.Min(pickCount, _boxes.Length);
+
+        int.TryParse(qpLastN.Text, out int lastN);
+        if (lastN <= 0) lastN = 100;
+
+        var start = DateTime.UtcNow;
+        List<int>? result = null;
+
+        try
         {
-            var nums = Enumerable.Range(1, 47).OrderBy(_ => rng.Next()).Take(5).OrderBy(n => n).ToList();
-            for (int i = 0; i < 5 && i < _boxes.Length; i++) _boxes[i].Text = nums[i].ToString();
-            if (_boxes.Length > 5) _boxes[5].Text = rng.Next(1, 28).ToString();
+            result = await SmartQuickPick.RunAsync(
+                _mode, (SmartQuickPick.Strategy)_qpStrategy, pickCount, gameMax, lastN,
+                msg => qpProgressMsg.Text = msg);
         }
-        else // Daily 3: 3 random digits 0-9
+        catch (Exception ex)
         {
-            for (int i = 0; i < 3 && i < _boxes.Length; i++) _boxes[i].Text = rng.Next(0, 10).ToString();
+            qpSpinner.IsRunning = false;
+            qpOverlay.IsVisible = false;
+            await DisplayAlert("QP Error", ex.Message, "OK");
+            return;
         }
+
+        // Guarantee at least 10 seconds elapsed since the user hit Generate
+        var elapsed = (DateTime.UtcNow - start).TotalMilliseconds;
+        if (elapsed < 10000)
+        {
+            qpProgressMsg.Text = "Finalizing selection...";
+            await Task.Delay((int)(10000 - elapsed));
+        }
+
+        qpSpinner.IsRunning = false;
+        qpOverlay.IsVisible = false;
+
+        _isRestoring = true;
+        for (int i = 0; i < _boxes.Length; i++)
+            _boxes[i].Text = i < result.Count ? result[i].ToString() : "";
+        _isRestoring = false;
+        _boxesDirty = true;
+        SavePreferences();
+
+        string stratLabel = _qpStrategy switch
+        {
+            0 => $"Hot (last {lastN} draws)",
+            1 => "Cold/Overdue",
+            2 => "Most Frequent",
+            3 => "Least Drawn",
+            4 => "Longest Gap",
+            _ => "Smart"
+        };
+        vm.StatusMessage = $"Smart QP [{stratLabel}]: {string.Join(", ", result)}";
     }
 
     private void BtnShiftRight_Clicked(object sender, EventArgs e)
@@ -730,13 +967,6 @@ public partial class MainPage : ContentPage
         await Shell.Current.GoToAsync(nameof(ResultsPage), false);
     }
 
-    private async void BtnJackpot_Clicked(object sender, EventArgs e)
-    {
-        if (_isPanning) return;
-        AppShell.JackpotPageInstance.PrePosition(true);
-        await Shell.Current.GoToAsync(nameof(JackpotPage), false);
-    }
-
     private async void BtnViewSets_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;
@@ -753,37 +983,397 @@ public partial class MainPage : ContentPage
     private async void BtnOptions_Clicked(object sender, EventArgs e)
     {
         string action = await DisplayActionSheet("Options", "Cancel", null,
-            "History", "Recurrence", "Combos",
-            "Data Files", "My Favorites", "Load Picks");
+            "Data Files", "My Favorites", "Load Picks", "Generate Numbers",
+            "Clear List", "Delete Multiple...", "Search Sets", "Check Wins for Draw#");
         switch (action)
         {
-            case "History":    vm.ActiveTab = 0; break;
-            case "Recurrence": vm.ActiveTab = 1; break;
-            case "Combos":     vm.ActiveTab = 2; break;
-            case "Data Files":   await Shell.Current.GoToAsync(nameof(DataViewerPage), false); break;
-            case "My Favorites": await Shell.Current.GoToAsync(nameof(MyFavoritePage), false); break;
-            case "Load Picks":   await Task.Delay(300); await LoadPicksFromFileAsync(); break;
+            case "Data Files":              await Shell.Current.GoToAsync(nameof(DataViewerPage), false); break;
+            case "My Favorites":            await Shell.Current.GoToAsync(nameof(MyFavoritePage), false); break;
+            case "Load Picks":              await Task.Delay(300); await LoadPicksFromFileAsync(); break;
+            case "Generate Numbers":        BtnGenerateNumbers_Clicked(sender, e); break;
+            case "Search Sets":             await Task.Delay(300); await SearchSetsAsync(); break;
+            case "Check Wins for Draw#":    DrawSearchPage.PresetGame = "Daily 3"; await Shell.Current.GoToAsync(nameof(DrawSearchPage), false); break;
+            case "Clear List":
+                if (vm.Picks.Count == 0) { vm.StatusMessage = "List is already empty"; break; }
+                bool confirmClear = await DisplayAlert("Clear List", $"Remove all {vm.Picks.Count} items from the list?", "Clear All", "Cancel");
+                if (confirmClear)
+                {
+                    vm.Picks.Clear();
+                    _boxesDirty = false;
+                    try { File.WriteAllLines(PicksAutoSavePath, vm.Picks); } catch { }
+                    vm.StatusMessage = "List cleared";
+                }
+                break;
+            case "Delete Multiple...":
+                EnterDeleteMode();
+                break;
         }
     }
+
+    private async void BtnSummary_Clicked(object sender, EventArgs e)
+        => await Shell.Current.GoToAsync(nameof(SummaryPage), false);
 
     private async void BtnAdvance_Clicked(object sender, EventArgs e)
     {
         string action = await DisplayActionSheet("Advance", "Cancel", null,
             "View Sets", "Archive", "Export Sets", "Refresh Data",
-            "Jackpot Winners", "Voice Settings", "Games Expiration", "Notifications");
+            "Voice Settings", "Notifications", "Games Expiration", "Purge All Games",
+            "Backup Data", "Restore Data");
         switch (action)
         {
-            case "View Sets":    BtnViewSets_Clicked(sender, e); break;
-            case "Archive":      BtnArchive_Clicked(sender, e); break;
-            case "Export Sets":  await Task.Delay(300); await ExportAllSetsAsync(); break;
-            case "Refresh Data": await vm.RefreshAllDataAsync(); break;
-            case "Jackpot Winners":
-                AppShell.JackpotPageInstance.PrePosition(true);
-                await Shell.Current.GoToAsync(nameof(JackpotPage), false);
-                break;
+            case "View Sets":        BtnViewSets_Clicked(sender, e); break;
+            case "Archive":          BtnArchive_Clicked(sender, e); break;
+            case "Export Sets":      await Task.Delay(300); await ExportAllSetsAsync(); break;
+            case "Refresh Data":     await vm.RefreshAllDataAsync(); break;
             case "Voice Settings":   await ShowVoiceSettingsAsync(); break;
-            case "Games Expiration": await Shell.Current.GoToAsync(nameof(AdvanceGamesPage), false); break;
             case "Notifications":    await Shell.Current.GoToAsync(nameof(NotificationsPage), false); break;
+            case "Games Expiration": await Shell.Current.GoToAsync(nameof(AdvanceGamesPage), false); break;
+            case "Purge All Games":  await PurgeAllGamesAsync(); break;
+            case "Backup Data":      await BackupDataAsync(); break;
+            case "Restore Data":     await RestoreDataAsync(); break;
+        }
+    }
+
+    // ── Purge helpers ─────────────────────────────────────────────────────────
+
+    static readonly (string prefix, int cols, string[] extra, string[] tempKeys)[] _purgeGames =
+    [
+        ("f5", 5,  Array.Empty<string>(),                         new[] { "f5_entries" }),
+        ("sl", 6,  Array.Empty<string>(),                         new[] { "sl_entries" }),
+        ("pb", 6,  Array.Empty<string>(),                         new[] { "pb_entries" }),
+        ("mm", 6,  Array.Empty<string>(),                         new[] { "mm_entries" }),
+        ("d3", 3,  new[] { "d3_btypes_", "d3_drawfilters_" },    new[] { "d3_entries", "d3_bettypes", "d3_drawfilters" }),
+        ("d4", 4,  new[] { "d4_btypes_" },                       new[] { "d4_entries", "d4_bettypes" }),
+        ("dd", 4,  Array.Empty<string>(),                         new[] { "dd_entries" }),
+    ];
+
+    /// <summary>
+    /// Deletes all expired rows (Play To &lt; today, or draw# &lt; calottery current) that have no recorded win.
+    /// Returns the number of rows deleted.
+    /// </summary>
+    static async Task<int> ExecutePurgeAsync(Dictionary<string, int>? currentDrawNumbers = null)
+    {
+        var winRecords = await SummaryPage.LoadAllAsync();
+        var today = DateTime.Today;
+        int deleted = 0;
+
+        foreach (var (prefix, cols, extra, tempKeys) in _purgeGames)
+        {
+            string gameKey = prefix.ToUpper();
+            int activeSlot = Preferences.Get($"{prefix}_active_slot", -1);
+            int currentDn = 0;
+            currentDrawNumbers?.TryGetValue(prefix, out currentDn);
+
+            for (int i = 0; i < 10; i++)
+            {
+                string setKey = $"{prefix}_set_{i}";
+                string advKey = $"{prefix}_adv_{i}";
+                string raw = Preferences.Get(setKey, "");
+                if (string.IsNullOrEmpty(raw)) continue;
+
+                var vals = raw.Split('|');
+                string advRaw = Preferences.Get(advKey, "");
+                var advParts = string.IsNullOrEmpty(advRaw) ? new string[10] : advRaw.Split('|');
+                if (advParts.Length < 10) Array.Resize(ref advParts, 10);
+
+                bool anyKept = false;
+                for (int r = 0; r < 10; r++)
+                {
+                    // Default: keep everything unless it has an expired advance date or past draw#
+                    bool keep = true;
+                    string winPrefix = $"auto_{gameKey}_{i + 1}_{r + 1}_";
+                    bool hasWin = winRecords.Any(w => w.SourceKey.StartsWith(winPrefix));
+
+                    if (r < advParts.Length && advParts[r] != null)
+                    {
+                        var pair = advParts[r].Split('~');
+                        if (pair.Length >= 2)
+                        {
+                            DateTime? end = null, start = null;
+                            if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null,
+                                    System.Globalization.DateTimeStyles.None, out var ed)) end = ed;
+                            if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null,
+                                    System.Globalization.DateTimeStyles.None, out var sd)) start = sd;
+                            var refDate = end ?? start;
+                            if (refDate.HasValue)
+                                // Delete all expired rows — wins are pre-saved to SummaryPage before purge runs
+                                keep = refDate.Value.Date >= today;
+
+                            // Also purge if the stored draw# (higher of start/end) is already past — but never purge winners.
+                            // If no draw# is stored, skip this check and rely on date only.
+                            if (keep && !hasWin && currentDn > 0 && pair.Length >= 3)
+                            {
+                                string storedDnStr = pair.Length >= 4 && !string.IsNullOrWhiteSpace(pair[3])
+                                    ? pair[3] : pair[2];
+                                if (!string.IsNullOrWhiteSpace(storedDnStr) &&
+                                    int.TryParse(storedDnStr, out int storedDn) && storedDn > 0 && storedDn < currentDn)
+                                    keep = false;
+                            }
+                        }
+                    }
+
+                    if (!keep)
+                    {
+                        deleted++;
+                        for (int c = 0; c < cols; c++)
+                            if (r * cols + c < vals.Length) vals[r * cols + c] = "";
+                        if (r < advParts.Length) advParts[r] = "~";
+                    }
+                    else anyKept = true;
+                }
+
+                string newData = string.Join("|", vals);
+                if (newData.Replace("|", "").Trim().Length == 0)
+                {
+                    Preferences.Remove(setKey);
+                    Preferences.Remove(advKey);
+                    foreach (var ex in extra) Preferences.Remove($"{ex}{i}");
+                    // If this was the active slot, clear the temp in-memory keys too
+                    // so the game page doesn't restore stale data from its temp cache
+                    if (i == activeSlot)
+                        foreach (var tk in tempKeys) Preferences.Remove(tk);
+                }
+                else
+                {
+                    Preferences.Set(setKey, newData);
+                    Preferences.Set(advKey, string.Join("|", advParts));
+                }
+            }
+        }
+
+        return deleted;
+    }
+
+    /// <summary>
+    /// Scans the last 30 days for any advance-ticket wins and saves them to SummaryPage
+    /// BEFORE the purge runs, so the purge's hasWin check is accurate.
+    /// </summary>
+    static async Task PreSaveAdvanceWinsAsync()
+    {
+        ResultsPageCls.ClearCache();
+        for (int d = 0; d <= 30; d++)
+        {
+            var date = DateTime.Today.AddDays(-d);
+            try
+            {
+                var result = await ResultsPageCls.ProcessDateAsync(date);
+                foreach (var aw in result.Winners.Where(w => !w.IsActiveNoWin && !string.IsNullOrEmpty(w.Prize)))
+                {
+                    if (!DateTime.TryParse(aw.DrawDate, out var awDate) || awDate == default)
+                        awDate = date;
+                    string sk = $"auto_{aw.Game}_{aw.SetNumber}_{aw.RowNumber}_{awDate:yyyyMMdd}";
+                    var (awAmt, _, _, awFree) = ResultsPage.ParsePrize(aw.Prize);
+                    await SummaryPage.AddWinAsync(new WinningRecord
+                    {
+                        Game         = aw.Game,
+                        Date         = awDate.ToString("yyyy-MM-dd"),
+                        Numbers      = aw.Numbers,
+                        Amount       = awAmt,
+                        IsFreeTicket = awFree,
+                        Note         = aw.MatchLabel,
+                        SourceKey    = sk,
+                    });
+                }
+            }
+            catch { }
+        }
+    }
+
+    /// <summary>
+    /// Checks on app open for expired plays and auto-purges them, showing a popup if anything was removed.
+    /// </summary>
+    async Task CheckAutoPurgeOnStartupAsync()
+    {
+        await PreSaveAdvanceWinsAsync();   // detect wins BEFORE purging
+        var currentDrawNumbers = await GetDataEntry.GetCurrentDrawNumbersAsync();
+        int deleted = await ExecutePurgeAsync(currentDrawNumbers);
+        if (deleted > 0)
+            await DisplayAlert("Auto-Purge",
+                $"{deleted} expired play{(deleted == 1 ? "" : "s")} with no win were automatically removed.",
+                "OK");
+    }
+
+    private async Task PurgeAllGamesAsync()
+    {
+        bool confirm = await DisplayAlert("Purge All Games",
+            "Clear all rows in every game? Rows with future advance dates or recorded wins will be preserved.",
+            "Yes, Purge", "Cancel");
+        if (!confirm) return;
+
+        var currentDrawNumbers = await GetDataEntry.GetCurrentDrawNumbersAsync();
+        int deleted = await ExecutePurgeAsync(currentDrawNumbers);
+        string msg = deleted > 0
+            ? $"Done. {deleted} expired row{(deleted == 1 ? "" : "s")} removed."
+            : "Nothing to purge — all rows are active or have wins.";
+        await DisplayAlert("Purge Complete", msg, "OK");
+    }
+
+    // ── Backup / Restore ──────────────────────────────────────────
+
+    static readonly (string prefix, int cols, string[] extras)[] _backupGames =
+    [
+        ("f5", 5,  Array.Empty<string>()),
+        ("sl", 6,  Array.Empty<string>()),
+        ("pb", 6,  Array.Empty<string>()),
+        ("mm", 6,  Array.Empty<string>()),
+        ("d3", 3,  new[] { "d3_btypes_", "d3_drawfilters_" }),
+        ("d4", 4,  new[] { "d4_btypes_" }),
+        ("dd", 4,  Array.Empty<string>()),
+    ];
+
+    static readonly string[] _scalarKeys =
+    [
+        "gameMode", "maxnum", "howmany",
+        "voice_silence_ms", "voice_min_ms", "voice_post_ms", "voice_mute_beep",
+        "notif_enabled", "notif_phone", "notif_sms_enabled", "notif_times",
+        "win_alert_enabled", "win_check_times",
+        "win_interval_enabled", "win_interval_start", "win_interval_end",
+        "win_interval_minutes", "win_min_amount",
+        "fantasy5_game_id", "sl_game_id", "mm_game_id",
+    ];
+
+    private async Task BackupDataAsync()
+    {
+        try
+        {
+            var root = new System.Text.Json.Nodes.JsonObject();
+
+            // Per-game slot data
+            var gamesNode = new System.Text.Json.Nodes.JsonObject();
+            foreach (var (prefix, _, extras) in _backupGames)
+            {
+                var slots = new System.Text.Json.Nodes.JsonObject();
+                for (int i = 0; i < 10; i++)
+                {
+                    string setKey = $"{prefix}_set_{i}";
+                    string advKey = $"{prefix}_adv_{i}";
+                    string setRaw = Preferences.Get(setKey, "");
+                    string advRaw = Preferences.Get(advKey, "");
+                    if (string.IsNullOrEmpty(setRaw) && string.IsNullOrEmpty(advRaw)) continue;
+
+                    var slot = new System.Text.Json.Nodes.JsonObject();
+                    if (!string.IsNullOrEmpty(setRaw)) slot["set"] = setRaw;
+                    if (!string.IsNullOrEmpty(advRaw)) slot["adv"] = advRaw;
+
+                    foreach (var ex in extras)
+                    {
+                        string exRaw = Preferences.Get($"{ex}{i}", "");
+                        if (!string.IsNullOrEmpty(exRaw))
+                            slot[ex.TrimEnd('_')] = exRaw;
+                    }
+                    slots[$"{i}"] = slot;
+                }
+                if (slots.Count > 0) gamesNode[prefix] = slots;
+            }
+            root["games"] = gamesNode;
+
+            // Scalar prefs
+            var scalars = new System.Text.Json.Nodes.JsonObject();
+            foreach (var key in _scalarKeys)
+            {
+                // Try int, bool, string in that order
+                try   { scalars[key] = Preferences.Get(key, int.MinValue); if ((int)scalars[key]! == int.MinValue) scalars.Remove(key); continue; } catch { }
+                try   { scalars[key] = Preferences.Get(key, false);        continue; } catch { }
+                      { var s = Preferences.Get(key, ""); if (!string.IsNullOrEmpty(s)) scalars[key] = s; }
+            }
+            root["scalars"] = scalars;
+
+            root["version"]   = 1;
+            root["backed_up"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
+            string json     = root.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            string fileName = $"DailyFantasy_backup_{DateTime.Now:yyyyMMdd_HHmmss}.json";
+
+            // Write to cache dir then share — no storage permission needed on any Android version
+            string path = Path.Combine(FileSystem.CacheDirectory, fileName);
+            await File.WriteAllTextAsync(path, json);
+
+            await Share.Default.RequestAsync(new ShareFileRequest
+            {
+                Title = "Save Backup",
+                File  = new ShareFile(path, "application/json"),
+            });
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Backup Failed", ex.Message, "OK");
+        }
+    }
+
+    private async Task RestoreDataAsync()
+    {
+        try
+        {
+            var result = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle    = "Select backup JSON file",
+                FileTypes      = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    { DevicePlatform.Android, new[] { "application/json", "*/*" } },
+                }),
+            });
+
+            if (result == null) return;
+
+            bool confirm = await DisplayAlert("Restore Data",
+                $"This will overwrite your current data with the backup.\n\nFile: {result.FileName}\n\nContinue?",
+                "Yes, Restore", "Cancel");
+            if (!confirm) return;
+
+            string json = await File.ReadAllTextAsync(result.FullPath);
+            var root    = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject();
+            if (root == null) { await DisplayAlert("Error", "Invalid backup file.", "OK"); return; }
+
+            int restored = 0;
+
+            // Per-game slot data
+            if (root["games"] is System.Text.Json.Nodes.JsonObject gamesNode)
+            {
+                foreach (var (prefix, _, extras) in _backupGames)
+                {
+                    if (gamesNode[prefix] is not System.Text.Json.Nodes.JsonObject slots) continue;
+                    foreach (var (idxStr, slotNode) in slots)
+                    {
+                        if (!int.TryParse(idxStr, out int i)) continue;
+                        if (slotNode is not System.Text.Json.Nodes.JsonObject slot) continue;
+
+                        if (slot["set"]?.GetValue<string>() is string setRaw)
+                        { Preferences.Set($"{prefix}_set_{i}", setRaw); restored++; }
+                        if (slot["adv"]?.GetValue<string>() is string advRaw)
+                        { Preferences.Set($"{prefix}_adv_{i}", advRaw); restored++; }
+
+                        foreach (var ex in extras)
+                        {
+                            string exKey = ex.TrimEnd('_');
+                            if (slot[exKey]?.GetValue<string>() is string exRaw)
+                                Preferences.Set($"{ex}{i}", exRaw);
+                        }
+                    }
+                }
+            }
+
+            // Scalar prefs — store as strings; each page re-reads with its own default type
+            if (root["scalars"] is System.Text.Json.Nodes.JsonObject scalars)
+            {
+                foreach (var (key, val) in scalars)
+                {
+                    if (val == null) continue;
+                    var kind = val.GetValue<System.Text.Json.JsonElement>().ValueKind;
+                    if (kind == System.Text.Json.JsonValueKind.True || kind == System.Text.Json.JsonValueKind.False)
+                        Preferences.Set(key, val.GetValue<bool>());
+                    else if (kind == System.Text.Json.JsonValueKind.Number)
+                        Preferences.Set(key, val.GetValue<int>());
+                    else
+                        Preferences.Set(key, val.GetValue<string>() ?? "");
+                    restored++;
+                }
+            }
+
+            await DisplayAlert("Restore Complete", $"Restored {restored} items. Restart the app for all changes to take effect.", "OK");
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Restore Failed", ex.Message, "OK");
         }
     }
 
@@ -837,6 +1427,140 @@ public partial class MainPage : ContentPage
         }
 
         await ShowVoiceSettingsAsync();
+    }
+
+    // ── Search Sets ───────────────────────────────────────────────────────────
+
+    private async Task SearchSetsAsync()
+    {
+        // Pick which game to search
+        string game = await DisplayActionSheet("Search which game?", "Cancel", null,
+            "All Games",
+            "Fantasy 5", "Super Lotto Plus", "Daily 3", "Daily 4",
+            "Powerball", "Mega Millions", "Daily Derby");
+        if (string.IsNullOrEmpty(game) || game == "Cancel") return;
+
+        string lastInput = "";
+
+        while (true)
+        {
+        // Prompt for numbers to search (pre-filled with last search)
+        string? input = await DisplayPromptAsync(
+            "Search Sets",
+            "Enter numbers (use ; to search multiple rows)\n(e.g.  5 12 27  or  5 12; 8 15 33)",
+            "Search", "Cancel",
+            initialValue: lastInput,
+            placeholder: "e.g. 5 12 27",
+            keyboard: Keyboard.Default);
+
+        if (string.IsNullOrWhiteSpace(input)) return;
+        lastInput = input;
+
+        // Split by ";" to allow multiple searches in one go
+        var searches = input.Split(';', StringSplitOptions.RemoveEmptyEntries);
+
+        var gamesToSearch = game == "All Games"
+            ? ExportGames
+            : ExportGames.Where(g => g.Caption == game).ToArray();
+
+        var results = new System.Text.StringBuilder();
+        int totalHits = 0;
+
+        foreach (var search in searches)
+        {
+            var searchNums = search
+                .Split(new[] { ' ', ',', '-', '|' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => s.Trim().TrimStart('0'))
+                .Where(s => s.Length > 0)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (searchNums.Count == 0) continue;
+
+            results.AppendLine($"══ {string.Join(", ", searchNums)} ══");
+            int searchHits = 0;
+
+            foreach (var (caption, prefKey, rows, cols, specialCol, specialLabel, _, stride, hasTime) in gamesToSearch)
+            {
+                var gameHits = new List<string>();
+
+                for (int slot = 0; slot < rows; slot++)
+                {
+                    string raw = Preferences.Get($"{prefKey}{slot}", "");
+                    if (string.IsNullOrWhiteSpace(raw)) continue;
+
+                    var parts = raw.Split('|');
+                    int rowCount = parts.Length / stride;
+                    for (int r = 0; r < rowCount; r++)
+                    {
+                        var rowNums = parts
+                            .Skip(r * stride)
+                            .Take(stride)
+                            .Select(v => v.Trim().TrimStart('0'))
+                            .Where(v => v.Length > 0)
+                            .ToList();
+
+                        var matched = rowNums.Where(n => searchNums.Contains(n)).ToList();
+                        if (matched.Count < searchNums.Count) continue;
+
+                        string rowDisplay = string.Join("  ", rowNums.Select(n =>
+                            matched.Contains(n) ? $"[{n}]" : n));
+                        gameHits.Add($"  Set {slot + 1}, Row {r + 1}: {rowDisplay}");
+                        searchHits++;
+                        totalHits++;
+                    }
+                }
+
+                string? autoKey = prefKey switch
+                {
+                    "f5_set_" => "F5",
+                    "sl_set_" => "SL",
+                    "d3_set_" => "D3",
+                    _ => null
+                };
+                if (autoKey != null)
+                {
+                    string autoPath = Path.Combine(FileSystem.AppDataDirectory, $"_autosave_{autoKey}.txt");
+                    if (File.Exists(autoPath))
+                    {
+                        var lines = await File.ReadAllLinesAsync(autoPath);
+                        for (int li = 0; li < lines.Length; li++)
+                        {
+                            var rowNums = lines[li]
+                                .Split(new[] { ' ', '|', '-', ',' }, StringSplitOptions.RemoveEmptyEntries)
+                                .Select(v => v.Trim().TrimStart('0'))
+                                .Where(v => v.Length > 0)
+                                .ToList();
+                            var matched = rowNums.Where(n => searchNums.Contains(n)).ToList();
+                            if (matched.Count < searchNums.Count) continue;
+                            string rowDisplay = string.Join("  ", rowNums.Select(n =>
+                                matched.Contains(n) ? $"[{n}]" : n));
+                            gameHits.Add($"  Picks #{li + 1}: {rowDisplay}");
+                            searchHits++;
+                            totalHits++;
+                        }
+                    }
+                }
+
+                if (gameHits.Count > 0)
+                {
+                    results.AppendLine($"── {caption} ──");
+                    foreach (var h in gameHits) results.AppendLine(h);
+                }
+            }
+
+            results.AppendLine(searchHits == 0 ? "  (no matches)" : $"  → {searchHits} match{(searchHits == 1 ? "" : "es")}");
+            results.AppendLine();
+        }
+
+        if (results.Length == 0)
+        {
+            await DisplayAlert("Search Sets", "No valid numbers entered.", "OK");
+            continue;
+        }
+
+        bool again = await DisplayAlert("Search Results", results.ToString(), "Search Again", "Done");
+        if (!again) return;
+        } // end while
     }
 
     // ── Export All Sets ───────────────────────────────────────────────────────
@@ -1036,9 +1760,7 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
 
             sb.Append("</body></html>");
             string jobName = toExport.Count == 1 ? toExport[0].Label : "Lottery Sets";
-#if ANDROID
             PrintHelper.PrintHtml(sb.ToString(), jobName);
-#endif
         }
         }
         catch (Exception ex)
@@ -1051,34 +1773,67 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
 
     private async Task LoadPicksFromFileAsync()
     {
-        string game = _mode switch { 1 => "SL", 2 => "D3", _ => "F5" };
-
-        // Check for internally saved picks file first
-        string internalPath = Path.Combine(FileSystem.AppDataDirectory, $"my{game}_picks.txt");
-        bool hasInternal = File.Exists(internalPath);
+        // Find all manually saved pick and combo files (timestamped, excludes autosave/_latest)
+        var appDir = FileSystem.AppDataDirectory;
+        var savedFiles = Directory.GetFiles(appDir, "my*_*.txt")
+            .Where(p => { var n = Path.GetFileName(p); return !n.EndsWith("_latest.txt") && !n.StartsWith("_") && (n.Contains("_picks_") || n.Contains("_combos_")); })
+            .Select(p => new FileInfo(p))
+            .OrderByDescending(f => f.LastWriteTime)
+            .Select(f => (Label: $"{f.Name}  ({f.LastWriteTime:MMM d  h:mm tt})", Path: f.FullName))
+            .ToList();
 
         var options = new List<string>();
-        if (hasInternal)
-        {
-            var info = new FileInfo(internalPath);
-            options.Add($"Load saved {game} picks ({info.LastWriteTime:MMM d h:mm tt})");
-        }
+        options.AddRange(savedFiles.Select(f => f.Label));
+        options.Add("✏️ Rename a file...");
+        options.Add("🗑 Delete a file...");
         options.Add("Browse for file...");
 
-        string? choice = await DisplayActionSheet($"Load {game} Picks", "Cancel", null, options.ToArray());
+        string? choice = await DisplayActionSheet(
+            savedFiles.Count == 0 ? "No saved files — browse or save first" : "Load Picks",
+            "Cancel", null, options.ToArray());
         if (choice == null || choice == "Cancel") return;
+
+        // Rename mode
+        if (choice == "✏️ Rename a file...")
+        {
+            if (savedFiles.Count == 0) { vm.StatusMessage = "No saved files to rename"; return; }
+            string? renChoice = await DisplayActionSheet("Rename which file?", "Cancel", null,
+                savedFiles.Select(f => f.Label).ToArray());
+            if (renChoice == null || renChoice == "Cancel") return;
+            var toRename = savedFiles.First(f => f.Label == renChoice);
+            string oldName = Path.GetFileNameWithoutExtension(toRename.Path);
+            string? newName = await DisplayPromptAsync("Rename File", "Enter new name:", initialValue: oldName, maxLength: 60);
+            if (string.IsNullOrWhiteSpace(newName) || newName == oldName) return;
+            // keep .txt, sanitize
+            newName = string.Concat(newName.Where(c => c != '/' && c != '\\' && c != ':' && c != '*' && c != '?' && c != '"' && c != '<' && c != '>' && c != '|'));
+            string newPath = Path.Combine(appDir, newName + ".txt");
+            File.Move(toRename.Path, newPath);
+            vm.StatusMessage = $"Renamed to {newName}.txt";
+            return;
+        }
+
+        // Delete mode
+        if (choice == "🗑 Delete a file...")
+        {
+            if (savedFiles.Count == 0) { vm.StatusMessage = "No saved files to delete"; return; }
+            string? delChoice = await DisplayActionSheet("Delete which file?", "Cancel", null,
+                savedFiles.Select(f => f.Label).ToArray());
+            if (delChoice == null || delChoice == "Cancel") return;
+            var toDelete = savedFiles.First(f => f.Label == delChoice);
+            bool confirm = await DisplayAlert("Delete", $"Delete {Path.GetFileName(toDelete.Path)}?", "Delete", "Cancel");
+            if (!confirm) return;
+            File.Delete(toDelete.Path);
+            vm.StatusMessage = $"Deleted {Path.GetFileName(toDelete.Path)}";
+            return;
+        }
 
         string? filePath = null;
 
-        if (choice.StartsWith("Load saved"))
-        {
-            filePath = internalPath;
-        }
-        else
+        if (choice == "Browse for file...")
         {
             var result = await FilePicker.PickAsync(new PickOptions
             {
-                PickerTitle = $"Select {game} picks .txt file",
+                PickerTitle = "Select picks .txt file",
                 FileTypes   = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
                 {
                     { DevicePlatform.Android, new[] { "text/plain", "*/*" } },
@@ -1089,6 +1844,10 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
             if (result == null) return;
             filePath = result.FullPath;
         }
+        else
+        {
+            filePath = savedFiles.First(f => f.Label == choice).Path;
+        }
 
         try
         {
@@ -1098,9 +1857,17 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
 
             if (lines.Count == 0) { vm.StatusMessage = "File is empty or unrecognized format"; return; }
 
+            // Preview before loading
+            var preview = string.Join("\n", lines.Take(25));
+            if (lines.Count > 25) preview += $"\n... and {lines.Count - 25} more";
+            bool doLoad = await DisplayAlert($"Preview — {lines.Count} picks", preview, "Load", "Cancel");
+            if (!doLoad) return;
+
             vm.Picks = new System.Collections.ObjectModel.ObservableCollection<string>(lines);
+            ReHookPicksAutoSave();
+            await File.WriteAllLinesAsync(PicksAutoSavePath, vm.Picks); // save immediately as latest
             vm.ActiveTab = 0; // switch to History tab to show the list
-            vm.StatusMessage = $"Loaded {lines.Count} {game} picks from file";
+            vm.StatusMessage = $"Loaded {lines.Count} picks from {Path.GetFileName(filePath)}";
         }
         catch (Exception ex)
         {
@@ -1222,11 +1989,101 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
             return;
         }
 
+        string pageName0 = _mode == 0 ? "F5 Winner" : _mode == 1 ? "Super Lotto" : "Daily 3";
+        string insertMode = await DisplayActionSheet(
+            $"Insert {vm.Combinations.Count:N0} combos into {pageName0}?",
+            "Cancel", null,
+            "Clear all sets & insert",
+            "Empty slots only");
+        if (insertMode == null || insertMode == "Cancel") return;
+
         const int WRows = 10;
         const int TotalSlots = 10;
         int wCols         = _mode == 1 ? 6 : _mode == 0 ? 5 : 3;
         string slotPrefix = _mode == 0 ? "f5_set_" : _mode == 1 ? "sl_set_" : "d3_set_";
         string pageName   = _mode == 0 ? "F5 Winner" : _mode == 1 ? "Super Lotto" : "Daily 3";
+
+        // Clear all slots first if user chose "Clear all sets & insert"
+        // Preserve/nuke/restore: collect advance rows → nuke all slots → restore advance rows
+        if (insertMode == "Clear all sets & insert")
+        {
+            // Step 0: flush active page's in-memory advance dates to Preferences first
+            if (_mode == 0) AppShell.WinnerPageInstance.FlushAdvanceDates();
+            else if (_mode == 1) AppShell.SuperLottoPageInstance.FlushAdvanceDates();
+            else AppShell.Daily3PageInstance.FlushAdvanceDates();
+
+            string advPrefix  = _mode == 0 ? "f5_adv_"  : _mode == 1 ? "sl_adv_"  : "d3_adv_";
+            string[] extraDel = _mode == 2 ? new[] { "d3_btypes_", "d3_drawfilters_" } : Array.Empty<string>();
+            var today = DateTime.Today;
+
+            // Step 1: collect all advance-ticket rows keyed by (slot, row)
+            // preservedSetRows[slot][row] = string[wCols] of cell values
+            // preservedAdvRows[slot][row] = adv date string "start~end"
+            var preservedSetRows = new Dictionary<int, Dictionary<int, string[]>>();
+            var preservedAdvRows = new Dictionary<int, Dictionary<int, string>>();
+
+            for (int s = 0; s < TotalSlots; s++)
+            {
+                string setKey = $"{slotPrefix}{s}";
+                string advKey = $"{advPrefix}{s}";
+                string raw    = Preferences.Get(setKey, "");
+                string advRaw = Preferences.Get(advKey, "");
+                if (string.IsNullOrEmpty(advRaw)) continue;
+
+                var vals     = string.IsNullOrEmpty(raw) ? new string[WRows * wCols] : raw.Split('|');
+                if (vals.Length < WRows * wCols) Array.Resize(ref vals, WRows * wCols);
+                var advParts = advRaw.Split('|');
+                if (advParts.Length < WRows) Array.Resize(ref advParts, WRows);
+
+                for (int r = 0; r < WRows; r++)
+                {
+                    var pair = advParts[r]?.Split('~');
+                    if (pair == null || pair.Length != 2) continue;
+                    DateTime? end = null, start = null;
+                    if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var ed)) end = ed;
+                    if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var sd)) start = sd;
+                    var refDate = end ?? start;
+                    if (!refDate.HasValue || refDate.Value < today) continue;
+
+                    // This row has a future advance date — preserve it
+                    if (!preservedSetRows.ContainsKey(s)) preservedSetRows[s] = new Dictionary<int, string[]>();
+                    if (!preservedAdvRows.ContainsKey(s)) preservedAdvRows[s] = new Dictionary<int, string>();
+                    var rowCells = new string[wCols];
+                    for (int c = 0; c < wCols; c++)
+                        rowCells[c] = r * wCols + c < vals.Length ? (vals[r * wCols + c] ?? "") : "";
+                    preservedSetRows[s][r] = rowCells;
+                    preservedAdvRows[s][r] = advParts[r];
+                }
+            }
+
+            // Step 2: nuke ALL slots completely
+            for (int s = 0; s < TotalSlots; s++)
+            {
+                Preferences.Remove($"{slotPrefix}{s}");
+                Preferences.Remove($"{advPrefix}{s}");
+                foreach (var ex in extraDel) Preferences.Remove($"{ex}{s}");
+            }
+
+            // Step 3: restore preserved advance-ticket rows back to their exact slot/row positions
+            foreach (var (s, rowMap) in preservedSetRows)
+            {
+                var newVals = new string[WRows * wCols];
+                for (int i = 0; i < newVals.Length; i++) newVals[i] = "";
+                var newAdv  = new string[WRows];
+                for (int i = 0; i < newAdv.Length; i++) newAdv[i] = "~";
+
+                foreach (var (r, cells) in rowMap)
+                {
+                    for (int c = 0; c < wCols; c++)
+                        newVals[r * wCols + c] = cells[c];
+                }
+                if (preservedAdvRows.TryGetValue(s, out var advRowMap))
+                    foreach (var (r, advStr) in advRowMap) newAdv[r] = advStr;
+
+                Preferences.Set($"{slotPrefix}{s}", string.Join("|", newVals));
+                Preferences.Set($"{advPrefix}{s}",  string.Join("|", newAdv));
+            }
+        }
 
         var combos = vm.Combinations.ToList();
         int comboIndex = 0;
@@ -1236,26 +2093,41 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
         for (int slot = 0; slot < TotalSlots && comboIndex < combos.Count; slot++)
         {
             string existing = Preferences.Get($"{slotPrefix}{slot}", "");
-            bool isEmpty = string.IsNullOrEmpty(existing) ||
-                           existing.Replace("|", "").Trim().Length == 0;
-            if (!isEmpty) continue;
+            bool hasData = !string.IsNullOrEmpty(existing) &&
+                           existing.Replace("|", "").Trim().Length > 0;
 
-            var vals = new string[WRows * wCols];
-            for (int i = 0; i < vals.Length; i++) vals[i] = "";
+            // For "Empty slots only": skip slots that have any data
+            if (insertMode == "Empty slots only" && hasData) continue;
+
+            // Load existing values (or blank slate)
+            var vals = hasData
+                ? existing.Split('|')
+                : new string[WRows * wCols];
+            if (vals.Length < WRows * wCols) Array.Resize(ref vals, WRows * wCols);
+            if (!hasData) for (int i = 0; i < vals.Length; i++) vals[i] = "";
 
             int rowsFilled = 0;
-            while (rowsFilled < WRows && comboIndex < combos.Count)
+            for (int r = 0; r < WRows && comboIndex < combos.Count; r++)
             {
+                // Skip rows that already have data (advance ticket rows)
+                bool rowHasData = false;
+                for (int c = 0; c < wCols; c++)
+                    if (!string.IsNullOrEmpty(vals[r * wCols + c])) { rowHasData = true; break; }
+                if (rowHasData) continue;
+
                 var parts = combos[comboIndex].Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 for (int col = 0; col < wCols && col < parts.Length; col++)
-                    vals[rowsFilled * wCols + col] = parts[col];
+                    vals[r * wCols + col] = parts[col];
                 rowsFilled++;
                 comboIndex++;
                 insertedRows++;
             }
 
-            Preferences.Set($"{slotPrefix}{slot}", string.Join("|", vals));
-            insertedSlots++;
+            if (rowsFilled > 0)
+            {
+                Preferences.Set($"{slotPrefix}{slot}", string.Join("|", vals));
+                insertedSlots++;
+            }
         }
 
         string msg = insertedRows > 0
@@ -1309,6 +2181,13 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
         await Shell.Current.GoToAsync(nameof(GeneratePage), false);
     }
 
+    private async void BtnJackpot_Clicked(object sender, EventArgs e)
+    {
+        if (_isPanning) return;
+        AppShell.JackpotPageInstance.PrePosition(true);
+        await Shell.Current.GoToAsync(nameof(JackpotPage), false);
+    }
+
     // ── Archive ───────────────────────────────────────────────────────────────
 
     private async void BtnArchive_Clicked(object sender, EventArgs e)
@@ -1335,6 +2214,23 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
             SavePreferences();
             ArchiveService.Archive($"Archive {DateTime.Now:MMM d, yyyy h:mm tt}");
 
+            // Clear main page boxes
+            _isRestoring = true;
+            if (_boxes != null)
+                foreach (var box in _boxes) box.Text = "";
+            _isRestoring = false;
+            for (int i = 1; i <= 15; i++)
+                Preferences.Remove($"box{i}");
+
+            // Clear all game pages (entries + slot caches)
+            AppShell.WinnerPageInstance.ClearForArchive();
+            AppShell.SuperLottoPageInstance.ClearForArchive();
+            AppShell.PowerballPageInstance.ClearForArchive();
+            AppShell.MegaMillionsPageInstance.ClearForArchive();
+            AppShell.Daily3PageInstance.ClearForArchive();
+            AppShell.Daily4PageInstance.ClearForArchive();
+            AppShell.DailyDerbyPageInstance.ClearForArchive();
+
             if (sender is Button btn)
             {
                 var orig = btn.Text;
@@ -1356,85 +2252,32 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
     {
         SavePreferences();
 
-        string game = _mode switch { 1 => "SL", 2 => "D3", _ => "F5" };
-
-        if (vm.ActiveTab == 2 && vm.Combinations.Count > 0)
+        int count;
+        if (vm.ActiveTab == 2)
         {
-            string? choice = await DisplayActionSheet(
-                $"Save {vm.Combinations.Count:N0} combos", "Cancel", null,
-                "Save to myCombos.txt", $"Share as File ({game})");
-            if (choice == null || choice == "Cancel") return;
-
-            try
-            {
-                var boxValues = string.Join(",", _boxes.Select(b => b.Text ?? ""));
-                var lines = new List<string>
-                {
-                    $"#game:{game}",
-                    $"#boxes:{boxValues}",
-                    $"#params:{MaxNum.Text},{HowMany.Text}"
-                };
-                lines.AddRange(vm.Combinations);
-
-                var path = Path.Combine(FileSystem.AppDataDirectory, "myCombos.txt");
-                await File.WriteAllLinesAsync(path, lines);
-                vm.StatusMessage = $"Saved {vm.Combinations.Count:N0} combos";
-
-                if (choice.StartsWith("Share"))
-                {
-                    string stamp     = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                    string sharePath = Path.Combine(FileSystem.CacheDirectory, $"{game}_combos_{stamp}.txt");
-                    await File.WriteAllLinesAsync(sharePath, lines);
-                    await Share.RequestAsync(new ShareFileRequest
-                    {
-                        Title = $"{game} Combos",
-                        File  = new ShareFile(sharePath, "text/plain")
-                    });
-                }
-            }
-            catch (Exception ex) { vm.StatusMessage = "Save error: " + ex.Message; }
-            return;
+            // Saving combos: write file AND sync vm.Picks so OnDisappearing/autosave stay correct
+            var snapshot = vm.Combinations.ToList();
+            try { File.WriteAllLines(PicksAutoSavePath, snapshot); } catch { }
+            // Silently replace Picks with combos (unhook to avoid double-write)
+            if (_picksRef != null) _picksRef.CollectionChanged -= OnPicksAutoSave;
+            vm.Picks = new System.Collections.ObjectModel.ObservableCollection<string>(snapshot);
+            ReHookPicksAutoSave();
+            count = snapshot.Count;
+        }
+        else
+        {
+            try { File.WriteAllLines(PicksAutoSavePath, vm.Picks); } catch { }
+            count = vm.Picks.Count;
         }
 
-        if (vm.Picks.Count > 0)
-        {
-            string? choice = await DisplayActionSheet(
-                $"Save {vm.Picks.Count} {game} picks", "Cancel", null,
-                $"Save to my{game}_picks.txt", $"Share as File ({game})");
-            if (choice == null || choice == "Cancel") return;
-
-            try
-            {
-                var lines = vm.Picks.ToList();
-                string internalPath = Path.Combine(FileSystem.AppDataDirectory, $"my{game}_picks.txt");
-                await File.WriteAllLinesAsync(internalPath, lines);
-                vm.StatusMessage = $"Saved {lines.Count} {game} picks";
-
-                if (choice.StartsWith("Share"))
-                {
-                    string stamp     = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                    string sharePath = Path.Combine(FileSystem.CacheDirectory, $"{game}_picks_{stamp}.txt");
-                    await File.WriteAllLinesAsync(sharePath, lines);
-                    await Share.RequestAsync(new ShareFileRequest
-                    {
-                        Title = $"{game} Picks",
-                        File  = new ShareFile(sharePath, "text/plain")
-                    });
-                }
-            }
-            catch (Exception ex) { vm.StatusMessage = "Save error: " + ex.Message; }
-            return;
-        }
+        vm.StatusMessage = count > 0 ? $"Saved {count} items" : "Saved (list is empty)";
 
         if (sender is Button btn)
         {
-            var orig = btn.Text;
-            var origColor = btn.BackgroundColor;
-            btn.Text = "Saved";
-            btn.BackgroundColor = Color.FromArgb("#1B5E20");
+            var orig = btn.Text; var origColor = btn.BackgroundColor;
+            btn.Text = "Saved!"; btn.BackgroundColor = Color.FromArgb("#1B5E20");
             await Task.Delay(1200);
-            btn.Text = orig;
-            btn.BackgroundColor = origColor;
+            btn.Text = orig; btn.BackgroundColor = origColor;
         }
     }
 }

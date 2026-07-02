@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DailyFantasyMAUI.SummaryPage"
+             BackgroundColor="#F0F4F8"
+             Shell.NavBarIsVisible="False">
+    <Grid x:Name="rootGrid" RowDefinitions="Auto,*,Auto">
+
+        <!-- Header -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="8,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="0" Text="← Back" Clicked="BtnBack_Clicked"
+                    BackgroundColor="Transparent" TextColor="White" FontSize="13" Padding="4,0"/>
+            <Label Grid.Column="1" Text="SUMMARY OF WINNINGS"
+                   FontSize="14" FontAttributes="Bold" TextColor="White"
+                   HorizontalOptions="Center" VerticalOptions="Center"/>
+            <Button Grid.Column="2" Text="Clear All" Clicked="BtnClearAll_Clicked"
+                    BackgroundColor="Transparent" TextColor="#FF7043" FontSize="12" Padding="4,0"/>
+        </Grid>
+
+        <!-- Scrollable game sections -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout x:Name="mainContainer" Padding="0,4,0,8" Spacing="0"/>
+        </ScrollView>
+
+        <!-- Grand total footer -->
+        <Grid Grid.Row="2" BackgroundColor="#1E2733" Padding="16,12">
+            <Label x:Name="lblGrandTotal" FontSize="16" FontAttributes="Bold"
+                   TextColor="White" HorizontalOptions="Center"/>
+        </Grid>
+
+    </Grid>
+</ContentPage>

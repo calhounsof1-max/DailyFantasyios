@@ -4,13 +4,18 @@ namespace DailyFantasyMAUI;
 
 public class WinnerEntry
 {
-    public string Game      { get; set; } = "";
-    public int    SetNumber { get; set; }
-    public int    RowNumber { get; set; }
-    public string Numbers   { get; set; } = "";
-    public string MatchLabel{ get; set; } = "";
-    public string Prize     { get; set; } = "";
-    public int    DrawNumber{ get; set; }
+    public string Game         { get; set; } = "";
+    public int    SetNumber    { get; set; }
+    public int    RowNumber    { get; set; }
+    public string Numbers      { get; set; } = "";
+    public string MatchLabel   { get; set; } = "";
+    public string Prize        { get; set; } = "";
+    // True when the ticket is still within its advance-play date range but did not win today
+    public bool   IsActiveNoWin { get; set; } = false;
+    // The actual draw date this entry is for (populated for past-advance wins so UI can strikethrough correctly)
+    public string DrawDate      { get; set; } = "";
+    // The advance "play to" end date (M/d format), shown instead of "In play" when available
+    public string PlayToDate    { get; set; } = "";
 }
 
 public class DateResultData
@@ -19,23 +24,35 @@ public class DateResultData
     public string DateLabel  { get; set; } = "";
 
     public int[]  F5Numbers  { get; set; } = Array.Empty<int>();
-    public int    F5DrawNumber     { get; set; }
     public int[]  SLMain     { get; set; } = Array.Empty<int>();
     public int    SLMega     { get; set; }
-    public int    SLDrawNumber     { get; set; }
     public int[]  PBMain     { get; set; } = Array.Empty<int>();
     public int    PBBall     { get; set; }
-    public int    PBDrawNumber     { get; set; }
     public int[]  MMMain     { get; set; } = Array.Empty<int>();
     public int    MMBall     { get; set; }
-    public int    MMDrawNumber     { get; set; }
     public int[]? D3Midday   { get; set; }
     public int[]? D3Evening  { get; set; }
     public int[]? D4Numbers  { get; set; }
-    public int    D4DrawNumber     { get; set; }
     public int[]? DDHorses   { get; set; }
     public string DDRaceTime { get; set; } = "";
+
+    public int    F5DrawNumber     { get; set; }
+    public int    SLDrawNumber     { get; set; }
+    public int    PBDrawNumber     { get; set; }
+    public int    MMDrawNumber     { get; set; }
+    public int    D4DrawNumber     { get; set; }
     public int    DDDrawNumber     { get; set; }
+    public int    D3MiddayDrawNum   { get; set; }
+    public int    D3EveningDrawNum  { get; set; }
+    public string D3MiddayDateLabel  { get; set; } = "";
+    public string D3EveningDateLabel { get; set; } = "";
+
+    public string F5DrawDate  { get; set; } = "";
+    public string SLDrawDate  { get; set; } = "";
+    public string PBDrawDate  { get; set; } = "";
+    public string MMDrawDate  { get; set; } = "";
+    public string D4DrawDate  { get; set; } = "";
+    public string DDDrawDate  { get; set; } = "";
 
     public List<WinnerEntry> Winners { get; set; } = new();
     public string Error { get; set; } = "";
@@ -483,9 +500,10 @@ public static class ResultsPageCls
 
         if (f5Draw.Numbers != null)
         {
-            result.F5Numbers   = f5Draw.Numbers;
+            result.F5Numbers    = f5Draw.Numbers;
             result.F5DrawNumber = f5Draw.DrawNumber;
-            result.DateLabel   = f5Draw.DrawDate;
+            result.F5DrawDate   = f5Draw.DrawDate ?? "";
+            result.DateLabel    = f5Draw.DrawDate;
         }
 
         // ── Find SL draw on or before selected date ──────────────────────────
@@ -499,9 +517,10 @@ public static class ResultsPageCls
 
         if (slDraw.MainNumbers != null)
         {
-            result.SLMain      = slDraw.MainNumbers;
-            result.SLMega      = slDraw.MegaNumber;
+            result.SLMain       = slDraw.MainNumbers;
+            result.SLMega       = slDraw.MegaNumber;
             result.SLDrawNumber = slDraw.DrawNumber;
+            result.SLDrawDate   = slDraw.DrawDate ?? "";
             if (string.IsNullOrEmpty(result.DateLabel))
                 result.DateLabel = slDraw.DrawDate;
         }
@@ -517,9 +536,10 @@ public static class ResultsPageCls
 
         if (pbDraw.MainNumbers != null)
         {
-            result.PBMain      = pbDraw.MainNumbers;
-            result.PBBall      = pbDraw.PBNumber;
+            result.PBMain       = pbDraw.MainNumbers;
+            result.PBBall       = pbDraw.PBNumber;
             result.PBDrawNumber = pbDraw.DrawNumber;
+            result.PBDrawDate   = pbDraw.DrawDate ?? "";
             if (string.IsNullOrEmpty(result.DateLabel))
                 result.DateLabel = pbDraw.DrawDate;
         }
@@ -535,9 +555,10 @@ public static class ResultsPageCls
 
         if (mmDraw.MainNumbers != null)
         {
-            result.MMMain      = mmDraw.MainNumbers;
-            result.MMBall      = mmDraw.MegaNumber;
+            result.MMMain       = mmDraw.MainNumbers;
+            result.MMBall       = mmDraw.MegaNumber;
             result.MMDrawNumber = mmDraw.DrawNumber;
+            result.MMDrawDate   = mmDraw.DrawDate ?? "";
             if (string.IsNullOrEmpty(result.DateLabel))
                 result.DateLabel = mmDraw.DrawDate;
         }
@@ -550,10 +571,12 @@ public static class ResultsPageCls
                 var ordered = g.OrderBy(d => d.DrawNumber).ToList();
                 var grpDate = DateTime.TryParse(g.Key, out var dt) ? dt : DateTime.MinValue;
                 return (DateLabel: g.Key, Date: grpDate,
-                    Midday:         ordered.Count >= 1 ? ordered[0].Numbers : null,
-                    MiddayPrizes:   ordered.Count >= 1 ? ordered[0].Prizes  : Array.Empty<DrawPrizeTier>(),
-                    Evening:        ordered.Count >= 2 ? ordered[1].Numbers : null,
-                    EveningPrizes:  ordered.Count >= 2 ? ordered[1].Prizes  : Array.Empty<DrawPrizeTier>());
+                    Midday:          ordered.Count >= 1 ? ordered[0].Numbers : null,
+                    MiddayPrizes:    ordered.Count >= 1 ? ordered[0].Prizes  : Array.Empty<DrawPrizeTier>(),
+                    MiddayDrawNum:   ordered.Count >= 1 ? ordered[0].DrawNumber : 0,
+                    Evening:         ordered.Count >= 2 ? ordered[1].Numbers : null,
+                    EveningPrizes:   ordered.Count >= 2 ? ordered[1].Prizes  : Array.Empty<DrawPrizeTier>(),
+                    EveningDrawNum:  ordered.Count >= 2 ? ordered[1].DrawNumber : 0);
             })
             .Where(g => g.Date != DateTime.MinValue && g.Date.Date <= date.Date)
             .OrderByDescending(g => g.Date)
@@ -561,8 +584,12 @@ public static class ResultsPageCls
 
         var d3MiddayGroup  = d3Groups.FirstOrDefault(g => g.Midday  != null);
         var d3EveningGroup = d3Groups.FirstOrDefault(g => g.Evening != null);
-        result.D3Midday  = d3MiddayGroup.Midday;
-        result.D3Evening = d3EveningGroup.Evening;
+        result.D3Midday          = d3MiddayGroup.Midday;
+        result.D3MiddayDrawNum   = d3MiddayGroup.MiddayDrawNum;
+        result.D3MiddayDateLabel = d3MiddayGroup.DateLabel ?? "";
+        result.D3Evening         = d3EveningGroup.Evening;
+        result.D3EveningDrawNum  = d3EveningGroup.EveningDrawNum;
+        result.D3EveningDateLabel = d3EveningGroup.DateLabel ?? "";
         var d3MiddayPrizes  = d3MiddayGroup.MiddayPrizes  ?? Array.Empty<DrawPrizeTier>();
         var d3EveningPrizes = d3EveningGroup.EveningPrizes ?? Array.Empty<DrawPrizeTier>();
 
@@ -573,8 +600,9 @@ public static class ResultsPageCls
             .OrderByDescending(d => d.Date)
             .FirstOrDefault();
 
-        result.D4Numbers   = d4Draw.Numbers;
+        result.D4Numbers    = d4Draw.Numbers;
         result.D4DrawNumber = d4Draw.DrawNumber;
+        result.D4DrawDate   = d4Draw.DrawDate ?? "";
         var d4Prizes = d4Draw.Prizes ?? Array.Empty<DrawPrizeTier>();
 
         // ── Find DD draw on or before selected date ──────────────────────────
@@ -584,9 +612,10 @@ public static class ResultsPageCls
             .OrderByDescending(d => d.Date)
             .FirstOrDefault();
 
-        result.DDHorses    = ddDraw.Horses;
-        result.DDRaceTime  = ddDraw.RaceTime ?? "";
+        result.DDHorses     = ddDraw.Horses;
+        result.DDRaceTime   = ddDraw.RaceTime ?? "";
         result.DDDrawNumber = ddDraw.DrawNumber;
+        result.DDDrawDate   = ddDraw.DrawDate ?? "";
         var ddPrizes = ddDraw.Prizes ?? Array.Empty<DrawPrizeTier>();
 
         if (string.IsNullOrEmpty(result.DateLabel))
@@ -600,13 +629,30 @@ public static class ResultsPageCls
 
             foreach (var (slot, rows) in ReadSets("f5", 5))
             {
+                var advDates = ReadAdvanceDates("f5", slot);
                 for (int r = 0; r < Rows; r++)
                 {
                     if (!RowAllFilled(rows[r])) continue;
+                    bool f5Valid = IsRowValidForDate(advDates[r].start, advDates[r].end, f5Draw.Date, selectedDate: date);
+                    if (!f5Valid) continue;
                     var nums    = rows[r].Select(int.Parse).ToArray();
                     int matches = nums.Count(n => winSet.Contains(n));
                     string prize = F5Prize(matches, prizes);
-                    if (string.IsNullOrEmpty(prize)) continue;
+                    if (string.IsNullOrEmpty(prize))
+                    {
+                        bool f5StillOpen = (advDates[r].end.HasValue && advDates[r].end.Value.Date > DateTime.Today)
+                            || (advDates[r].drawStart > 0 && result.F5DrawNumber <= (advDates[r].drawEnd > 0 ? advDates[r].drawEnd : advDates[r].drawStart));
+                        if (f5StillOpen)
+                            result.Winners.Add(new WinnerEntry
+                            {
+                                Game = "F5", SetNumber = slot + 1, RowNumber = r + 1,
+                                Numbers    = string.Join("  ", nums.Select(n => n.ToString("D2"))),
+                                MatchLabel = $"{matches}/5", Prize = "", DrawDate = f5Draw.DrawDate ?? "",
+                                IsActiveNoWin = true,
+                                PlayToDate = advDates[r].end.HasValue ? advDates[r].end.Value.ToString("M/d") : ""
+                            });
+                        continue;
+                    }
 
                     result.Winners.Add(new WinnerEntry
                     {
@@ -615,7 +661,8 @@ public static class ResultsPageCls
                         RowNumber  = r + 1,
                         Numbers    = string.Join("  ", nums.Select(n => n.ToString("D2"))),
                         MatchLabel = $"{matches}/5",
-                        Prize      = prize
+                        Prize      = prize,
+                        DrawDate   = f5Draw.DrawDate ?? ""
                     });
                 }
             }
@@ -629,19 +676,34 @@ public static class ResultsPageCls
 
             foreach (var (slot, rows) in ReadSets("sl", 6))
             {
+                var advDates = ReadAdvanceDates("sl", slot);
                 for (int r = 0; r < Rows; r++)
                 {
                     if (!RowAllFilled(rows[r])) continue;
+                    bool slValid = IsRowValidForDate(advDates[r].start, advDates[r].end, slDraw.Date, selectedDate: date);
+                    if (!slValid) continue;
                     var nums        = rows[r].Select(int.Parse).ToArray();
                     int mainMatches = nums.Take(5).Count(n => mainSet.Contains(n));
                     bool megaMatch  = nums.Length == 6 && result.SLMega > 0 && nums[5] == result.SLMega;
 
-                    string prize = SLPrize(mainMatches, megaMatch, prizes);
-                    if (string.IsNullOrEmpty(prize)) continue;
-
                     string matchLabel  = megaMatch ? $"{mainMatches}+M" : $"{mainMatches}/5";
                     string numsDisplay = string.Join("  ", nums.Take(5).Select(n => n.ToString("D2")))
                                         + "  |M:" + nums[5].ToString("D2");
+                    string prize = SLPrize(mainMatches, megaMatch, prizes);
+                    if (string.IsNullOrEmpty(prize))
+                    {
+                        bool slStillOpen = (advDates[r].end.HasValue && advDates[r].end.Value.Date > DateTime.Today)
+                            || (advDates[r].drawStart > 0 && result.SLDrawNumber <= (advDates[r].drawEnd > 0 ? advDates[r].drawEnd : advDates[r].drawStart));
+                        if (slStillOpen)
+                            result.Winners.Add(new WinnerEntry
+                            {
+                                Game = "SL", SetNumber = slot + 1, RowNumber = r + 1,
+                                Numbers = numsDisplay, MatchLabel = matchLabel, Prize = "",
+                                DrawDate = slDraw.DrawDate ?? "", IsActiveNoWin = true,
+                                PlayToDate = advDates[r].end.HasValue ? advDates[r].end.Value.ToString("M/d") : ""
+                            });
+                        continue;
+                    }
 
                     result.Winners.Add(new WinnerEntry
                     {
@@ -650,7 +712,8 @@ public static class ResultsPageCls
                         RowNumber  = r + 1,
                         Numbers    = numsDisplay,
                         MatchLabel = matchLabel,
-                        Prize      = prize
+                        Prize      = prize,
+                        DrawDate   = slDraw.DrawDate ?? ""
                     });
                 }
             }
@@ -664,19 +727,34 @@ public static class ResultsPageCls
 
             foreach (var (slot, rows) in ReadSets("pb", 6))
             {
+                var advDates = ReadAdvanceDates("pb", slot);
                 for (int r = 0; r < Rows; r++)
                 {
                     if (!RowAllFilled(rows[r])) continue;
+                    bool pbValid = IsRowValidForDate(advDates[r].start, advDates[r].end, pbDraw.Date, selectedDate: date);
+                    if (!pbValid) continue;
                     var nums        = rows[r].Select(int.Parse).ToArray();
                     int mainMatches = nums.Take(5).Count(n => mainSet.Contains(n));
                     bool pbMatch    = nums.Length == 6 && result.PBBall > 0 && nums[5] == result.PBBall;
 
-                    string prize = PBPrize(mainMatches, pbMatch, prizes);
-                    if (string.IsNullOrEmpty(prize)) continue;
-
                     string matchLabel  = pbMatch ? $"{mainMatches}+PB" : $"{mainMatches}/5";
                     string numsDisplay = string.Join("  ", nums.Take(5).Select(n => n.ToString("D2")))
                                         + "  |PB:" + nums[5].ToString("D2");
+                    string prize = PBPrize(mainMatches, pbMatch, prizes);
+                    if (string.IsNullOrEmpty(prize))
+                    {
+                        bool pbStillOpen = (advDates[r].end.HasValue && advDates[r].end.Value.Date > DateTime.Today)
+                            || (advDates[r].drawStart > 0 && result.PBDrawNumber <= (advDates[r].drawEnd > 0 ? advDates[r].drawEnd : advDates[r].drawStart));
+                        if (pbStillOpen)
+                            result.Winners.Add(new WinnerEntry
+                            {
+                                Game = "PB", SetNumber = slot + 1, RowNumber = r + 1,
+                                Numbers = numsDisplay, MatchLabel = matchLabel, Prize = "",
+                                DrawDate = pbDraw.DrawDate ?? "", IsActiveNoWin = true,
+                                PlayToDate = advDates[r].end.HasValue ? advDates[r].end.Value.ToString("M/d") : ""
+                            });
+                        continue;
+                    }
 
                     result.Winners.Add(new WinnerEntry
                     {
@@ -685,7 +763,8 @@ public static class ResultsPageCls
                         RowNumber  = r + 1,
                         Numbers    = numsDisplay,
                         MatchLabel = matchLabel,
-                        Prize      = prize
+                        Prize      = prize,
+                        DrawDate   = pbDraw.DrawDate ?? ""
                     });
                 }
             }
@@ -699,19 +778,34 @@ public static class ResultsPageCls
 
             foreach (var (slot, rows) in ReadSets("mm", 6))
             {
+                var advDates = ReadAdvanceDates("mm", slot);
                 for (int r = 0; r < Rows; r++)
                 {
                     if (!RowAllFilled(rows[r])) continue;
+                    bool mmValid = IsRowValidForDate(advDates[r].start, advDates[r].end, mmDraw.Date, selectedDate: date);
+                    if (!mmValid) continue;
                     var nums        = rows[r].Select(int.Parse).ToArray();
                     int mainMatches = nums.Take(5).Count(n => mainSet.Contains(n));
                     bool mbMatch    = nums.Length == 6 && result.MMBall > 0 && nums[5] == result.MMBall;
 
-                    string prize = MMPrize(mainMatches, mbMatch, prizes);
-                    if (string.IsNullOrEmpty(prize)) continue;
-
                     string matchLabel  = mbMatch ? $"{mainMatches}+MB" : $"{mainMatches}/5";
                     string numsDisplay = string.Join("  ", nums.Take(5).Select(n => n.ToString("D2")))
                                         + "  |MB:" + nums[5].ToString("D2");
+                    string prize = MMPrize(mainMatches, mbMatch, prizes);
+                    if (string.IsNullOrEmpty(prize))
+                    {
+                        bool mmStillOpen = (advDates[r].end.HasValue && advDates[r].end.Value.Date > DateTime.Today)
+                            || (advDates[r].drawStart > 0 && result.MMDrawNumber <= (advDates[r].drawEnd > 0 ? advDates[r].drawEnd : advDates[r].drawStart));
+                        if (mmStillOpen)
+                            result.Winners.Add(new WinnerEntry
+                            {
+                                Game = "MM", SetNumber = slot + 1, RowNumber = r + 1,
+                                Numbers = numsDisplay, MatchLabel = matchLabel, Prize = "",
+                                DrawDate = mmDraw.DrawDate ?? "", IsActiveNoWin = true,
+                                PlayToDate = advDates[r].end.HasValue ? advDates[r].end.Value.ToString("M/d") : ""
+                            });
+                        continue;
+                    }
 
                     result.Winners.Add(new WinnerEntry
                     {
@@ -720,7 +814,8 @@ public static class ResultsPageCls
                         RowNumber  = r + 1,
                         Numbers    = numsDisplay,
                         MatchLabel = matchLabel,
-                        Prize      = prize
+                        Prize      = prize,
+                        DrawDate   = mmDraw.DrawDate ?? ""
                     });
                 }
             }
@@ -731,21 +826,28 @@ public static class ResultsPageCls
         {
             foreach (var (slot, rows) in ReadSets("d3", 3))
             {
-                var betTypes = ReadD3BetTypes(slot);
+                var betTypes    = ReadD3BetTypes(slot);
+                var drawFilters = ReadD3DrawFilters(slot);
+                var advDates    = ReadAdvanceDates("d3", slot);
+                var d3MiddayDate  = DateTime.TryParse(result.D3MiddayDateLabel,  out var dmd) ? dmd : DateTime.Today;
+                var d3EveningDate = DateTime.TryParse(result.D3EveningDateLabel, out var ded) ? ded : DateTime.Today;
                 for (int r = 0; r < Rows; r++)
                 {
                     if (!RowAllFilled(rows[r])) continue;
                     var userNums   = rows[r].Select(int.Parse).ToArray();
                     var sortedUser = userNums.OrderBy(x => x).ToArray();
-                    string bt      = betTypes[r]; // "S", "B", or "S&B"
+                    string bt      = betTypes[r];    // "S", "B", or "S&B"
+                    string df      = drawFilters[r]; // "B", "M", or "E"
                     string boxType = D3BoxType(userNums); // "Box3", "Box6", or "" (triple)
 
-                    // Raw draw matches
-                    bool isDayStr = result.D3Midday  != null && userNums.SequenceEqual(result.D3Midday);
-                    bool isDayBox = !isDayStr && result.D3Midday  != null &&
+                    // Raw draw matches — only check draws allowed by per-row filter and advance date
+                    bool middayValid  = IsRowValidForDate(advDates[r].start, advDates[r].end, d3MiddayDate, selectedDate: date);
+                    bool eveningValid = IsRowValidForDate(advDates[r].start, advDates[r].end, d3EveningDate, selectedDate: date);
+                    bool isDayStr = df != "E" && middayValid  && result.D3Midday  != null && userNums.SequenceEqual(result.D3Midday);
+                    bool isDayBox = !isDayStr && df != "E" && middayValid  && result.D3Midday  != null &&
                                    sortedUser.SequenceEqual(result.D3Midday.OrderBy(x => x));
-                    bool isEveStr = result.D3Evening != null && userNums.SequenceEqual(result.D3Evening);
-                    bool isEveBox = !isEveStr && result.D3Evening != null &&
+                    bool isEveStr = df != "M" && eveningValid && result.D3Evening != null && userNums.SequenceEqual(result.D3Evening);
+                    bool isEveBox = !isEveStr && df != "M" && eveningValid && result.D3Evening != null &&
                                    sortedUser.SequenceEqual(result.D3Evening.OrderBy(x => x));
 
                     // Apply bet type to determine win type
@@ -769,23 +871,44 @@ public static class ResultsPageCls
                         else if (isEveBox && !string.IsNullOrEmpty(boxType)) eveWin = "SB_Box";
                     }
 
-                    if (dayWin == null && eveWin == null) continue;
+                    if (dayWin == null && eveWin == null)
+                    {
+                        bool d3InDateRange = advDates[r].start.HasValue && advDates[r].end.HasValue &&
+                                             date.Date >= advDates[r].start.Value.Date && date.Date <= advDates[r].end.Value.Date;
+                        bool d3HasDrawRange = advDates[r].drawStart > 0;
+                        bool d3DrawInRange  = d3HasDrawRange && (middayValid || eveningValid);
+                        bool d3IsActive     = middayValid || eveningValid || d3InDateRange || d3DrawInRange;
+                        bool d3StillOpen    = (advDates[r].end.HasValue && advDates[r].end.Value.Date >= DateTime.Today)
+                                              || d3DrawInRange;
+                        if (d3IsActive && d3StillOpen)
+                            result.Winners.Add(new WinnerEntry
+                            {
+                                Game = "D3", SetNumber = slot + 1, RowNumber = r + 1,
+                                Numbers = string.Join("-", userNums), MatchLabel = "No match", Prize = "",
+                                DrawDate = result.D3MiddayDateLabel, IsActiveNoWin = true,
+                                PlayToDate = advDates[r].end.HasValue ? advDates[r].end.Value.ToString("M/d") : ""
+                            });
+                        continue;
+                    }
 
-                    string matchLabel, prize;
+                    string matchLabel, prize, d3DrawDate;
                     if (dayWin != null && eveWin != null)
                     {
-                        matchLabel = $"D:{D3Label(dayWin)} N:{D3Label(eveWin)}";
-                        prize      = $"{D3PrizeCalc(dayWin, boxType, d3MiddayPrizes)} + {D3PrizeCalc(eveWin, boxType, d3EveningPrizes)}";
+                        matchLabel  = $"Md-{D3Label(dayWin)} Ev-{D3Label(eveWin)}";
+                        prize       = $"{D3PrizeCalc(dayWin, boxType, d3MiddayPrizes)} + {D3PrizeCalc(eveWin, boxType, d3EveningPrizes)}";
+                        d3DrawDate  = result.D3MiddayDateLabel;
                     }
                     else if (dayWin != null)
                     {
-                        matchLabel = $"Day {D3Label(dayWin)}";
-                        prize      = D3PrizeCalc(dayWin, boxType, d3MiddayPrizes);
+                        matchLabel  = $"Md-{D3Label(dayWin)}";
+                        prize       = D3PrizeCalc(dayWin, boxType, d3MiddayPrizes);
+                        d3DrawDate  = result.D3MiddayDateLabel;
                     }
                     else
                     {
-                        matchLabel = $"Eve {D3Label(eveWin!)}";
-                        prize      = D3PrizeCalc(eveWin!, boxType, d3EveningPrizes);
+                        matchLabel  = $"Ev-{D3Label(eveWin!)}";
+                        prize       = D3PrizeCalc(eveWin!, boxType, d3EveningPrizes);
+                        d3DrawDate  = result.D3EveningDateLabel;
                     }
 
                     result.Winners.Add(new WinnerEntry
@@ -795,7 +918,8 @@ public static class ResultsPageCls
                         RowNumber  = r + 1,
                         Numbers    = string.Join("-", userNums),
                         MatchLabel = matchLabel,
-                        Prize      = prize
+                        Prize      = prize,
+                        DrawDate   = d3DrawDate
                     });
                 }
             }
@@ -808,9 +932,13 @@ public static class ResultsPageCls
             foreach (var (slot, rows) in ReadSets("d4", 4))
             {
                 var betTypes = ReadD4BetTypes(slot);
+                var advDates = ReadAdvanceDates("d4", slot);
+                var d4Date   = DateTime.TryParse(result.D4DrawDate, out var d4dt) ? d4dt : DateTime.Today;
                 for (int r = 0; r < Rows; r++)
                 {
                     if (!RowAllFilled(rows[r])) continue;
+                    bool d4Valid = IsRowValidForDate(advDates[r].start, advDates[r].end, d4Date, selectedDate: date);
+                    if (!d4Valid) continue;
                     var userNums   = rows[r].Select(int.Parse).ToArray();
                     var sortedUser = userNums.OrderBy(x => x).ToArray();
                     string bt      = betTypes[r];
@@ -837,7 +965,20 @@ public static class ResultsPageCls
                         else if (isBox && !string.IsNullOrEmpty(boxType)) winType = boxType;
                     }
 
-                    if (winType == null) continue;
+                    if (winType == null)
+                    {
+                        bool d4StillOpen = (advDates[r].end.HasValue && advDates[r].end.Value.Date > DateTime.Today)
+                            || (advDates[r].drawStart > 0 && result.D4DrawNumber <= (advDates[r].drawEnd > 0 ? advDates[r].drawEnd : advDates[r].drawStart));
+                        if (d4StillOpen)
+                            result.Winners.Add(new WinnerEntry
+                            {
+                                Game = "D4", SetNumber = slot + 1, RowNumber = r + 1,
+                                Numbers = string.Join("-", userNums), MatchLabel = "No match", Prize = "",
+                                DrawDate = result.D4DrawDate, IsActiveNoWin = true,
+                                PlayToDate = advDates[r].end.HasValue ? advDates[r].end.Value.ToString("M/d") : ""
+                            });
+                        continue;
+                    }
 
                     if (winType == "SB_Straight")
                     {
@@ -862,7 +1003,8 @@ public static class ResultsPageCls
                         RowNumber  = r + 1,
                         Numbers    = string.Join("-", userNums),
                         MatchLabel = matchLabel,
-                        Prize      = prize
+                        Prize      = prize,
+                        DrawDate   = result.D4DrawDate
                     });
                 }
             }
@@ -873,12 +1015,17 @@ public static class ResultsPageCls
         {
             string winTimeNorm = NormalizeTime(result.DDRaceTime);
             string winTimeLast3 = winTimeNorm.Length >= 3 ? winTimeNorm[^3..] : winTimeNorm;
+            var ddAdvSlotCache = new Dictionary<int, (DateTime?, DateTime?)[]>();
+            var ddDate = DateTime.TryParse(result.DDDrawDate, out var dddt) ? dddt : DateTime.Today;
             foreach (var (slot, rows) in ReadDDSets())
             {
+                var advDates = ReadAdvanceDates("dd", slot);
                 for (int r = 0; r < Rows; r++)
                 {
                     var (h1, h2, h3, userTime) = rows[r];
                     bool horsesSet = h1 > 0 && h2 > 0 && h3 > 0;
+                    bool ddValid = IsRowValidForDate(advDates[r].start, advDates[r].end, ddDate, selectedDate: date);
+                    if (!ddValid) continue;
                     string userTimeDigits = new string(userTime.Where(char.IsDigit).ToArray());
                     bool timeEntered = userTimeDigits.Length == 3;
 
@@ -904,11 +1051,24 @@ public static class ResultsPageCls
                     }
                     else if (timeMatch) winType = "Time";
 
-                    if (winType == null) continue;
-
-                    string numsDisplay = horsesSet
+                    string ddNumsDisplay = horsesSet
                         ? $"{h1}-{h2}-{h3}" + (timeEntered ? $"  ⏱{userTime}" : "")
                         : $"⏱{userTime}";
+
+                    if (winType == null)
+                    {
+                        bool ddStillOpen = (advDates[r].end.HasValue && advDates[r].end.Value.Date > DateTime.Today)
+                            || (advDates[r].drawStart > 0 && result.DDDrawNumber <= (advDates[r].drawEnd > 0 ? advDates[r].drawEnd : advDates[r].drawStart));
+                        if (ddStillOpen)
+                            result.Winners.Add(new WinnerEntry
+                            {
+                                Game = "DD", SetNumber = slot + 1, RowNumber = r + 1,
+                                Numbers = ddNumsDisplay, MatchLabel = "No match", Prize = "",
+                                DrawDate = result.DDDrawDate, IsActiveNoWin = true,
+                                PlayToDate = advDates[r].end.HasValue ? advDates[r].end.Value.ToString("M/d") : ""
+                            });
+                        continue;
+                    }
 
                     string matchLabel = winType;
                     string prize = winType switch
@@ -923,26 +1083,483 @@ public static class ResultsPageCls
                         Game       = "DD",
                         SetNumber  = slot + 1,
                         RowNumber  = r + 1,
-                        Numbers    = numsDisplay,
+                        Numbers    = ddNumsDisplay,
                         MatchLabel = matchLabel,
-                        Prize      = prize
+                        Prize      = prize,
+                        DrawDate   = result.DDDrawDate
                     });
                 }
             }
         }
 
+        // ── Scan past draws for active advance tickets ───────────────────────────
+        ScanAdvancePastWins(date, result);
+
+        // ── Ensure active advance tickets always appear even when draw data is missing ──
+        // Covers case where fetch failed or today's draw isn't published yet.
+        ScanActiveAdvanceTickets(date, result);
+
         return result;
+    }
+
+    // Adds "in play" entries for any active advance ticket rows covering the selected date
+    // that weren't already added by the primary scan or ScanAdvancePastWins.
+    static void ScanActiveAdvanceTickets(DateTime date, DateResultData result)
+    {
+        bool AlreadyAdded(string game, int slot, int row) =>
+            result.Winners.Any(w => w.Game == game && w.SetNumber == slot + 1 && w.RowNumber == row + 1);
+
+        void AddIfMissing(string game, string prefix, int cols, Func<int[], string> numsDisplay, int currentDrawNum = 0)
+        {
+            foreach (var (slot, rows) in ReadSets(prefix, cols))
+            {
+                var advDates = ReadAdvanceDates(prefix, slot);
+                for (int r = 0; r < Rows; r++)
+                {
+                    if (!RowAllFilled(rows[r])) continue;
+                    bool hasDateRange = advDates[r].start.HasValue;
+                    bool hasDrawRange = advDates[r].drawStart > 0;
+                    if (!hasDateRange && !hasDrawRange) continue;
+                    if (hasDateRange)
+                    {
+                        if (date.Date < advDates[r].start.Value.Date) continue;
+                        if (advDates[r].end.HasValue && date.Date > advDates[r].end.Value.Date) continue;
+                        if (advDates[r].end.HasValue && advDates[r].end.Value.Date < DateTime.Today) continue;
+                    }
+                    if (hasDrawRange && !hasDateRange)
+                    {
+                        // Draw# only ticket — verify current draw is in range
+                        if (currentDrawNum == 0) continue;
+                        int effEnd = advDates[r].drawEnd > 0 ? advDates[r].drawEnd : advDates[r].drawStart;
+                        if (currentDrawNum < advDates[r].drawStart || currentDrawNum > effEnd) continue;
+                    }
+                    if (AlreadyAdded(game, slot, r)) continue;
+                    var nums = rows[r].Select(int.Parse).ToArray();
+                    result.Winners.Add(new WinnerEntry
+                    {
+                        Game = game, SetNumber = slot + 1, RowNumber = r + 1,
+                        Numbers = numsDisplay(nums), MatchLabel = "", Prize = "", DrawDate = "",
+                        IsActiveNoWin = true,
+                        PlayToDate = advDates[r].end.HasValue ? advDates[r].end.Value.ToString("M/d") : ""
+                    });
+                }
+            }
+        }
+
+        // Use max draw# for D3 (either midday or evening — whichever is latest)
+        int d3DrawNum = Math.Max(result.D3MiddayDrawNum, result.D3EveningDrawNum);
+        AddIfMissing("F5", "f5", 5, n => string.Join("  ", n.Select(x => x.ToString("D2"))), result.F5DrawNumber);
+        AddIfMissing("SL", "sl", 6, n => string.Join("  ", n.Take(5).Select(x => x.ToString("D2"))) + "  |M:" + n[5].ToString("D2"), result.SLDrawNumber);
+        AddIfMissing("PB", "pb", 6, n => string.Join("  ", n.Take(5).Select(x => x.ToString("D2"))) + "  |PB:" + n[5].ToString("D2"), result.PBDrawNumber);
+        AddIfMissing("MM", "mm", 6, n => string.Join("  ", n.Take(5).Select(x => x.ToString("D2"))) + "  |MB:" + n[5].ToString("D2"), result.MMDrawNumber);
+        AddIfMissing("D3", "d3", 3, n => string.Join("-", n), d3DrawNum);
+        AddIfMissing("D4", "d4", 4, n => string.Join("-", n), result.D4DrawNumber);
+        // DD handled separately (different storage format — skip here)
+    }
+
+    // For each game, look through ALL cached draws BEFORE the selected date and surface
+    // any wins by active advance-play tickets that were not caught by the primary scan.
+    // This keeps past wins visible on the results page as long as the ticket is still running.
+    static void ScanAdvancePastWins(DateTime date, DateResultData result)
+    {
+        // ── F5 ──────────────────────────────────────────────────────────────────
+        var f5Past = _f5
+            .Select(d => (Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
+                          d.DrawDate, d.DrawNumber, d.Numbers, d.Prizes))
+            .Where(d => d.Date != DateTime.MinValue && d.Date.Date <= date.Date)
+            .OrderByDescending(d => d.Date)
+            .ToList();
+
+        if (f5Past.Count > 0)
+        {
+            foreach (var (slot, rows) in ReadSets("f5", 5))
+            {
+                var advDates = ReadAdvanceDates("f5", slot);
+                for (int r = 0; r < Rows; r++)
+                {
+                    if (!RowAllFilled(rows[r])) continue;
+                    if (!advDates[r].start.HasValue && !advDates[r].end.HasValue && advDates[r].drawStart == 0) continue;
+                    var nums = rows[r].Select(int.Parse).ToArray();
+                    foreach (var draw in f5Past)
+                    {
+                        if (!IsRowValidForDate(advDates[r].start, advDates[r].end, draw.Date)) continue;
+                        if (result.Winners.Any(w => w.Game == "F5" && w.SetNumber == slot + 1 && w.RowNumber == r + 1 && w.DrawDate == draw.DrawDate && !w.IsActiveNoWin)) continue;
+                        var winSet  = new HashSet<int>(draw.Numbers);
+                        int matches = nums.Count(n => winSet.Contains(n));
+                        string prize = F5Prize(matches, draw.Prizes ?? Array.Empty<DrawPrizeTier>());
+                        if (string.IsNullOrEmpty(prize)) continue;
+                        result.Winners.Add(new WinnerEntry
+                        {
+                            Game = "F5", SetNumber = slot + 1, RowNumber = r + 1,
+                            Numbers    = string.Join("  ", nums.Select(n => n.ToString("D2"))),
+                            MatchLabel = $"{matches}/5", Prize = prize, DrawDate = draw.DrawDate ?? ""
+                        });
+                    }
+                }
+            }
+        }
+
+        // ── SL ──────────────────────────────────────────────────────────────────
+        var slPast = _sl
+            .Select(d => (Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
+                          d.DrawDate, d.DrawNumber, d.MainNumbers, d.MegaNumber, d.Prizes))
+            .Where(d => d.Date != DateTime.MinValue && d.Date.Date <= date.Date)
+            .OrderByDescending(d => d.Date)
+            .ToList();
+
+        if (slPast.Count > 0)
+        {
+            foreach (var (slot, rows) in ReadSets("sl", 6))
+            {
+                var advDates = ReadAdvanceDates("sl", slot);
+                for (int r = 0; r < Rows; r++)
+                {
+                    if (!RowAllFilled(rows[r])) continue;
+                    if (!advDates[r].start.HasValue && !advDates[r].end.HasValue && advDates[r].drawStart == 0) continue;
+                    var nums = rows[r].Select(int.Parse).ToArray();
+                    foreach (var draw in slPast)
+                    {
+                        if (!IsRowValidForDate(advDates[r].start, advDates[r].end, draw.Date)) continue;
+                        if (result.Winners.Any(w => w.Game == "SL" && w.SetNumber == slot + 1 && w.RowNumber == r + 1 && w.DrawDate == draw.DrawDate && !w.IsActiveNoWin)) continue;
+                        var mainSet     = new HashSet<int>(draw.MainNumbers);
+                        int mainMatches = nums.Take(5).Count(n => mainSet.Contains(n));
+                        bool megaMatch  = nums.Length == 6 && draw.MegaNumber > 0 && nums[5] == draw.MegaNumber;
+                        string prize    = SLPrize(mainMatches, megaMatch, draw.Prizes ?? Array.Empty<DrawPrizeTier>());
+                        if (string.IsNullOrEmpty(prize)) continue;
+                        string ml  = megaMatch ? $"{mainMatches}+M" : $"{mainMatches}/5";
+                        string nds = string.Join("  ", nums.Take(5).Select(n => n.ToString("D2"))) + "  |M:" + nums[5].ToString("D2");
+                        result.Winners.Add(new WinnerEntry
+                        {
+                            Game = "SL", SetNumber = slot + 1, RowNumber = r + 1,
+                            Numbers = nds, MatchLabel = ml, Prize = prize, DrawDate = draw.DrawDate ?? ""
+                        });
+                    }
+                }
+            }
+        }
+
+        // ── PB ──────────────────────────────────────────────────────────────────
+        var pbPast = _pb
+            .Select(d => (Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
+                          d.DrawDate, d.DrawNumber, d.MainNumbers, d.PBNumber, d.Prizes))
+            .Where(d => d.Date != DateTime.MinValue && d.Date.Date <= date.Date)
+            .OrderByDescending(d => d.Date)
+            .ToList();
+
+        if (pbPast.Count > 0)
+        {
+            foreach (var (slot, rows) in ReadSets("pb", 6))
+            {
+                var advDates = ReadAdvanceDates("pb", slot);
+                for (int r = 0; r < Rows; r++)
+                {
+                    if (!RowAllFilled(rows[r])) continue;
+                    if (!advDates[r].start.HasValue && !advDates[r].end.HasValue && advDates[r].drawStart == 0) continue;
+                    var nums = rows[r].Select(int.Parse).ToArray();
+                    foreach (var draw in pbPast)
+                    {
+                        if (!IsRowValidForDate(advDates[r].start, advDates[r].end, draw.Date)) continue;
+                        if (result.Winners.Any(w => w.Game == "PB" && w.SetNumber == slot + 1 && w.RowNumber == r + 1 && w.DrawDate == draw.DrawDate && !w.IsActiveNoWin)) continue;
+                        var mainSet     = new HashSet<int>(draw.MainNumbers);
+                        int mainMatches = nums.Take(5).Count(n => mainSet.Contains(n));
+                        bool pbMatch    = nums.Length == 6 && draw.PBNumber > 0 && nums[5] == draw.PBNumber;
+                        string prize    = PBPrize(mainMatches, pbMatch, draw.Prizes ?? Array.Empty<DrawPrizeTier>());
+                        if (string.IsNullOrEmpty(prize)) continue;
+                        string ml  = pbMatch ? $"{mainMatches}+PB" : $"{mainMatches}/5";
+                        string nds = string.Join("  ", nums.Take(5).Select(n => n.ToString("D2"))) + "  |PB:" + nums[5].ToString("D2");
+                        result.Winners.Add(new WinnerEntry
+                        {
+                            Game = "PB", SetNumber = slot + 1, RowNumber = r + 1,
+                            Numbers = nds, MatchLabel = ml, Prize = prize, DrawDate = draw.DrawDate ?? ""
+                        });
+                    }
+                }
+            }
+        }
+
+        // ── MM ──────────────────────────────────────────────────────────────────
+        var mmPast = _mm
+            .Select(d => (Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
+                          d.DrawDate, d.DrawNumber, d.MainNumbers, d.MegaNumber, d.Prizes))
+            .Where(d => d.Date != DateTime.MinValue && d.Date.Date <= date.Date)
+            .OrderByDescending(d => d.Date)
+            .ToList();
+
+        if (mmPast.Count > 0)
+        {
+            foreach (var (slot, rows) in ReadSets("mm", 6))
+            {
+                var advDates = ReadAdvanceDates("mm", slot);
+                for (int r = 0; r < Rows; r++)
+                {
+                    if (!RowAllFilled(rows[r])) continue;
+                    if (!advDates[r].start.HasValue && !advDates[r].end.HasValue && advDates[r].drawStart == 0) continue;
+                    var nums = rows[r].Select(int.Parse).ToArray();
+                    foreach (var draw in mmPast)
+                    {
+                        if (!IsRowValidForDate(advDates[r].start, advDates[r].end, draw.Date)) continue;
+                        if (result.Winners.Any(w => w.Game == "MM" && w.SetNumber == slot + 1 && w.RowNumber == r + 1 && w.DrawDate == draw.DrawDate && !w.IsActiveNoWin)) continue;
+                        var mainSet     = new HashSet<int>(draw.MainNumbers);
+                        int mainMatches = nums.Take(5).Count(n => mainSet.Contains(n));
+                        bool mbMatch    = nums.Length == 6 && draw.MegaNumber > 0 && nums[5] == draw.MegaNumber;
+                        string prize    = MMPrize(mainMatches, mbMatch, draw.Prizes ?? Array.Empty<DrawPrizeTier>());
+                        if (string.IsNullOrEmpty(prize)) continue;
+                        string ml  = mbMatch ? $"{mainMatches}+MB" : $"{mainMatches}/5";
+                        string nds = string.Join("  ", nums.Take(5).Select(n => n.ToString("D2"))) + "  |MB:" + nums[5].ToString("D2");
+                        result.Winners.Add(new WinnerEntry
+                        {
+                            Game = "MM", SetNumber = slot + 1, RowNumber = r + 1,
+                            Numbers = nds, MatchLabel = ml, Prize = prize, DrawDate = draw.DrawDate ?? ""
+                        });
+                    }
+                }
+            }
+        }
+
+        // ── D3 ──────────────────────────────────────────────────────────────────
+        var d3PastGroups = _d3
+            .GroupBy(d => d.DrawDate)
+            .Select(g =>
+            {
+                var ordered = g.OrderBy(d => d.DrawNumber).ToList();
+                var grpDate = DateTime.TryParse(g.Key, out var dt) ? dt : DateTime.MinValue;
+                return (DateLabel: g.Key, Date: grpDate,
+                    Midday:          ordered.Count >= 1 ? ordered[0].Numbers : null,
+                    MiddayPrizes:    ordered.Count >= 1 ? ordered[0].Prizes  : Array.Empty<DrawPrizeTier>(),
+                    MiddayDrawNum:   ordered.Count >= 1 ? ordered[0].DrawNumber : 0,
+                    Evening:         ordered.Count >= 2 ? ordered[1].Numbers : null,
+                    EveningPrizes:   ordered.Count >= 2 ? ordered[1].Prizes  : Array.Empty<DrawPrizeTier>(),
+                    EveningDrawNum:  ordered.Count >= 2 ? ordered[1].DrawNumber : 0);
+            })
+            .Where(g => g.Date != DateTime.MinValue && g.Date.Date <= date.Date)
+            .OrderByDescending(g => g.Date)
+            .ToList();
+
+        if (d3PastGroups.Count > 0)
+        {
+            foreach (var (slot, rows) in ReadSets("d3", 3))
+            {
+                var betTypes = ReadD3BetTypes(slot);
+                var drawFilters = ReadD3DrawFilters(slot);
+                var advDates = ReadAdvanceDates("d3", slot);
+                for (int r = 0; r < Rows; r++)
+                {
+                    if (!RowAllFilled(rows[r])) continue;
+                    if (!advDates[r].start.HasValue && !advDates[r].end.HasValue && advDates[r].drawStart == 0) continue;
+                    var userNums   = rows[r].Select(int.Parse).ToArray();
+                    var sortedUser = userNums.OrderBy(x => x).ToArray();
+                    string bt      = betTypes[r];
+                    string df      = drawFilters[r];
+                    string boxType = D3BoxType(userNums);
+                    foreach (var draw in d3PastGroups)
+                    {
+                        bool dValid = IsRowValidForDate(advDates[r].start, advDates[r].end, draw.Date);
+                        if (!dValid) continue;
+                        if (result.Winners.Any(w => w.Game == "D3" && w.SetNumber == slot + 1 && w.RowNumber == r + 1 && w.DrawDate == draw.DateLabel && !w.IsActiveNoWin)) continue;
+                        bool isDayStr = df != "E" && draw.Midday  != null && userNums.SequenceEqual(draw.Midday);
+                        bool isDayBox = !isDayStr && df != "E" && draw.Midday  != null && sortedUser.SequenceEqual(draw.Midday.OrderBy(x => x));
+                        bool isEveStr = df != "M" && draw.Evening != null && userNums.SequenceEqual(draw.Evening);
+                        bool isEveBox = !isEveStr && df != "M" && draw.Evening != null && sortedUser.SequenceEqual(draw.Evening.OrderBy(x => x));
+                        string? dayWin = null, eveWin = null;
+                        if (bt == "S") { if (isDayStr) dayWin = "Straight"; if (isEveStr) eveWin = "Straight"; }
+                        else if (bt == "B")
+                        {
+                            if ((isDayStr || isDayBox) && !string.IsNullOrEmpty(boxType)) dayWin = boxType;
+                            if ((isEveStr || isEveBox) && !string.IsNullOrEmpty(boxType)) eveWin = boxType;
+                        }
+                        else
+                        {
+                            if (isDayStr) dayWin = "SB_Straight"; else if (isDayBox && !string.IsNullOrEmpty(boxType)) dayWin = "SB_Box";
+                            if (isEveStr) eveWin = "SB_Straight"; else if (isEveBox && !string.IsNullOrEmpty(boxType)) eveWin = "SB_Box";
+                        }
+                        if (dayWin == null && eveWin == null) continue;
+                        string ml, p;
+                        if (dayWin != null && eveWin != null)
+                        { ml = $"Md-{D3Label(dayWin)} Ev-{D3Label(eveWin)}"; p = $"{D3PrizeCalc(dayWin, boxType, draw.MiddayPrizes)} + {D3PrizeCalc(eveWin, boxType, draw.EveningPrizes)}"; }
+                        else if (dayWin != null)
+                        { ml = $"Md-{D3Label(dayWin)}"; p = D3PrizeCalc(dayWin, boxType, draw.MiddayPrizes); }
+                        else
+                        { ml = $"Ev-{D3Label(eveWin!)}"; p = D3PrizeCalc(eveWin!, boxType, draw.EveningPrizes); }
+                        result.Winners.Add(new WinnerEntry
+                        {
+                            Game = "D3", SetNumber = slot + 1, RowNumber = r + 1,
+                            Numbers = string.Join("-", userNums), MatchLabel = ml, Prize = p,
+                            DrawDate = draw.DateLabel ?? ""
+                        });
+                    }
+                }
+            }
+        }
+
+        // ── D4 ──────────────────────────────────────────────────────────────────
+        var d4Past = _d4
+            .Select(d => (Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
+                          d.DrawDate, d.DrawNumber, d.Numbers, d.Prizes))
+            .Where(d => d.Date != DateTime.MinValue && d.Date.Date <= date.Date)
+            .OrderByDescending(d => d.Date)
+            .ToList();
+
+        if (d4Past.Count > 0)
+        {
+            foreach (var (slot, rows) in ReadSets("d4", 4))
+            {
+                var betTypes = ReadD4BetTypes(slot);
+                var advDates = ReadAdvanceDates("d4", slot);
+                for (int r = 0; r < Rows; r++)
+                {
+                    if (!RowAllFilled(rows[r])) continue;
+                    if (!advDates[r].start.HasValue && !advDates[r].end.HasValue && advDates[r].drawStart == 0) continue;
+                    var userNums   = rows[r].Select(int.Parse).ToArray();
+                    var sortedUser = userNums.OrderBy(x => x).ToArray();
+                    string bt = betTypes[r];
+                    string boxType = D4BoxType(userNums);
+                    foreach (var draw in d4Past)
+                    {
+                        if (!IsRowValidForDate(advDates[r].start, advDates[r].end, draw.Date)) continue;
+                        if (result.Winners.Any(w => w.Game == "D4" && w.SetNumber == slot + 1 && w.RowNumber == r + 1 && w.DrawDate == draw.DrawDate && !w.IsActiveNoWin)) continue;
+                        var sortedWin = draw.Numbers.OrderBy(x => x).ToArray();
+                        bool isStr = userNums.SequenceEqual(draw.Numbers);
+                        bool isBox = !isStr && sortedUser.SequenceEqual(sortedWin);
+                        string? wt = null;
+                        if (bt == "S") { if (isStr) wt = "Straight"; }
+                        else if (bt == "B") { if ((isStr || isBox) && !string.IsNullOrEmpty(boxType)) wt = boxType; }
+                        else { if (isStr) wt = "SB_Straight"; else if (isBox && !string.IsNullOrEmpty(boxType)) wt = boxType; }
+                        if (wt == null) continue;
+                        string ml = wt == "SB_Straight" ? "S&B!" : wt == "Straight" ? "Straight" : "Box";
+                        string p  = D4PrizeCalc(wt, bt, draw.Prizes ?? Array.Empty<DrawPrizeTier>());
+                        result.Winners.Add(new WinnerEntry
+                        {
+                            Game = "D4", SetNumber = slot + 1, RowNumber = r + 1,
+                            Numbers = string.Join("-", userNums), MatchLabel = ml, Prize = p,
+                            DrawDate = draw.DrawDate ?? ""
+                        });
+                    }
+                }
+            }
+        }
+
+        // ── DD ──────────────────────────────────────────────────────────────────
+        var ddPast = _dd
+            .Select(d => (Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
+                          d.DrawDate, d.DrawNumber, d.Horses, d.RaceTime, d.Prizes))
+            .Where(d => d.Date != DateTime.MinValue && d.Date.Date <= date.Date)
+            .OrderByDescending(d => d.Date)
+            .ToList();
+
+        if (ddPast.Count > 0)
+        {
+            foreach (var (slot, rows) in ReadDDSets())
+            {
+                var advDates = ReadAdvanceDates("dd", slot);
+                for (int r = 0; r < Rows; r++)
+                {
+                    var (h1, h2, h3, userTime) = rows[r];
+                    bool horsesSet = h1 > 0 && h2 > 0 && h3 > 0;
+                    if (!advDates[r].start.HasValue && !advDates[r].end.HasValue && advDates[r].drawStart == 0) continue;
+                    string userTimeDigits = new string(userTime.Where(char.IsDigit).ToArray());
+                    bool timeEntered = userTimeDigits.Length == 3;
+                    if (!horsesSet && !timeEntered) continue;
+                    string numsDisplay = horsesSet ? $"{h1}-{h2}-{h3}" + (timeEntered ? $"  ⏱{userTime}" : "") : $"⏱{userTime}";
+                    foreach (var draw in ddPast)
+                    {
+                        if (!IsRowValidForDate(advDates[r].start, advDates[r].end, draw.Date)) continue;
+                        if (result.Winners.Any(w => w.Game == "DD" && w.SetNumber == slot + 1 && w.RowNumber == r + 1 && w.DrawDate == draw.DrawDate && !w.IsActiveNoWin)) continue;
+                        string winTimeNorm = NormalizeTime(draw.RaceTime ?? "");
+                        string winTimeLast3 = winTimeNorm.Length >= 3 ? winTimeNorm[^3..] : winTimeNorm;
+                        bool timeMatch = timeEntered && !string.IsNullOrEmpty(winTimeLast3) && userTimeDigits == winTimeLast3;
+                        string? wt = null;
+                        if (horsesSet)
+                        {
+                            bool m1 = h1 == draw.Horses[0]; bool m2 = h2 == draw.Horses[1]; bool m3 = h3 == draw.Horses[2];
+                            if      (m1 && m2 && m3 && timeMatch) wt = "GRAND!";
+                            else if (m1 && m2 && timeMatch)       wt = "Exa+Time";
+                            else if (m1 && m2)                    wt = "Exacta";
+                            else if (m1 && timeMatch)             wt = "Win+Time";
+                            else if (m1)                          wt = "Win";
+                            else if (timeMatch)                   wt = "Time";
+                        }
+                        else if (timeMatch) wt = "Time";
+                        if (wt == null) continue;
+                        string p = wt switch
+                        {
+                            "Win+Time" => DDComboPrize("Win",    "Time", draw.Prizes ?? Array.Empty<DrawPrizeTier>()),
+                            "Exa+Time" => DDComboPrize("Exacta", "Time", draw.Prizes ?? Array.Empty<DrawPrizeTier>()),
+                            _          => DDPrize(wt, draw.Prizes ?? Array.Empty<DrawPrizeTier>())
+                        };
+                        result.Winners.Add(new WinnerEntry
+                        {
+                            Game = "DD", SetNumber = slot + 1, RowNumber = r + 1,
+                            Numbers = numsDisplay, MatchLabel = wt, Prize = p,
+                            DrawDate = draw.DrawDate ?? ""
+                        });
+                    }
+                }
+            }
+        }
     }
 
     static bool RowAllFilled(string[] row) =>
         row.All(v => !string.IsNullOrWhiteSpace(v) && int.TryParse(v, out _));
 
+    // Returns (playStart, playEnd, drawStart, drawEnd) per row for a given slot.
+    // Format in prefs: "{prefix}_adv_{slot}" = "yyyyMMdd~yyyyMMdd~drawStart~drawEnd|..." one entry per row.
+    static (DateTime? start, DateTime? end, int drawStart, int drawEnd)[] ReadAdvanceDates(string prefix, int slot)
+    {
+        var result = new (DateTime?, DateTime?, int, int)[Rows];
+        string raw = Preferences.Get($"{prefix}_adv_{slot}", "");
+        if (string.IsNullOrEmpty(raw)) return result;
+        var parts = raw.Split('|');
+        for (int r = 0; r < Rows && r < parts.Length; r++)
+        {
+            var pair = parts[r].Split('~');
+            if (pair.Length < 2) continue;
+            DateTime? start = null, end = null;
+            if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null,
+                    System.Globalization.DateTimeStyles.None, out var sd)) start = sd;
+            if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null,
+                    System.Globalization.DateTimeStyles.None, out var ed)) end = ed;
+            int drawStart = pair.Length > 2 && int.TryParse(pair[2], out int ds) ? ds : 0;
+            int drawEnd   = pair.Length > 3 && int.TryParse(pair[3], out int de) ? de : 0;
+            result[r] = (start, end, drawStart, drawEnd);
+        }
+        return result;
+    }
+
+    // No advance dates/draw# = ticket is for today only.
+    // With date range = draw date must fall within [start, end].
+    // With draw# range = draw number must fall within [drawStart, drawEnd] (drawEnd optional, defaults to drawStart).
+    static bool IsRowValidForDate(DateTime? playStart, DateTime? playEnd, DateTime drawDate,
+        int drawNum = 0, int drawStart = 0, int drawEnd = 0, DateTime? selectedDate = null)
+    {
+        bool hasDate    = playStart.HasValue || playEnd.HasValue;
+        bool hasDrawNum = drawStart > 0;
+
+        if (!hasDate && !hasDrawNum)
+            return drawDate.Date == (selectedDate?.Date ?? DateTime.Today);
+
+        if (hasDate)
+        {
+            DateTime start = playStart?.Date ?? DateTime.MinValue;
+            DateTime end   = playEnd?.Date   ?? DateTime.MaxValue;
+            if (drawDate.Date < start || drawDate.Date > end) return false;
+        }
+
+        if (hasDrawNum && drawNum > 0)
+        {
+            int effEnd = drawEnd > 0 ? drawEnd : drawStart;
+            if (drawNum < drawStart || drawNum > effEnd) return false;
+        }
+
+        return true;
+    }
+
     static string D3Label(string winType) => winType switch
     {
-        "Straight"    => "Str",
-        "SB_Straight" => "S&B!",
-        "Box3"        => "Box3",
-        "Box6"        => "Box6",
+        "Straight"    => "S",
+        "SB_Straight" => "S/B",
+        "SB_Box"      => "S/B",
+        "Box3"        => "B",
+        "Box6"        => "B",
         _ => winType
     };
 
@@ -956,6 +1573,19 @@ public static class ResultsPageCls
             var val = r < parts.Length ? parts[r] : "S";
             if (val == "S+B") val = "S&B";
             result[r] = valid.Contains(val) ? val : "S";
+        }
+        return result;
+    }
+
+    static string[] ReadD3DrawFilters(int slot)
+    {
+        string[] valid = ["B", "M", "E"];
+        var parts = Preferences.Get($"d3_drawfilters_{slot}", "").Split('|');
+        var result = new string[Rows];
+        for (int r = 0; r < Rows; r++)
+        {
+            var val = r < parts.Length ? parts[r] : "B";
+            result[r] = valid.Contains(val) ? val : "B";
         }
         return result;
     }

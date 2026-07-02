@@ -26,6 +26,7 @@ public partial class AdvanceGamesPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        TranslationX = 0;
         BuildCards();
     }
 
@@ -38,7 +39,7 @@ public partial class AdvanceGamesPage : ContentPage
 
         foreach (var game in Games)
         {
-            var entries = new List<(int Slot, int Row, DateTime? Start, DateTime? End, string[] Numbers, string DrawFilter)>();
+            var entries = new List<(int Slot, int Row, DateTime? Start, DateTime? End, string[] Numbers, string DrawFilter, string DrawStart, string DrawEnd)>();
 
             for (int slot = 0; slot < 10; slot++)
             {
@@ -85,8 +86,10 @@ public partial class AdvanceGamesPage : ContentPage
 
                     string drawFilter = game.Prefix == "d3" && r < d3DfParts.Length
                         ? (d3DfParts[r] ?? "B") : "B";
+                    string drawNumStart = pair.Length > 2 ? pair[2] : "";
+                    string drawNumEnd   = pair.Length > 3 ? pair[3] : "";
 
-                    entries.Add((slot, r, start, end, nums, drawFilter));
+                    entries.Add((slot, r, start, end, nums, drawFilter, drawNumStart, drawNumEnd));
                 }
             }
 
@@ -109,7 +112,7 @@ public partial class AdvanceGamesPage : ContentPage
     }
 
     Frame BuildGameCard(GameDef game,
-        List<(int Slot, int Row, DateTime? Start, DateTime? End, string[] Numbers, string DrawFilter)> entries,
+        List<(int Slot, int Row, DateTime? Start, DateTime? End, string[] Numbers, string DrawFilter, string DrawStart, string DrawEnd)> entries,
         DateTime today, DateTime now)
     {
         TimeSpan CutoffFor(string df) =>
@@ -181,7 +184,7 @@ public partial class AdvanceGamesPage : ContentPage
 
         // ── Entry rows ─────────────────────────────────────────────────────
         bool first = true;
-        foreach (var (slot, row, start, end, nums, drawFilter) in entries
+        foreach (var (slot, row, start, end, nums, drawFilter, drawNumStart, drawNumEnd) in entries
             .OrderBy(e => e.Slot).ThenBy(e => e.Row))
         {
             if (!first)
@@ -318,6 +321,22 @@ public partial class AdvanceGamesPage : ContentPage
                 TextColor = isActive ? Color.FromArgb("#374151") : Color.FromArgb("#9CA3AF"),
             });
             rowContainer.Children.Add(datesRow);
+
+            // Draw number line (if set)
+            if (!string.IsNullOrWhiteSpace(drawNumStart))
+            {
+                string drawText = string.IsNullOrWhiteSpace(drawNumEnd) || drawNumEnd == drawNumStart
+                    ? $"DRAW # {drawNumStart}"
+                    : $"DRAW # {drawNumStart} - {drawNumEnd}";
+                rowContainer.Children.Add(new Label
+                {
+                    Text = drawText,
+                    FontSize = 11,
+                    FontAttributes = FontAttributes.Bold,
+                    TextColor = isActive ? Color.FromArgb(game.AccentHex) : Color.FromArgb("#9CA3AF"),
+                    Margin = new Thickness(0, 2, 0, 0),
+                });
+            }
 
             // Tap row to navigate to that game/set/row
             int capturedSlot = slot;

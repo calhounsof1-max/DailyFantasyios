@@ -62,7 +62,7 @@ public partial class ArchivePage : ContentPage
         var btnRestore = new Button
         {
             Text = "Restore",
-            FontSize = 10,
+            FontSize = 13,
             BackgroundColor = Color.FromArgb("#1565C0"),
             TextColor = Colors.White,
             CornerRadius = 18,
@@ -75,7 +75,7 @@ public partial class ArchivePage : ContentPage
         var btnDelete = new Button
         {
             Text = "Delete",
-            FontSize = 10,
+            FontSize = 13,
             BackgroundColor = Color.FromArgb("#B71C1C"),
             TextColor = Colors.White,
             CornerRadius = 18,
@@ -122,23 +122,62 @@ public partial class ArchivePage : ContentPage
 
         if (action == null || action == "Cancel") return;
 
-        bool confirm = await DisplayAlert("Confirm Restore",
-            $"Restore {action} from this archive?\nThis will overwrite any current sets in that game.",
-            "Restore", "Cancel");
+        // Build preview of the numbers in this archive
+        string preview = BuildRestorePreview(entry, action);
+        bool confirm = await DisplayAlert($"Preview — {action}", preview, "Restore", "Cancel");
         if (!confirm) return;
 
         switch (action)
         {
-            case "All Games":   ArchiveService.RestoreAll(entry); break;
-            case "Fantasy 5":   ArchiveService.RestoreGame(entry, "f5"); break;
-            case "Super Lotto": ArchiveService.RestoreGame(entry, "sl"); break;
+            case "All Games":      ArchiveService.RestoreAll(entry); break;
+            case "Fantasy 5":      ArchiveService.RestoreGame(entry, "f5"); break;
+            case "Super Lotto":    ArchiveService.RestoreGame(entry, "sl"); break;
             case "Powerball":      ArchiveService.RestoreGame(entry, "pb"); break;
             case "Mega Millions":  ArchiveService.RestoreGame(entry, "mm"); break;
             case "Daily 3":        ArchiveService.RestoreGame(entry, "d3"); break;
-            case "Daily 4":     ArchiveService.RestoreGame(entry, "d4"); break;
+            case "Daily 4":        ArchiveService.RestoreGame(entry, "d4"); break;
         }
 
         await DisplayAlert("Restored", $"{action} sets have been restored.", "OK");
+    }
+
+    static string BuildRestorePreview(ArchiveEntry entry, string action)
+    {
+        // map action → (prefix, cols)
+        var games = action == "All Games"
+            ? new[] { ("f5","Fantasy 5",5), ("sl","Super Lotto",6), ("pb","Powerball",6),
+                      ("mm","Mega Millions",6), ("d3","Daily 3",3), ("d4","Daily 4",4) }
+            : action switch
+            {
+                "Fantasy 5"     => new[] { ("f5","Fantasy 5",5) },
+                "Super Lotto"   => new[] { ("sl","Super Lotto",6) },
+                "Powerball"     => new[] { ("pb","Powerball",6) },
+                "Mega Millions" => new[] { ("mm","Mega Millions",6) },
+                "Daily 3"       => new[] { ("d3","Daily 3",3) },
+                "Daily 4"       => new[] { ("d4","Daily 4",4) },
+                _               => Array.Empty<(string,string,int)>()
+            };
+
+        var sb = new System.Text.StringBuilder();
+        foreach (var (prefix, label, cols) in games)
+        {
+            if (!entry.Games.TryGetValue(prefix, out var d)) continue;
+            var rows = new List<string>();
+            for (int s = 0; s < 10; s++)
+            {
+                if (!d.TryGetValue($"set_{s}", out var raw) || string.IsNullOrWhiteSpace(raw.Replace("|",""))) continue;
+                var vals = raw.Split('|');
+                var nums = new List<string>();
+                for (int c = 0; c < cols && c < vals.Length; c++)
+                    if (!string.IsNullOrWhiteSpace(vals[c])) nums.Add(vals[c]);
+                if (nums.Count > 0) rows.Add($"Set {s+1}: {string.Join(" ", nums)}");
+            }
+            if (rows.Count == 0) continue;
+            if (sb.Length > 0) sb.AppendLine();
+            sb.AppendLine($"── {label} ──");
+            foreach (var r in rows) sb.AppendLine(r);
+        }
+        return sb.Length > 0 ? sb.ToString().TrimEnd() : "(no data found)";
     }
 
     async Task OnDelete(ArchiveEntry entry)

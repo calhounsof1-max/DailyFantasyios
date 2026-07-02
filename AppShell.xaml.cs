@@ -1,4 +1,4 @@
-﻿namespace DailyFantasyMAUI;
+namespace DailyFantasyMAUI;
 
 class SingletonRouteFactory(Element instance) : RouteFactory
 {
@@ -25,9 +25,11 @@ public partial class AppShell : Shell
 	internal static readonly DataViewerPage DataViewerPageInstance = new();
 	internal static readonly JackpotPage       JackpotPageInstance       = new();
 	internal static readonly CheckTicketPage   CheckTicketPageInstance   = new();
-	internal static readonly MyFavoritePage   MyFavoritePageInstance    = new();
-	internal static readonly AdvanceGamesPage    AdvanceGamesPageInstance    = new();
-	internal static readonly NotificationsPage   NotificationsPageInstance   = new();
+	internal static readonly MyFavoritePage       MyFavoritePageInstance       = new();
+	internal static readonly NotificationsPage    NotificationsPageInstance    = new();
+	internal static readonly AdvanceGamesPage     AdvanceGamesPageInstance     = new();
+	internal static readonly SummaryPage          SummaryPageInstance          = new();
+	internal static readonly DrawSearchPage       DrawSearchPageInstance        = new();
 
 #if IOS
 	protected override void OnNavigated(ShellNavigatedEventArgs args)
@@ -74,8 +76,10 @@ public partial class AppShell : Shell
 		Routing.RegisterRoute(nameof(DataViewerPage),  new SingletonRouteFactory(DataViewerPageInstance));
 		Routing.RegisterRoute(nameof(JackpotPage),       new SingletonRouteFactory(JackpotPageInstance));
 		Routing.RegisterRoute(nameof(CheckTicketPage),   new SingletonRouteFactory(CheckTicketPageInstance));
-		Routing.RegisterRoute(nameof(MyFavoritePage),    new SingletonRouteFactory(MyFavoritePageInstance));
-		Routing.RegisterRoute(nameof(AdvanceGamesPage),   new SingletonRouteFactory(AdvanceGamesPageInstance));
-		Routing.RegisterRoute(nameof(NotificationsPage),  new SingletonRouteFactory(NotificationsPageInstance));
+		Routing.RegisterRoute(nameof(MyFavoritePage),       new SingletonRouteFactory(MyFavoritePageInstance));
+		Routing.RegisterRoute(nameof(NotificationsPage),    new SingletonRouteFactory(NotificationsPageInstance));
+		Routing.RegisterRoute(nameof(AdvanceGamesPage),     new SingletonRouteFactory(AdvanceGamesPageInstance));
+		Routing.RegisterRoute(nameof(SummaryPage),           new SingletonRouteFactory(SummaryPageInstance));
+		Routing.RegisterRoute(nameof(DrawSearchPage),        new SingletonRouteFactory(DrawSearchPageInstance));
 	}
 }

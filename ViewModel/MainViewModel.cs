@@ -82,6 +82,7 @@ namespace DailyFantasyMAUI.ViewModel
                     await GetDataEntry.UpdateF5CsvAsync();
                     await GetDataEntry.UpdateSLCsvAsync();
                     await GetDataEntry.UpdateD3CsvAsync();
+                    await GetDataEntry.UpdateJackpotCacheAsync(); // fetch all jackpot results once per day
                 });
 
                 // Reload collections on the main thread after update

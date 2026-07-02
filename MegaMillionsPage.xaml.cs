@@ -26,9 +26,13 @@ public partial class MegaMillionsPage : ContentPage
 
     DateTime?[] _playStart = new DateTime?[Rows];
     DateTime?[] _playEnd   = new DateTime?[Rows];
+    string[]    _drawStart = new string[Rows];
+    string[]    _drawEnd   = new string[Rows];
     Grid?       _advOverlay;
     DatePicker? _advStartPicker;
     DatePicker? _advEndPicker;
+    Entry?      _advDrawStartEntry;
+    Entry?      _advDrawEndEntry;
     int         _advRow = -1;
 
     int[] _winningMainNums = Array.Empty<int>();
@@ -38,6 +42,7 @@ public partial class MegaMillionsPage : ContentPage
     bool _isPanning   = false;
     bool _voiceOn = false;
     bool _voiceSettingText = false;
+    bool _overrideMode = false;
     int  _voiceRow = 0, _voiceCol = 0;
     Entry? _voiceTarget = null;
     Color _voiceTargetOldColor = Colors.White;
@@ -121,7 +126,26 @@ public partial class MegaMillionsPage : ContentPage
     private async void BtnGoHome_Clicked(object sender, EventArgs e) =>
         await Shell.Current.Navigation.PopToRootAsync(false);
 
-    private async void BtnGames_Clicked(object sender, EventArgs e) => await GameNavHelper.ShowGamesDropdown(this);
+    private async void BtnGameMenu_Clicked(object sender, EventArgs e)
+    {
+        string? choice = await DisplayActionSheet("Go to Game", "Cancel", null,
+            "Fantasy 5", "Super Lotto", "Powerball", "Mega Millions", "Daily 3", "Daily 4", "Daily Derby", "Notifications", "Summary of Winnings", "Check Wins for Draw#");
+        if (choice == null || choice == "Cancel") return;
+        if (choice == "Notifications") { await Shell.Current.GoToAsync(nameof(NotificationsPage), false); return; }
+        if (choice == "Summary of Winnings") { await Shell.Current.GoToAsync(nameof(SummaryPage), false); return; }
+        if (choice == "Check Wins for Draw#") { DrawSearchPage.PresetGame = "Mega Millions"; await Shell.Current.GoToAsync(nameof(DrawSearchPage), false); return; }
+        await Shell.Current.Navigation.PopToRootAsync(false);
+        switch (choice)
+        {
+            case "Fantasy 5":    WinnerPage.ComingFrom    = "main"; await Shell.Current.GoToAsync(nameof(WinnerPage),     false); break;
+            case "Super Lotto":  SuperLottoPage.ComingFrom = "main"; await Shell.Current.GoToAsync(nameof(SuperLottoPage), false); break;
+            case "Powerball":    PowerballPage.ComingFrom  = "main"; await Shell.Current.GoToAsync(nameof(PowerballPage),  false); break;
+            case "Mega Millions":MegaMillionsPage.ComingFrom="main"; await Shell.Current.GoToAsync(nameof(MegaMillionsPage),false); break;
+            case "Daily 3":      Daily3Page.ComingFrom     = "main"; await Shell.Current.GoToAsync(nameof(Daily3Page),     false); break;
+            case "Daily 4":      Daily4Page.ComingFrom     = "main"; await Shell.Current.GoToAsync(nameof(Daily4Page),     false); break;
+            case "Daily Derby":  DailyDerbyPage.ComingFrom = "main"; await Shell.Current.GoToAsync(nameof(DailyDerbyPage), false); break;
+        }
+    }
 
     private async void BtnGoBack_Clicked(object sender, EventArgs e)
     {
@@ -146,21 +170,6 @@ public partial class MegaMillionsPage : ContentPage
     protected override void OnAppearing()
     {
         this.TranslateTo(0, 0, 220, Easing.CubicOut);
-        if (ComingFrom == "results")
-        {
-            btnBack.Text = "← RESULTS";
-            btnBack.BackgroundColor = Color.FromArgb("#FF8F00");
-        }
-        else if (ComingFrom == "main")
-        {
-            btnBack.Text = "← HOME";
-            btnBack.BackgroundColor = Color.FromArgb("#FF8F00");
-        }
-        else
-        {
-            btnBack.Text = "← PB";
-            btnBack.BackgroundColor = Color.FromArgb("#C62828");
-        }
         base.OnAppearing();
         _ = LoadAllDraws();
         Dispatcher.Dispatch(() =>
@@ -199,8 +208,6 @@ public partial class MegaMillionsPage : ContentPage
                     LoadEntries();
             }
             UpdateSlotPicker();
-            LoadAdvanceDates(_activeSlot);
-            UpdateAllResultBackgrounds();
             if (pendingRow >= 0)
                 _ = HighlightRow(pendingRow);
         });
@@ -208,8 +215,8 @@ public partial class MegaMillionsPage : ContentPage
 
     protected override void OnDisappearing()
     {
-        base.OnDisappearing();
         SaveAdvanceDates(_activeSlot);
+        base.OnDisappearing();
         if (_voiceOn) StopVoice();
         if (_highlightedView != null) { _highlightedView.BackgroundColor = Colors.White; _highlightedView = null; }
         SaveEntries();
@@ -231,7 +238,7 @@ public partial class MegaMillionsPage : ContentPage
     private void LoadEntries()
     {
         var saved = Preferences.Get("mm_entries", "");
-        if (string.IsNullOrEmpty(saved)) return;
+        if (string.IsNullOrEmpty(saved)) { ClearAllEntries(); return; }
         var vals = saved.Split('|');
         for (int r = 0; r < Rows; r++)
             for (int c = 0; c < TotalCols; c++)
@@ -266,6 +273,8 @@ public partial class MegaMillionsPage : ContentPage
         foreach (var lbl in _results) lbl.Text = "";
         Array.Clear(_playStart, 0, Rows);
         Array.Clear(_playEnd,   0, Rows);
+        Array.Clear(_drawStart, 0, Rows);
+        Array.Clear(_drawEnd,   0, Rows);
         UpdateAllResultBackgrounds();
     }
 
@@ -281,6 +290,8 @@ public partial class MegaMillionsPage : ContentPage
         _results[r].Text = "";
         _playStart[r] = null;
         _playEnd[r]   = null;
+        _drawStart[r] = "";
+        _drawEnd[r]   = "";
         UpdateResultBackground(r);
         SaveEntries();
     }
@@ -305,13 +316,91 @@ public partial class MegaMillionsPage : ContentPage
                 int idx = r * TotalCols + c;
                 _entries[r, c].Text = idx < vals.Length ? vals[idx] : "";
             }
-        CheckAll();
         LoadAdvanceDates(slot);
+        CheckAll();
         UpdateAllResultBackgrounds();
     }
 
     private bool SlotHasData(int slot) =>
         !string.IsNullOrEmpty(Preferences.Get(SetKey(slot), ""));
+
+
+    private bool _advAllDateMode = false;
+
+    private void BtnAdvAllToggle_Clicked(object sender, EventArgs e)
+    {
+        _advAllDateMode = !_advAllDateMode;
+        advAllDrawMode.IsVisible = !_advAllDateMode;
+        advAllDateMode.IsVisible = _advAllDateMode;
+        btnAdvAllToggle.Text = _advAllDateMode ? "#" : "📅";
+        btnAdvAllToggle.BackgroundColor = _advAllDateMode
+            ? Color.FromArgb("#2E7D32")
+            : Color.FromArgb("#546E7A");
+        if (_advAllDateMode)
+        {
+            advAllFromPicker.Date = DateTime.Today;
+            advAllToPicker.Date = DateTime.Today;
+        }
+    }
+
+    private void BtnAdvAllCombinedSet_Clicked(object sender, EventArgs e)
+    {
+        bool hasDate = _advAllDateMode;
+        DateTime from = advAllFromPicker.Date ?? DateTime.Today;
+        DateTime toRaw = advAllToPicker.Date ?? DateTime.Today;
+        var to = toRaw >= from ? toRaw : from;
+        string ds = (entAdvAllStart.Text ?? "").Trim();
+        string de = (entAdvAllEnd.Text ?? "").Trim();
+        bool hasDraw = !string.IsNullOrEmpty(ds) && int.TryParse(ds, out _);
+        if (!hasDate && !hasDraw) return;
+        int cols = _entries.GetLength(1);
+        for (int r = 0; r < Rows; r++)
+        {
+            bool hasNums = false;
+            for (int c = 0; c < cols; c++)
+                if (!string.IsNullOrEmpty(_entries[r, c].Text)) { hasNums = true; break; }
+            if (!hasNums) continue;
+            if (hasDate) { _playStart[r] = from; _playEnd[r] = to; }
+            if (hasDraw) { _drawStart[r] = ds; _drawEnd[r] = string.IsNullOrEmpty(de) ? ds : de; }
+        }
+        if (_activeSlot >= 0) SaveAdvanceDates(_activeSlot);
+        UpdateAllResultBackgrounds();
+    }
+
+    private static bool TryParseAdvDate(string? text, out DateTime result)
+    {
+        if (DateTime.TryParseExact(text ?? "", new[] { "M/d/yy", "M/d/yyyy", "MM/dd/yy", "MM/dd/yyyy", "M/d/yy", "M-d-yy", "M-d-yyyy" },
+            System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out result)) return true;
+        if (DateTime.TryParse(text ?? "", out result)) return true;
+        result = DateTime.Today;
+        return false;
+    }
+
+    private void ApplyAdvanceToRowIfActive(int row)
+    {
+        bool applied = false;
+        if (_advAllDateMode)
+        {
+            DateTime from = advAllFromPicker.Date ?? DateTime.Today;
+            DateTime to = advAllToPicker.Date ?? DateTime.Today;
+            if (to < from) to = from;
+            _playStart[row] = from; _playEnd[row] = to;
+            applied = true;
+        }
+        string ds = (entAdvAllStart.Text ?? "").Trim();
+        string de = (entAdvAllEnd.Text ?? "").Trim();
+        if (!string.IsNullOrEmpty(ds) && int.TryParse(ds, out _))
+        {
+            _drawStart[row] = ds;
+            _drawEnd[row] = string.IsNullOrEmpty(de) ? ds : de;
+            applied = true;
+        }
+        if (applied)
+        {
+            if (_activeSlot >= 0) SaveAdvanceDates(_activeSlot);
+            UpdateResultBackground(row);
+        }
+    }
 
     private void BuildSlotPicker()
     {
@@ -374,9 +463,10 @@ public partial class MegaMillionsPage : ContentPage
                     _entries[r, c].Text = idx < vals.Length ? vals[idx] : "";
                 }
             CheckAll();
+            LoadAdvanceDates(slot);
+            UpdateAllResultBackgrounds();
         }
         else if (SlotHasData(slot)) FillFromSlot(slot);
-        LoadAdvanceDates(slot); UpdateAllResultBackgrounds();
         UpdateSlotPicker();
     }
 
@@ -410,14 +500,18 @@ public partial class MegaMillionsPage : ContentPage
             var rowNum = new Label
             {
                 Text = $"{r + 1,2}.",
-                FontSize = 10,
+                FontSize = 13,
                 TextColor = Color.FromArgb("#F57F17"),
                 VerticalOptions = LayoutOptions.Center,
-                WidthRequest = 18,
+                WidthRequest = 24,
             };
             rowNum.GestureRecognizers.Add(new TapGestureRecognizer
             {
-                Command = new Command(() => ClearRow(rowIdx))
+                Command = new Command(async () =>
+                {
+                    bool ok = await DisplayAlert("Clear Row", $"Clear row {rowIdx + 1}?", "Ok", "Cancel");
+                    if (ok) ClearRow(rowIdx);
+                })
             });
             Grid.SetColumn(rowNum, 0);
             row.Children.Add(rowNum);
@@ -428,8 +522,23 @@ public partial class MegaMillionsPage : ContentPage
                 var entry = MakeEntry(Color.FromArgb("#FFF8E1"));
                 AttachMaxClamp(entry, MainMax);
                 int row_ = r, col_ = c;
-                entry.TextChanged += (_, _) =>
+                entry.TextChanged += (s, e) =>
                 {
+                    // Duplicate prevention (main cols only)
+                    string nv = e.NewTextValue ?? "";
+                    if (nv.Length == ((Entry)s!).MaxLength && int.TryParse(nv, out int entered) && entered > 0)
+                    {
+                        for (int ci = 0; ci < MainCols; ci++)
+                        {
+                            if (ci == col_) continue;
+                            if (int.TryParse(_entries[row_, ci].Text, out int ex) && ex == entered)
+                            {
+                                ((Entry)s!).Text = e.OldTextValue ?? "";
+                                lblStatus.Text = $"Row {row_ + 1}: {entered} already used — no duplicates";
+                                return;
+                            }
+                        }
+                    }
                     if (!_voiceSettingText && _entries[row_, col_].Text?.Length == 2) AdvanceFocus(row_, col_);
                     SaveEntries();
                     if (IsRowFull(row_)) CheckAll();
@@ -461,22 +570,34 @@ public partial class MegaMillionsPage : ContentPage
             // Result label
             var result = new Label
             {
-                Text = "",
+                Text = "+",
                 FontSize = 12,
                 FontAttributes = FontAttributes.Bold,
-                TextColor = Color.FromArgb("#888"),
+                TextColor = Color.FromArgb("#4B6A8A"),
                 VerticalOptions = LayoutOptions.Center,
-                WidthRequest = 32,
                 HorizontalTextAlignment = TextAlignment.Center,
             };
             _results[r] = result;
+            var resultBorder = new Border
+            {
+                Content = result,
+                Stroke = new SolidColorBrush(Color.FromArgb("#2D4A6A")),
+                StrokeThickness = 1,
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 8 },
+                BackgroundColor = Colors.Transparent,
+                Padding = new Thickness(4, 2),
+                WidthRequest = 40,
+                VerticalOptions = LayoutOptions.Center,
+                HorizontalOptions = LayoutOptions.Center,
+            };
+            Grid.SetColumn(resultBorder, 8);
+            row.Children.Add(resultBorder);
+
             int ri = r;
-            result.GestureRecognizers.Add(new TapGestureRecognizer
+            resultBorder.GestureRecognizers.Add(new TapGestureRecognizer
             {
                 Command = new Command(() => ShowAdvancePlayOverlay(ri))
             });
-            Grid.SetColumn(result, 8);
-            row.Children.Add(result);
 
             rowsContainer.Children.Add(row);
         }
@@ -487,12 +608,12 @@ public partial class MegaMillionsPage : ContentPage
         var e = new Entry
         {
             Keyboard = Keyboard.Numeric,
-            FontSize = 11,
+            FontSize = 18,
             FontAttributes = FontAttributes.Bold,
             TextColor = Colors.Black,
             BackgroundColor = bg,
             HorizontalTextAlignment = TextAlignment.Center,
-            HeightRequest = 22,
+            HeightRequest = 44,
             MaxLength = 2,
         };
         e.HandlerChanged += ForceBlackText;
@@ -510,6 +631,7 @@ public partial class MegaMillionsPage : ContentPage
     {
         if (col < MainCols - 1) { _entries[row, col + 1].Focus(); return; }
         if (col == MainCols - 1) { _entries[row, MBCol].Focus(); return; }
+        ApplyAdvanceToRowIfActive(row);
         if (row + 1 < Rows) _entries[row + 1, 0].Focus();
     }
 
@@ -570,12 +692,14 @@ public partial class MegaMillionsPage : ContentPage
 
         spinner.IsVisible = true;
         spinner.IsRunning = true;
+        loadingOverlay.IsVisible = true;
         lblDrawDate.Text = "Fetching draws from calottery.com...";
 
         var raw = await GetDataEntry.GetMegaMillionsDraws(30);
 
         spinner.IsVisible = false;
         spinner.IsRunning = false;
+        loadingOverlay.IsVisible = false;
 
         if (raw.Count == 0)
         {
@@ -591,7 +715,7 @@ public partial class MegaMillionsPage : ContentPage
             .Select(d => (
                 Date: DateTime.TryParse(d.DrawDate, out var dt) ? dt : DateTime.MinValue,
                 Label: d.DrawDate,
-                DrawNumber:  d.DrawNumber,
+                DrawNumber: d.DrawNumber,
                 MainNumbers: d.MainNumbers,
                 MBNumber:    d.MegaNumber))
             .Where(d => d.Date != DateTime.MinValue)
@@ -687,7 +811,18 @@ public partial class MegaMillionsPage : ContentPage
             {
                 _results[r].Text = "";
             }
+
         }
+        UpdateAllResultBackgrounds();
+    }
+
+
+    internal void ClearForArchive()
+    {
+        _slotCache.Clear();
+        _activeSlot = -1;
+        ClearAllEntries();
+        UpdateSlotPicker();
     }
 
     // ── Button handlers ──────────────────────────────────────────────────────
@@ -715,6 +850,17 @@ public partial class MegaMillionsPage : ContentPage
         lblStatus.Text = "Log copied to clipboard";
         await Task.Delay(1500);
         lblStatus.Text = orig;
+    }
+
+    private void BtnOverride_Clicked(object sender, EventArgs e)
+    {
+        _overrideMode = !_overrideMode;
+        btnOverride.BackgroundColor = _overrideMode
+            ? Color.FromArgb("#E65100")
+            : Color.FromArgb("#546E7A");
+        advAllPanel.BackgroundColor = _overrideMode
+            ? Color.FromArgb("#FFF3E0")
+            : Colors.Transparent;
     }
 
     private async void BtnQuickPick_Clicked(object sender, EventArgs e)
@@ -754,13 +900,41 @@ public partial class MegaMillionsPage : ContentPage
     {
         bool confirm = await DisplayAlert("Clear All Sets", "Remove all 10 saved sets?", "Yes", "Cancel");
         if (!confirm) return;
-        for (int i = 0; i < 10; i++) Preferences.Remove(SetKey(i));
-        ClearAllEntries();
+        int skipped = 0;
+        bool activePartial = false;
+        for (int i = 0; i < 10; i++)
+        {
+            if (SlotHasFutureAdvDate(i))
+            {
+                skipped++;
+                if (i == _activeSlot) activePartial = true;
+                else PartialClearSlot(i);
+            }
+            else
+            {
+                Preferences.Remove(SetKey(i));
+                Preferences.Remove(AdvDatesKey(i));
+            }
+        }
+        _slotCache.Clear();
+        if (activePartial)
+        {
+            var now   = DateTime.Now;
+            var today = now.Date;
+            for (int r = 0; r < Rows; r++)
+            {
+                var refDate = _playEnd[r] ?? _playStart[r];
+                if (!refDate.HasValue || refDate.Value.Date < today || (refDate.Value.Date == today && now.TimeOfDay >= TimeSpan.FromHours(20))) ClearRow(r);
+            }
+            if (_activeSlot >= 0) { SaveSet(_activeSlot); SaveAdvanceDates(_activeSlot); }
+        }
+        else if (_activeSlot < 0 || !SlotHasFutureAdvDate(_activeSlot))
+            ClearAllEntries();
         UpdateSlotPicker();
         if (sender is Button btn)
         {
             var orig = btn.Text; var origColor = btn.BackgroundColor;
-            btn.Text = "Cleared"; btn.BackgroundColor = Color.FromArgb("#1B5E20");
+            btn.Text = skipped > 0 ? $"Cleared ({skipped} kept)" : "Cleared"; btn.BackgroundColor = Color.FromArgb("#1B5E20");
             await Task.Delay(1200);
             btn.Text = orig; btn.BackgroundColor = origColor;
         }
@@ -768,9 +942,8 @@ public partial class MegaMillionsPage : ContentPage
 
     private void BtnVoice_Clicked(object sender, EventArgs e)
     {
-#if IOS
+        if (!Services.VoiceNumberService.IsAvailable) { lblStatus.Text = "Speech recognition not available"; return; }
         if (_voiceOn) StopVoice(); else StartVoice();
-#endif
     }
 
     void StartVoice()
@@ -781,20 +954,16 @@ public partial class MegaMillionsPage : ContentPage
         _voiceOn = true;
         btnVoice.BackgroundColor = Colors.Red;
         SetVoiceTarget();
-#if IOS
         Services.VoiceNumberService.StatusUpdate += OnVoiceStatus;
         Services.VoiceNumberService.StartContinuous(OnVoiceNumbers);
-#endif
     }
 
     void StopVoice()
     {
         _voiceOn = false;
         ClearVoiceTarget();
-#if IOS
         Services.VoiceNumberService.StatusUpdate -= OnVoiceStatus;
         Services.VoiceNumberService.Stop();
-#endif
         btnVoice.BackgroundColor = Color.FromArgb("#0277BD");
         lblStatus.Text = "Mic off";
     }
@@ -891,16 +1060,58 @@ public partial class MegaMillionsPage : ContentPage
     {
         _advStartPicker = new DatePicker
         {
-            Format = "MMM d, yyyy", FontSize = 14, Date = DateTime.Today,
-            MinimumDate = new DateTime(2020, 1, 1), MaximumDate = new DateTime(2035, 12, 31),
+            Format = "MMM d, yyyy",
+            FontSize = 14,
+            Date = DateTime.Today,
+            MinimumDate = new DateTime(2020, 1, 1),
+            MaximumDate = new DateTime(2035, 12, 31),
             TextColor = Colors.White,
         };
         _advEndPicker = new DatePicker
         {
-            Format = "MMM d, yyyy", FontSize = 14, Date = DateTime.Today,
-            MinimumDate = new DateTime(2020, 1, 1), MaximumDate = new DateTime(2035, 12, 31),
+            Format = "MMM d, yyyy",
+            FontSize = 14,
+            Date = DateTime.Today,
+            MinimumDate = new DateTime(2020, 1, 1),
+            MaximumDate = new DateTime(2035, 12, 31),
             TextColor = Colors.White,
         };
+        _advStartPicker.DateSelected += (_, e) =>
+        {
+            if (_advEndPicker!.Date < e.NewDate)
+                _advEndPicker.Date = e.NewDate;
+        };
+        _advDrawStartEntry = new Entry
+        {
+            Placeholder = "Start #",
+            Keyboard = Keyboard.Numeric,
+            PlaceholderColor = Color.FromArgb("#6B7280"),
+            TextColor = Colors.White,
+            BackgroundColor = Color.FromArgb("#2D3748"),
+            FontSize = 14,
+        };
+        _advDrawEndEntry = new Entry
+        {
+            Placeholder = "End # (optional)",
+            Keyboard = Keyboard.Numeric,
+            PlaceholderColor = Color.FromArgb("#6B7280"),
+            TextColor = Colors.White,
+            BackgroundColor = Color.FromArgb("#2D3748"),
+            FontSize = 14,
+        };
+        var drawGrid = new Grid
+        {
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Auto),
+                new ColumnDefinition(GridLength.Star),
+            },
+            ColumnSpacing = 6,
+        };
+        drawGrid.Add(_advDrawStartEntry, 0, 0);
+        drawGrid.Add(new Label { Text = "—", TextColor = Color.FromArgb("#8B9DC3"), VerticalOptions = LayoutOptions.Center, HorizontalOptions = LayoutOptions.Center, FontSize = 16 }, 1, 0);
+        drawGrid.Add(_advDrawEndEntry, 2, 0);
 
         var btnClear  = new Button { Text = "Clear",  BackgroundColor = Color.FromArgb("#4B5563"), TextColor = Colors.White, CornerRadius = 10, HeightRequest = 42, FontSize = 13 };
         var btnCancel = new Button { Text = "Cancel", BackgroundColor = Color.FromArgb("#1E293B"), TextColor = Colors.White, CornerRadius = 10, HeightRequest = 42, FontSize = 13 };
@@ -911,6 +1122,8 @@ public partial class MegaMillionsPage : ContentPage
             if (_advRow < 0) return;
             _playStart[_advRow] = null;
             _playEnd[_advRow]   = null;
+            _drawStart[_advRow] = "";
+            _drawEnd[_advRow]   = "";
             UpdateResultBackground(_advRow);
             SaveAdvanceDates(_activeSlot);
             _advOverlay!.IsVisible = false;
@@ -920,9 +1133,14 @@ public partial class MegaMillionsPage : ContentPage
         {
             if (_advRow < 0) return;
             _playStart[_advRow] = _advStartPicker!.Date;
-            _playEnd[_advRow]   = _advEndPicker!.Date;
+            _playEnd[_advRow]   = _advEndPicker!.Date >= _advStartPicker!.Date ? _advEndPicker!.Date : _advStartPicker!.Date;
+            string ds = (_advDrawStartEntry!.Text ?? "").Trim();
+            string de = (_advDrawEndEntry!.Text ?? "").Trim();
+            _drawStart[_advRow] = ds;
+            _drawEnd[_advRow]   = de;
             UpdateResultBackground(_advRow);
             SaveAdvanceDates(_activeSlot);
+            ResultsPageCls.ClearCache(); ResultsPage.NeedsRefresh = true;
             _advOverlay!.IsVisible = false;
         };
 
@@ -945,17 +1163,23 @@ public partial class MegaMillionsPage : ContentPage
             VerticalOptions = LayoutOptions.Center,
             HorizontalOptions = LayoutOptions.Center,
             WidthRequest = 310,
-            Content = new VerticalStackLayout
+            MaximumHeightRequest = 500,
+            Content = new ScrollView
             {
-                Spacing = 12,
-                Children =
+                Content = new VerticalStackLayout
                 {
-                    new Label { Text = "Advance Play Dates", FontSize = 16, FontAttributes = FontAttributes.Bold, TextColor = Colors.White, HorizontalOptions = LayoutOptions.Center },
-                    new Label { Text = "Play From", FontSize = 11, TextColor = Color.FromArgb("#8B9DC3") },
-                    _advStartPicker,
-                    new Label { Text = "Play To",   FontSize = 11, TextColor = Color.FromArgb("#8B9DC3") },
-                    _advEndPicker,
-                    btnRow,
+                    Spacing = 12,
+                    Children =
+                    {
+                        new Label { Text = "Advance Play Dates", FontSize = 16, FontAttributes = FontAttributes.Bold, TextColor = Colors.White, HorizontalOptions = LayoutOptions.Center },
+                        new Label { Text = "Play From", FontSize = 11, TextColor = Color.FromArgb("#8B9DC3") },
+                        _advStartPicker,
+                        new Label { Text = "Play To", FontSize = 11, TextColor = Color.FromArgb("#8B9DC3") },
+                        _advEndPicker,
+                        new Label { Text = "Draw # (optional)", FontSize = 11, TextColor = Color.FromArgb("#8B9DC3") },
+                        drawGrid,
+                        btnRow,
+                    }
                 }
             }
         };
@@ -969,99 +1193,37 @@ public partial class MegaMillionsPage : ContentPage
         rootGrid.Children.Add(_advOverlay);
     }
 
+
+
     private void ShowAdvancePlayOverlay(int row)
     {
         _advRow = row;
         _advStartPicker!.Date = _playStart[row] ?? DateTime.Today;
-        _advEndPicker!.Date   = _playEnd[row]   ?? DateTime.Today;
+        var defEnd = _playEnd[row];
+        if (!defEnd.HasValue || defEnd.Value.Date < (_playStart[row]?.Date ?? DateTime.Today))
+            defEnd = (_playStart[row] ?? DateTime.Today).AddDays(20);
+        _advEndPicker!.Date = defEnd.Value;
+        _advDrawStartEntry!.Text = _drawStart[row] ?? "";
+        _advDrawEndEntry!.Text   = _drawEnd[row] ?? "";
         _advOverlay!.IsVisible = true;
     }
 
     private void UpdateResultBackground(int r)
     {
-        bool hasDate = _playStart[r].HasValue || _playEnd[r].HasValue;
-        _results[r].BackgroundColor = hasDate ? Color.FromArgb("#1A3A8A") : Colors.Transparent;
+        bool hasAdv = _playStart[r].HasValue || _playEnd[r].HasValue
+                   || !string.IsNullOrEmpty(_drawStart[r]);
+        _results[r].BackgroundColor = hasAdv ? Color.FromArgb("#1A3A8A") : Colors.Transparent;
         bool showingResult = !string.IsNullOrEmpty(_results[r].Text) && _results[r].Text != "+";
         if (!showingResult)
         {
             _results[r].Text = "+";
-            _results[r].TextColor = hasDate ? Colors.White : Color.FromArgb("#4B6A8A");
+            _results[r].TextColor = hasAdv ? Colors.White : Color.FromArgb("#4B6A8A");
         }
     }
 
     private void UpdateAllResultBackgrounds()
     {
         for (int r = 0; r < Rows; r++) UpdateResultBackground(r);
-    }
-
-    private void SaveAdvanceDates(int slot)
-    {
-        if (slot < 0) return;
-        var parts = new string[Rows];
-        for (int r = 0; r < Rows; r++)
-        {
-            string s = _playStart[r].HasValue ? _playStart[r]!.Value.ToString("yyyyMMdd") : "";
-            string e = _playEnd[r].HasValue   ? _playEnd[r]!.Value.ToString("yyyyMMdd")   : "";
-            parts[r] = $"{s}~{e}";
-        }
-        Preferences.Set(AdvDatesKey(slot), string.Join("|", parts));
-    }
-
-    public void FlushAdvanceDates()
-    {
-        if (_activeSlot >= 0) SaveAdvanceDates(_activeSlot);
-    }
-
-    private void LoadAdvanceDates(int slot)
-    {
-        Array.Clear(_playStart, 0, Rows);
-        Array.Clear(_playEnd,   0, Rows);
-        if (slot < 0) return;
-        string raw = Preferences.Get(AdvDatesKey(slot), "");
-        if (string.IsNullOrEmpty(raw)) return;
-        var parts = raw.Split('|');
-        for (int r = 0; r < Rows && r < parts.Length; r++)
-        {
-            var pair = parts[r].Split('~');
-            if (pair.Length == 2)
-            {
-                if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null,
-                    System.Globalization.DateTimeStyles.None, out var sd))
-                    _playStart[r] = sd;
-                if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null,
-                    System.Globalization.DateTimeStyles.None, out var ed))
-                    _playEnd[r] = ed;
-            }
-        }
-    }
-
-    private bool SlotHasFutureAdvDate(int slot)
-    {
-        var now   = DateTime.Now;
-        var today = now.Date;
-        if (slot == _activeSlot)
-        {
-            for (int r = 0; r < Rows; r++)
-            {
-                var refDate = _playEnd[r] ?? _playStart[r];
-                if (refDate.HasValue && (refDate.Value.Date > today || (refDate.Value.Date == today && now.TimeOfDay < TimeSpan.FromHours(20)))) return true;
-            }
-            return false;
-        }
-        if (string.IsNullOrEmpty(Preferences.Get(SetKey(slot), ""))) return false;
-        string raw = Preferences.Get(AdvDatesKey(slot), "");
-        if (string.IsNullOrEmpty(raw)) return false;
-        foreach (var part in raw.Split('|'))
-        {
-            var pair = part.Split('~');
-            if (pair.Length != 2) continue;
-            DateTime? end = null, start = null;
-            if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var ed)) end = ed;
-            if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var sd)) start = sd;
-            var refDate = end ?? start;
-            if (refDate.HasValue && (refDate.Value.Date > today || (refDate.Value.Date == today && now.TimeOfDay < TimeSpan.FromHours(20)))) return true;
-        }
-        return false;
     }
 
     private string AdvDatesKey(int slot) => $"mm_adv_{slot}";
@@ -1081,7 +1243,7 @@ public partial class MegaMillionsPage : ContentPage
             if (r < advParts.Length && advParts[r] != null)
             {
                 var pair = advParts[r].Split('~');
-                if (pair.Length == 2)
+                if (pair.Length >= 2)
                 {
                     DateTime? end = null, start = null;
                     if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var ed)) end = ed;
@@ -1102,5 +1264,73 @@ public partial class MegaMillionsPage : ContentPage
         { Preferences.Remove(SetKey(slot)); Preferences.Remove(AdvDatesKey(slot)); }
         else
         { Preferences.Set(SetKey(slot), newData); Preferences.Set(AdvDatesKey(slot), string.Join("|", advParts)); }
+    }
+    private bool SlotHasFutureAdvDate(int slot)
+    {
+        var now   = DateTime.Now;
+        var today = now.Date;
+        if (slot == _activeSlot)
+        {
+            for (int r = 0; r < Rows; r++)
+            {
+                var refDate = _playEnd[r] ?? _playStart[r];
+                if (refDate.HasValue && (refDate.Value.Date > today || (refDate.Value.Date == today && now.TimeOfDay < TimeSpan.FromHours(20)))) return true;
+            }
+            return false;
+        }
+        if (string.IsNullOrEmpty(Preferences.Get(SetKey(slot), ""))) return false;
+        string raw = Preferences.Get(AdvDatesKey(slot), "");
+        if (string.IsNullOrEmpty(raw)) return false;
+        foreach (var part in raw.Split('|'))
+        {
+            var pair = part.Split('~');
+            if (pair.Length < 2) continue;
+            DateTime? end = null, start = null;
+            if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var ed)) end = ed;
+            if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var sd)) start = sd;
+            var refDate = end ?? start;
+            if (refDate.HasValue && (refDate.Value.Date > today || (refDate.Value.Date == today && now.TimeOfDay < TimeSpan.FromHours(20)))) return true;
+        }
+        return false;
+    }
+
+    private void SaveAdvanceDates(int slot)
+    {
+        if (slot < 0) return;
+        var parts = new string[Rows];
+        for (int r = 0; r < Rows; r++)
+        {
+            string s = _playStart[r].HasValue ? _playStart[r]!.Value.ToString("yyyyMMdd") : "";
+            string e = _playEnd[r].HasValue   ? _playEnd[r]!.Value.ToString("yyyyMMdd")   : "";
+            parts[r] = $"{s}~{e}~{_drawStart[r] ?? ""}~{_drawEnd[r] ?? ""}";
+        }
+        Preferences.Set(AdvDatesKey(slot), string.Join("|", parts));
+    }
+
+    private void LoadAdvanceDates(int slot)
+    {
+        Array.Clear(_playStart, 0, Rows);
+        Array.Clear(_playEnd,   0, Rows);
+        Array.Clear(_drawStart, 0, Rows);
+        Array.Clear(_drawEnd,   0, Rows);
+        if (slot < 0) return;
+        string raw = Preferences.Get(AdvDatesKey(slot), "");
+        if (string.IsNullOrEmpty(raw)) return;
+        var parts = raw.Split('|');
+        for (int r = 0; r < Rows && r < parts.Length; r++)
+        {
+            var pair = parts[r].Split('~');
+            if (pair.Length >= 2)
+            {
+                if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null,
+                    System.Globalization.DateTimeStyles.None, out var sd))
+                    _playStart[r] = sd;
+                if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null,
+                    System.Globalization.DateTimeStyles.None, out var ed))
+                    _playEnd[r] = ed;
+            }
+            _drawStart[r] = pair.Length > 2 ? pair[2] : "";
+            _drawEnd[r]   = pair.Length > 3 ? pair[3] : "";
+        }
     }
 }

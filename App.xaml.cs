@@ -1,4 +1,4 @@
-﻿using DailyFantasyMAUI.Services;
+using DailyFantasyMAUI.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Application = Microsoft.Maui.Controls.Application;
 

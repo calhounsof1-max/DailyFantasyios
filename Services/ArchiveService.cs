@@ -25,6 +25,7 @@ public static class ArchiveService
         ("mm", 10, "mm_entries"),
         ("d3", 10, "d3_entries"),
         ("d4", 10, "d4_entries"),
+        ("dd", 10, "dd_entries"),
     ];
 
     public static List<ArchiveEntry> Load()

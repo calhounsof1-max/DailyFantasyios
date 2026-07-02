@@ -72,6 +72,7 @@ public static class AdvancePlayNotificationService
     public static string? PendingLaunchBody   { get; private set; }
 
     /// On app launch: stores expiring games (≤1 day) for in-app display only.
+    /// No Android notification or SMS is sent — the 9 AM daily alarm handles those.
     public static void CheckAndNotify()
     {
         var active = ScanAll()

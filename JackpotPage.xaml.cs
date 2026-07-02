@@ -9,15 +9,15 @@ public partial class JackpotPage : ContentPage
     double _panRight;
 
     // Stored draw data for overlay detail view
-    List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> _f5Draws = new();
-    List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> _slDraws = new();
-    List<(string DrawDate, int DrawNumber, int[] MainNumbers, int PBNumber, DrawPrizeTier[] Prizes)> _pbDraws = new();
-    List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> _mmDraws = new();
-    List<(string DrawDate, int DrawNumber, int[] Horses, string RaceTime, DrawPrizeTier[] Prizes)> _ddDraws = new();
-    List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> _d3Draws = new();
-    List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> _d3EveDraws = new();
-    List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> _d3MidDraws = new();
-    List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> _d4Draws = new();
+    List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)>                          _f5Draws = new();
+    List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)>      _slDraws = new();
+    List<(string DrawDate, int DrawNumber, int[] MainNumbers, int PBNumber, DrawPrizeTier[] Prizes)>        _pbDraws = new();
+    List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)>      _mmDraws = new();
+    List<(string DrawDate, int DrawNumber, int[] Horses, string RaceTime, DrawPrizeTier[] Prizes)>          _ddDraws = new();
+    List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)>                          _d3Draws = new();
+    List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)>                          _d3EveDraws = new();
+    List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)>                          _d3MidDraws = new();
+    List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)>                          _d4Draws = new();
 
     // ── Game order ───────────────────────────────────────────────────────────
     const string PrefGameOrder = "jackpot_game_order";
@@ -180,7 +180,7 @@ public partial class JackpotPage : ContentPage
         if (draws.Count == 0) { SetCardError(cardF5, lblF5Badge, lblF5Date, lblF5Numbers, lblF5Result); return; }
         var d = draws[0];
         lblF5Date.Text    = d.DrawNumber > 0 ? $"{d.DrawDate}  •  Draw #{d.DrawNumber}" : d.DrawDate;
-        lblF5Numbers.Text = string.Join("  ", d.Numbers.Select(n => n.ToString("D2")));
+        lblF5Numbers.Text = string.Join("  ", d.Numbers.Select(n => n.ToString()));
         var tier1 = d.Prizes.FirstOrDefault(p => p.Tier == 1);
         SetWinnerResult(cardF5, lblF5Badge, lblF5Result, tier1, "Match 5/5");
         lblF5Jackpot.Text = nextJackpot.HasValue ? $"Next jackpot: ${nextJackpot.Value:N0}" : "";
@@ -191,8 +191,8 @@ public partial class JackpotPage : ContentPage
         if (draws.Count == 0) { SetCardError(cardSL, lblSLBadge, lblSLDate, lblSLNumbers, lblSLResult); return; }
         var d = draws[0];
         lblSLDate.Text    = d.DrawNumber > 0 ? $"{d.DrawDate}  •  Draw #{d.DrawNumber}" : d.DrawDate;
-        lblSLNumbers.Text = string.Join("  ", d.MainNumbers.Select(n => n.ToString("D2"))) +
-                            "  +" + d.MegaNumber.ToString("D2");
+        lblSLNumbers.Text = string.Join("  ", d.MainNumbers.Select(n => n.ToString())) +
+                            "  +" + d.MegaNumber.ToString();
         var tier1 = d.Prizes.FirstOrDefault(p => p.Tier == 1);
         SetWinnerResult(cardSL, lblSLBadge, lblSLResult, tier1, "Match 5+Mega");
         lblSLJackpot.Text = nextJackpot.HasValue ? $"Next jackpot: ${nextJackpot.Value:N0}" : "";
@@ -203,8 +203,8 @@ public partial class JackpotPage : ContentPage
         if (draws.Count == 0) { SetCardError(cardPB, lblPBBadge, lblPBDate, lblPBNumbers, lblPBResult); return; }
         var d = draws[0];
         lblPBDate.Text    = d.DrawNumber > 0 ? $"{d.DrawDate}  •  Draw #{d.DrawNumber}" : d.DrawDate;
-        lblPBNumbers.Text = string.Join("  ", d.MainNumbers.Select(n => n.ToString("D2"))) +
-                            "  +" + d.PBNumber.ToString("D2");
+        lblPBNumbers.Text = string.Join("  ", d.MainNumbers.Select(n => n.ToString())) +
+                            "  +" + d.PBNumber.ToString();
         var tier1 = d.Prizes.FirstOrDefault(p => p.Tier == 1);
         SetWinnerResult(cardPB, lblPBBadge, lblPBResult, tier1, "Match 5+PB");
         lblPBJackpot.Text = nextJackpot.HasValue ? $"Next jackpot: ${nextJackpot.Value:N0}" : "";
@@ -215,8 +215,8 @@ public partial class JackpotPage : ContentPage
         if (draws.Count == 0) { SetCardError(cardMM, lblMMBadge, lblMMDate, lblMMNumbers, lblMMResult); return; }
         var d = draws[0];
         lblMMDate.Text    = d.DrawNumber > 0 ? $"{d.DrawDate}  •  Draw #{d.DrawNumber}" : d.DrawDate;
-        lblMMNumbers.Text = string.Join("  ", d.MainNumbers.Select(n => n.ToString("D2"))) +
-                            "  +" + d.MegaNumber.ToString("D2");
+        lblMMNumbers.Text = string.Join("  ", d.MainNumbers.Select(n => n.ToString())) +
+                            "  +" + d.MegaNumber.ToString();
         var tier1 = d.Prizes.FirstOrDefault(p => p.Tier == 1);
         SetWinnerResult(cardMM, lblMMBadge, lblMMResult, tier1, "Match 5+Mega");
         lblMMJackpot.Text = nextJackpot.HasValue ? $"Next jackpot: ${nextJackpot.Value:N0}" : "";
@@ -235,13 +235,13 @@ public partial class JackpotPage : ContentPage
             ? horses
             : horses + "   ⏱ " + d.RaceTime;
 
-        var tier1 = d.Prizes.FirstOrDefault(p => p.Tier == 1);
-        SetWinnerResult(cardDD, lblDDBadge, lblDDResult, tier1, "GRAND! (1st/2nd/3rd in order)");
+        var grandTier = d.Prizes.FirstOrDefault(p => p.Tier == 7);
+        SetWinnerResult(cardDD, lblDDBadge, lblDDResult, grandTier, "Grand Prize");
 
         if (nextJackpot.HasValue)
-            lblDDJackpot.Text = $"Next GRAND!: ~${nextJackpot.Value:N0}";
-        else if (tier1 != null && tier1.Amount > 0)
-            lblDDJackpot.Text = $"Last GRAND! prize: ${tier1.Amount:N0}";
+            lblDDJackpot.Text = $"Next Grand Prize: ~${nextJackpot.Value:N0}";
+        else if (grandTier != null && grandTier.Amount > 0)
+            lblDDJackpot.Text = $"Grand Prize: ${grandTier.Amount:N0}";
         else
             lblDDJackpot.Text = "";
     }
@@ -250,12 +250,25 @@ public partial class JackpotPage : ContentPage
     {
         _d3EveDraws.Clear();
         _d3MidDraws.Clear();
-        // Within each date group: higher DrawNumber = Evening, lower = Midday
-        foreach (var g in all.GroupBy(d => d.DrawDate))
+        // Order groups newest-first by max DrawNumber (avoids unreliable date-string sorting)
+        var groups = all
+            .GroupBy(d => d.DrawDate)
+            .OrderByDescending(g => g.Max(x => x.DrawNumber));
+        foreach (var g in groups)
         {
-            var sorted = g.OrderByDescending(d => d.DrawNumber).ToList();
-            _d3EveDraws.Add(sorted[0]);
-            if (sorted.Count >= 2) _d3MidDraws.Add(sorted[1]);
+            var draws = g.OrderByDescending(d => d.DrawNumber).ToList();
+            if (draws.Count >= 2)
+            {
+                // Two draws: higher DrawNumber = Evening, lower = Midday
+                if (_d3EveDraws.Count == 0) _d3EveDraws.Add(draws[0]);
+                if (_d3MidDraws.Count == 0) _d3MidDraws.Add(draws[1]);
+            }
+            else
+            {
+                // Single draw for this date = Midday (Evening not drawn yet today)
+                if (_d3MidDraws.Count == 0) _d3MidDraws.Add(draws[0]);
+            }
+            if (_d3EveDraws.Count > 0 && _d3MidDraws.Count > 0) break;
         }
     }
 
@@ -393,7 +406,7 @@ public partial class JackpotPage : ContentPage
                 if (_f5Draws.Count == 0) return;
                 var f5 = _f5Draws[0];
                 gameName  = "Fantasy 5";
-                drawDate  = f5.DrawNumber > 0 ? $"{f5.DrawDate}  •  Draw #{f5.DrawNumber}" : f5.DrawDate;
+                drawDate  = f5.DrawDate;
                 gameColor = Color.FromArgb("#FF8F00");
                 prizes    = f5.Prizes;
                 foreach (var n in f5.Numbers)
@@ -404,7 +417,7 @@ public partial class JackpotPage : ContentPage
                 if (_slDraws.Count == 0) return;
                 var sl = _slDraws[0];
                 gameName  = "SuperLotto Plus";
-                drawDate  = sl.DrawNumber > 0 ? $"{sl.DrawDate}  •  Draw #{sl.DrawNumber}" : sl.DrawDate;
+                drawDate  = sl.DrawDate;
                 gameColor = Color.FromArgb("#7B1FA2");
                 prizes    = sl.Prizes;
                 foreach (var n in sl.MainNumbers)
@@ -417,7 +430,7 @@ public partial class JackpotPage : ContentPage
                 if (_pbDraws.Count == 0) return;
                 var pb = _pbDraws[0];
                 gameName  = "Powerball";
-                drawDate  = pb.DrawNumber > 0 ? $"{pb.DrawDate}  •  Draw #{pb.DrawNumber}" : pb.DrawDate;
+                drawDate  = pb.DrawDate;
                 gameColor = Color.FromArgb("#C62828");
                 prizes    = pb.Prizes;
                 foreach (var n in pb.MainNumbers)
@@ -430,7 +443,7 @@ public partial class JackpotPage : ContentPage
                 if (_mmDraws.Count == 0) return;
                 var mm = _mmDraws[0];
                 gameName  = "Mega Millions";
-                drawDate  = mm.DrawNumber > 0 ? $"{mm.DrawDate}  •  Draw #{mm.DrawNumber}" : mm.DrawDate;
+                drawDate  = mm.DrawDate;
                 gameColor = Color.FromArgb("#1565C0");
                 prizes    = mm.Prizes;
                 foreach (var n in mm.MainNumbers)
@@ -443,7 +456,7 @@ public partial class JackpotPage : ContentPage
                 if (_ddDraws.Count == 0) return;
                 var dd = _ddDraws[0];
                 gameName  = "Daily Derby";
-                drawDate  = dd.DrawNumber > 0 ? $"{dd.DrawDate}  •  Draw #{dd.DrawNumber}" : dd.DrawDate;
+                drawDate  = dd.DrawDate;
                 gameColor = Color.FromArgb("#5D4037");
                 prizes    = dd.Prizes;
                 string[] positions = { "1st", "2nd", "3rd" };
@@ -482,7 +495,7 @@ public partial class JackpotPage : ContentPage
                 if (_d4Draws.Count == 0) return;
                 var d4 = _d4Draws[0];
                 gameName  = "Daily 4";
-                drawDate  = d4.DrawNumber > 0 ? $"{d4.DrawDate}  •  Draw #{d4.DrawNumber}" : d4.DrawDate;
+                drawDate  = d4.DrawDate;
                 gameColor = Color.FromArgb("#00695C");
                 prizes    = d4.Prizes;
                 foreach (var n in d4.Numbers)
@@ -500,7 +513,10 @@ public partial class JackpotPage : ContentPage
 
         if (prizes != null && prizes.Length > 0)
         {
-            foreach (var tier in prizes.OrderBy(p => p.Tier))
+            var ordered = gameCode == "DD"
+                ? prizes.OrderByDescending(p => p.Tier)
+                : prizes.OrderBy(p => p.Tier);
+            foreach (var tier in ordered)
                 overlayPrizesPanel.Children.Add(MakePrizeRow(gameCode, tier, gameColor));
         }
         else
@@ -532,7 +548,7 @@ public partial class JackpotPage : ContentPage
             Margin            = new Thickness(4, 4),
             Content           = new Label
             {
-                Text                  = number.ToString("D2"),
+                Text                  = number.ToString(),
                 TextColor             = isSpecial ? Colors.White : gameColor,
                 FontAttributes        = FontAttributes.Bold,
                 FontSize              = 14,
@@ -716,10 +732,13 @@ public partial class JackpotPage : ContentPage
             },
             "DD" => tier switch
             {
-                1 => "GRAND! (Exact Order 1st-2nd-3rd)",
-                2 => "1st & 2nd Place (Exact Order)",
-                3 => "1st Place",
-                4 => "Consolation",
+                1 => "Win",
+                2 => "Exacta",
+                3 => "Trifecta",
+                4 => "Race Time",
+                5 => "Win / RT",
+                6 => "Exacta / RT",
+                7 => "Grand Prize",
                 _ => $"Prize Tier {tier}"
             },
             "D3E" or "D3M" => tier switch

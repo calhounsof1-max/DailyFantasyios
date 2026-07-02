@@ -1206,8 +1206,9 @@ namespace DailyFantasyMAUI.Services
                 DateTime lastDate = DateTime.MinValue;
                 int lastDrawNumber = 0;
                 {
+                    // File is newest-first; read without reversing so first valid row = most recent draw
                     var lines = await File.ReadAllLinesAsync(localPath);
-                    foreach (var l in lines.Reverse())
+                    foreach (var l in lines)
                     {
                         if (string.IsNullOrWhiteSpace(l) || l.StartsWith("D")) continue;
                         var p = l.Split(',');
@@ -1226,16 +1227,38 @@ namespace DailyFantasyMAUI.Services
                 var toAppend = recent
                     .Where(d => d.DrawNumber > lastDrawNumber)
                     .Select(d => { DateTime.TryParse(d.DrawDate, out var dt); return (dt, d.DrawNumber, d.Numbers); })
-                    .OrderBy(x => x.DrawNumber)
+                    .OrderByDescending(x => x.DrawNumber)  // newest first for prepend
                     .ToList();
 
                 if (toAppend.Count == 0) return;
 
-                await using var sw = new StreamWriter(localPath, append: true, System.Text.Encoding.UTF8);
-                foreach (var (dt, drawNum, nums) in toAppend)
-                    await sw.WriteLineAsync($"{dt:yyyy-MM-dd},{drawNum},{nums[0]},{nums[1]},{nums[2]},");
+                // Prepend new rows after header (file is newest-first); deduplicate by DrawNumber to
+                // clean up any duplicate rows left by old code
+                var existingLines = await File.ReadAllLinesAsync(localPath);
+                var fileHeader = existingLines.Length > 0 ? existingLines[0] : "DrawDate,DrawNumber,N1,N2,N3,DrawTime";
+                var newRows = toAppend.Select(x => $"{x.dt:yyyy-MM-dd},{x.DrawNumber},{x.Numbers[0]},{x.Numbers[1]},{x.Numbers[2]},");
+                var newDrawNums = new HashSet<int>(toAppend.Select(x => x.DrawNumber));
+                // Keep existing lines that don't duplicate a new draw's number
+                var dedupedExisting = existingLines.Skip(1).Where(l =>
+                {
+                    if (string.IsNullOrWhiteSpace(l) || l.StartsWith("D")) return true;
+                    var p = l.Split(',');
+                    if (p.Length < 2 || !int.TryParse(p[1], out int dn)) return true;
+                    return !newDrawNums.Contains(dn);
+                });
+                // Also deduplicate existing lines against each other by DrawNumber
+                var seenNums = new HashSet<int>(newDrawNums);
+                var uniqueExisting = dedupedExisting.Where(l =>
+                {
+                    if (string.IsNullOrWhiteSpace(l) || l.StartsWith("D")) return true;
+                    var p = l.Split(',');
+                    if (p.Length < 2 || !int.TryParse(p[1], out int dn)) return true;
+                    return seenNums.Add(dn); // Add returns false if already present
+                });
+                var allLines = new[] { fileHeader }.Concat(newRows).Concat(uniqueExisting);
+                await File.WriteAllLinesAsync(localPath, allLines, System.Text.Encoding.UTF8);
 
-                _ = Logger.LogAsync($"D3 CSV: appended {toAppend.Count} new draw(s) through {toAppend[^1].dt:yyyy-MM-dd}");
+                _ = Logger.LogAsync($"D3 CSV: prepended {toAppend.Count} new draw(s) through {toAppend[0].dt:yyyy-MM-dd}");
             }
             catch (Exception ex) { _ = Logger.LogAsync($"D3 CSV update error: {ex.Message}"); }
         }
@@ -1322,6 +1345,37 @@ namespace DailyFantasyMAUI.Services
             return cachedId;
         }
 
+        // ── Current draw numbers (for advance-play purge) ────────────────────
+
+        /// <summary>
+        /// Fetches the latest draw number for each game from calottery.com.
+        /// Returns a dictionary keyed by game prefix (f5, sl, pb, mm, d3, d4, dd).
+        /// </summary>
+        public static async Task<Dictionary<string, int>> GetCurrentDrawNumbersAsync()
+        {
+            var result = new Dictionary<string, int>();
+            try
+            {
+                var f5Task = GetPastDraws(1);
+                var slTask = GetSuperLottoDraws(1);
+                var pbTask = GetPowerballDraws(1);
+                var mmTask = GetMegaMillionsDraws(1);
+                var d3Task = GetDaily3Draws(1);
+                var d4Task = GetDaily4Draws(1);
+                var ddTask = GetDailyDerbyDraws(1);
+                await Task.WhenAll(f5Task, slTask, pbTask, mmTask, d3Task, d4Task, ddTask);
+                if (f5Task.Result.Count > 0 && f5Task.Result[0].DrawNumber > 0) result["f5"] = f5Task.Result[0].DrawNumber;
+                if (slTask.Result.Count > 0 && slTask.Result[0].DrawNumber > 0) result["sl"] = slTask.Result[0].DrawNumber;
+                if (pbTask.Result.Count > 0 && pbTask.Result[0].DrawNumber > 0) result["pb"] = pbTask.Result[0].DrawNumber;
+                if (mmTask.Result.Count > 0 && mmTask.Result[0].DrawNumber > 0) result["mm"] = mmTask.Result[0].DrawNumber;
+                if (d3Task.Result.Count > 0 && d3Task.Result[0].DrawNumber > 0) result["d3"] = d3Task.Result[0].DrawNumber;
+                if (d4Task.Result.Count > 0 && d4Task.Result[0].DrawNumber > 0) result["d4"] = d4Task.Result[0].DrawNumber;
+                if (ddTask.Result.Count > 0 && ddTask.Result[0].DrawNumber > 0) result["dd"] = ddTask.Result[0].DrawNumber;
+            }
+            catch { }
+            return result;
+        }
+
         // ── Next-draw jackpot amounts ─────────────────────────────────────────
 
         public static async Task<(decimal? F5, decimal? SL, decimal? PB, decimal? MM, decimal? DD)> GetNextJackpotAmounts()
@@ -1371,7 +1425,7 @@ namespace DailyFantasyMAUI.Services
         {
             var draws = await GetPastDraws(1);
             if (draws.Count == 0) return (false, string.Empty, Array.Empty<int>());
-            var (date, _, numbers, _) = draws[0];
+            var d0 = draws[0]; var date = d0.DrawDate; var numbers = d0.Numbers;
             return (true, date, numbers);
         }
 
