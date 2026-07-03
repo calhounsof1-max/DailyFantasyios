@@ -37,7 +37,7 @@ public static class EntryHelper
                 et.SelectAll();
 #elif IOS
             CoreFoundation.DispatchQueue.MainQueue.DispatchAfter(
-                new Foundation.NSTimeInterval(0.05),
+                new CoreFoundation.DispatchTime(CoreFoundation.DispatchTime.Now, 50_000_000L),
                 () =>
                 {
                     if (entry.Handler?.PlatformView is UIKit.UITextField tf)
@@ -96,9 +96,10 @@ public static class EntryHelper
 
                 // All-selected: the selected range spans the entire text AND there is an actual
                 // selection (not just a cursor), so SelectedTextRange is non-empty.
+                var sel = textField.SelectedTextRange;
                 bool allSelected = !isEmpty
-                    && textField.SelectedTextRange != null
-                    && !textField.SelectedTextRange.Empty
+                    && sel != null
+                    && textField.GetOffsetFromPosition(sel.Start, sel.End) > 0
                     && range.Location == 0
                     && (nint)range.Length == (nint)text.Length;
 
