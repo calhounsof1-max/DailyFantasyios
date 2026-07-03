@@ -35,6 +35,7 @@ public partial class Daily3Page : ContentPage
     bool _suppressPickerEvent = false;
     bool _suppressExcl = false;
     bool _loading = false;
+    bool _retreating = false;
     readonly Dictionary<int, (string entries, string betTypes, string drawFilters)> _slotCache = new();
     View? _highlightedView;
 
@@ -627,7 +628,8 @@ public partial class Daily3Page : ContentPage
                 entry.HandlerChanged += ForceBlackText;
 
                 int row_ = r, col_ = c;
-                entry.Focused += (_, _) => { if (!_loading) Dispatcher.Dispatch(() => _entries[row_, col_].Text = ""); };
+                entry.Focused += (_, _) => { if (!_loading && !_retreating) Dispatcher.Dispatch(() => _entries[row_, col_].Text = ""); _retreating = false; };
+                EntryHelper.AttachBackspace(entry, () => RetreatFocus(row_, col_));
                 entry.TextChanged += (_, _) =>
                 {
                     if (_loading) return;
@@ -855,6 +857,13 @@ public partial class Daily3Page : ContentPage
             _entries[nextRow, nextCol].Text = "";
             Dispatcher.Dispatch(() => _entries[nextRow, nextCol].Focus());
         }
+    }
+
+    private void RetreatFocus(int row, int col)
+    {
+        _retreating = true;
+        if (col > 0) EntryHelper.SelectAll(_entries[row, col - 1]);
+        else if (row > 0) EntryHelper.SelectAll(_entries[row - 1, Cols - 1]);
     }
 
     private void ForceBlackText(object? sender, EventArgs e)

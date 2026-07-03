@@ -510,6 +510,7 @@ public partial class PowerballPage : ContentPage
                 var entry = MakeEntry(Color.FromArgb("#F5F5F5"));
                 AttachMaxClamp(entry, 69);
                 int row_ = r, col_ = c;
+                EntryHelper.AttachBackspace(entry, () => RetreatFocus(row_, col_));
                 entry.TextChanged += (s, e) =>
                 {
                     // Duplicate prevention (main cols only)
@@ -545,6 +546,7 @@ public partial class PowerballPage : ContentPage
             var pbEntry = MakeEntry(Color.FromArgb("#FFF3E0"));
             AttachMaxClamp(pbEntry, 26);
             int mrow = r;
+            EntryHelper.AttachBackspace(pbEntry, () => RetreatFocus(mrow, PBCol));
             pbEntry.TextChanged += (_, _) =>
             {
                 if (!_voiceSettingText && _entries[mrow, PBCol].Text?.Length == 2) AdvanceFocus(mrow, PBCol);
@@ -621,6 +623,13 @@ public partial class PowerballPage : ContentPage
         if (col == MainCols - 1) { _entries[row, PBCol].Focus(); return; }
         ApplyAdvanceToRowIfActive(row);
         if (row + 1 < Rows) _entries[row + 1, 0].Focus();
+    }
+
+    private void RetreatFocus(int row, int col)
+    {
+        if (col == PBCol) { EntryHelper.SelectAll(_entries[row, MainCols - 1]); return; }
+        if (col > 0) { EntryHelper.SelectAll(_entries[row, col - 1]); return; }
+        if (row > 0) EntryHelper.SelectAll(_entries[row - 1, PBCol]);
     }
 
     static void AttachMaxClamp(Entry entry, int max)

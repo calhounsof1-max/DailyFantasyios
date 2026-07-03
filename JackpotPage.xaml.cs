@@ -48,6 +48,7 @@ public partial class JackpotPage : ContentPage
     };
 
     List<string> _gameOrder = new();
+    string _currentGameCode = "";
 
     public JackpotPage()
     {
@@ -107,13 +108,13 @@ public partial class JackpotPage : ContentPage
         progressBar.Progress = 0;
         progressBar.IsVisible = true;
 
-        var f5Task  = GetDataEntry.GetPastDraws(3);
-        var slTask  = GetDataEntry.GetSuperLottoDraws(3);
-        var pbTask  = GetDataEntry.GetPowerballDraws(3);
-        var mmTask  = GetDataEntry.GetMegaMillionsDraws(3);
-        var ddTask  = GetDataEntry.GetDailyDerbyDraws(3);
-        var d3Task  = GetDataEntry.GetDaily3Draws(3);
-        var d4Task  = GetDataEntry.GetDaily4Draws(3);
+        var f5Task  = GetDataEntry.GetPastDraws(11);
+        var slTask  = GetDataEntry.GetSuperLottoDraws(11);
+        var pbTask  = GetDataEntry.GetPowerballDraws(11);
+        var mmTask  = GetDataEntry.GetMegaMillionsDraws(11);
+        var ddTask  = GetDataEntry.GetDailyDerbyDraws(11);
+        var d3Task  = GetDataEntry.GetDaily3Draws(22);
+        var d4Task  = GetDataEntry.GetDaily4Draws(11);
         var jpTask  = GetDataEntry.GetNextJackpotAmounts();
 
         int done = 0;
@@ -154,6 +155,10 @@ public partial class JackpotPage : ContentPage
         lblLastChecked.Text = $"Checked {DateTime.Today:MMM d, yyyy} at {checkedAt}";
         lblStatus.Text = "Done";
         progressBar.IsVisible = false;
+
+        // If the detail overlay is open, refresh its draw picker with the full live data
+        if (overlayGrid.IsVisible && !string.IsNullOrEmpty(_currentGameCode))
+            PopulateDrawPicker(_currentGameCode);
     }
 
     void SetAllLoading()
@@ -260,15 +265,15 @@ public partial class JackpotPage : ContentPage
             if (draws.Count >= 2)
             {
                 // Two draws: higher DrawNumber = Evening, lower = Midday
-                if (_d3EveDraws.Count == 0) _d3EveDraws.Add(draws[0]);
-                if (_d3MidDraws.Count == 0) _d3MidDraws.Add(draws[1]);
+                if (_d3EveDraws.Count < 10) _d3EveDraws.Add(draws[0]);
+                if (_d3MidDraws.Count < 10) _d3MidDraws.Add(draws[1]);
             }
             else
             {
                 // Single draw for this date = Midday (Evening not drawn yet today)
-                if (_d3MidDraws.Count == 0) _d3MidDraws.Add(draws[0]);
+                if (_d3MidDraws.Count < 10) _d3MidDraws.Add(draws[0]);
             }
-            if (_d3EveDraws.Count > 0 && _d3MidDraws.Count > 0) break;
+            if (_d3EveDraws.Count >= 10 && _d3MidDraws.Count >= 10) break;
         }
     }
 
@@ -391,6 +396,16 @@ public partial class JackpotPage : ContentPage
 
     void ShowDrawDetail(string gameCode)
     {
+        _currentGameCode = gameCode;
+        drawPickerFrame.IsVisible = false;
+        overlayDropArrow.Text = "▼";
+        PopulateDrawPicker(gameCode);
+        ShowDrawContent(gameCode, 0);
+        overlayGrid.IsVisible = true;
+    }
+
+    void ShowDrawContent(string gameCode, int drawIndex)
+    {
         overlayNumbersPanel.Children.Clear();
         overlayPrizesPanel.Children.Clear();
         overlayRaceTime.IsVisible = false;
@@ -404,9 +419,10 @@ public partial class JackpotPage : ContentPage
         {
             case "F5":
                 if (_f5Draws.Count == 0) return;
-                var f5 = _f5Draws[0];
+                if (drawIndex >= _f5Draws.Count) drawIndex = 0;
+                var f5 = _f5Draws[drawIndex];
                 gameName  = "Fantasy 5";
-                drawDate  = f5.DrawDate;
+                drawDate  = f5.DrawNumber > 0 ? $"{f5.DrawDate}  •  Draw #{f5.DrawNumber}" : f5.DrawDate;
                 gameColor = Color.FromArgb("#FF8F00");
                 prizes    = f5.Prizes;
                 foreach (var n in f5.Numbers)
@@ -415,9 +431,10 @@ public partial class JackpotPage : ContentPage
 
             case "SL":
                 if (_slDraws.Count == 0) return;
-                var sl = _slDraws[0];
+                if (drawIndex >= _slDraws.Count) drawIndex = 0;
+                var sl = _slDraws[drawIndex];
                 gameName  = "SuperLotto Plus";
-                drawDate  = sl.DrawDate;
+                drawDate  = sl.DrawNumber > 0 ? $"{sl.DrawDate}  •  Draw #{sl.DrawNumber}" : sl.DrawDate;
                 gameColor = Color.FromArgb("#7B1FA2");
                 prizes    = sl.Prizes;
                 foreach (var n in sl.MainNumbers)
@@ -428,9 +445,10 @@ public partial class JackpotPage : ContentPage
 
             case "PB":
                 if (_pbDraws.Count == 0) return;
-                var pb = _pbDraws[0];
+                if (drawIndex >= _pbDraws.Count) drawIndex = 0;
+                var pb = _pbDraws[drawIndex];
                 gameName  = "Powerball";
-                drawDate  = pb.DrawDate;
+                drawDate  = pb.DrawNumber > 0 ? $"{pb.DrawDate}  •  Draw #{pb.DrawNumber}" : pb.DrawDate;
                 gameColor = Color.FromArgb("#C62828");
                 prizes    = pb.Prizes;
                 foreach (var n in pb.MainNumbers)
@@ -441,9 +459,10 @@ public partial class JackpotPage : ContentPage
 
             case "MM":
                 if (_mmDraws.Count == 0) return;
-                var mm = _mmDraws[0];
+                if (drawIndex >= _mmDraws.Count) drawIndex = 0;
+                var mm = _mmDraws[drawIndex];
                 gameName  = "Mega Millions";
-                drawDate  = mm.DrawDate;
+                drawDate  = mm.DrawNumber > 0 ? $"{mm.DrawDate}  •  Draw #{mm.DrawNumber}" : mm.DrawDate;
                 gameColor = Color.FromArgb("#1565C0");
                 prizes    = mm.Prizes;
                 foreach (var n in mm.MainNumbers)
@@ -454,9 +473,10 @@ public partial class JackpotPage : ContentPage
 
             case "DD":
                 if (_ddDraws.Count == 0) return;
-                var dd = _ddDraws[0];
+                if (drawIndex >= _ddDraws.Count) drawIndex = 0;
+                var dd = _ddDraws[drawIndex];
                 gameName  = "Daily Derby";
-                drawDate  = dd.DrawDate;
+                drawDate  = dd.DrawNumber > 0 ? $"{dd.DrawDate}  •  Draw #{dd.DrawNumber}" : dd.DrawDate;
                 gameColor = Color.FromArgb("#5D4037");
                 prizes    = dd.Prizes;
                 string[] positions = { "1st", "2nd", "3rd" };
@@ -471,7 +491,8 @@ public partial class JackpotPage : ContentPage
 
             case "D3E":
                 if (_d3EveDraws.Count == 0) return;
-                var d3e = _d3EveDraws[0];
+                if (drawIndex >= _d3EveDraws.Count) drawIndex = 0;
+                var d3e = _d3EveDraws[drawIndex];
                 gameName  = "Daily 3 – Evening";
                 drawDate  = d3e.DrawNumber > 0 ? $"{d3e.DrawDate}  •  Draw #{d3e.DrawNumber} Evening" : d3e.DrawDate;
                 gameColor = Color.FromArgb("#1976D2");
@@ -482,7 +503,8 @@ public partial class JackpotPage : ContentPage
 
             case "D3M":
                 if (_d3MidDraws.Count == 0) return;
-                var d3m = _d3MidDraws[0];
+                if (drawIndex >= _d3MidDraws.Count) drawIndex = 0;
+                var d3m = _d3MidDraws[drawIndex];
                 gameName  = "Daily 3 – Midday";
                 drawDate  = d3m.DrawNumber > 0 ? $"{d3m.DrawDate}  •  Draw #{d3m.DrawNumber} Midday" : d3m.DrawDate;
                 gameColor = Color.FromArgb("#1976D2");
@@ -493,9 +515,10 @@ public partial class JackpotPage : ContentPage
 
             case "D4":
                 if (_d4Draws.Count == 0) return;
-                var d4 = _d4Draws[0];
+                if (drawIndex >= _d4Draws.Count) drawIndex = 0;
+                var d4 = _d4Draws[drawIndex];
                 gameName  = "Daily 4";
-                drawDate  = d4.DrawDate;
+                drawDate  = d4.DrawNumber > 0 ? $"{d4.DrawDate}  •  Draw #{d4.DrawNumber}" : d4.DrawDate;
                 gameColor = Color.FromArgb("#00695C");
                 prizes    = d4.Prizes;
                 foreach (var n in d4.Numbers)
@@ -530,8 +553,113 @@ public partial class JackpotPage : ContentPage
                 HorizontalOptions = LayoutOptions.Center
             });
         }
+    }
 
-        overlayGrid.IsVisible = true;
+    // ── Draw History Picker ──────────────────────────────────────────────────
+
+    (string date, int drawNum)[] GetDrawList(string gameCode) => gameCode switch
+    {
+        "F5"  => _f5Draws .Select(d => (d.DrawDate, d.DrawNumber)).ToArray(),
+        "SL"  => _slDraws .Select(d => (d.DrawDate, d.DrawNumber)).ToArray(),
+        "PB"  => _pbDraws .Select(d => (d.DrawDate, d.DrawNumber)).ToArray(),
+        "MM"  => _mmDraws .Select(d => (d.DrawDate, d.DrawNumber)).ToArray(),
+        "DD"  => _ddDraws .Select(d => (d.DrawDate, d.DrawNumber)).ToArray(),
+        "D3E" => _d3EveDraws.Select(d => (d.DrawDate, d.DrawNumber)).ToArray(),
+        "D3M" => _d3MidDraws.Select(d => (d.DrawDate, d.DrawNumber)).ToArray(),
+        "D4"  => _d4Draws .Select(d => (d.DrawDate, d.DrawNumber)).ToArray(),
+        _     => Array.Empty<(string, int)>()
+    };
+
+    void PopulateDrawPicker(string gameCode)
+    {
+        drawPickerStack.Children.Clear();
+        var list = GetDrawList(gameCode);
+        if (list.Length == 0) return;
+
+        for (int i = 0; i < list.Length; i++)
+        {
+            int idx = i;
+            var (date, drawNum) = list[i];
+
+            if (i == 0)
+                drawPickerStack.Children.Add(MakePickerSectionHeader("RECENT DRAW"));
+            else if (i == 1)
+                drawPickerStack.Children.Add(MakePickerSectionHeader("PAST DRAWS"));
+
+            drawPickerStack.Children.Add(MakePickerRow(date, drawNum, gameCode, idx));
+        }
+    }
+
+    View MakePickerSectionHeader(string text)
+    {
+        return new Label
+        {
+            Text            = text,
+            FontSize        = 11,
+            FontAttributes  = FontAttributes.Bold,
+            TextColor       = Color.FromArgb("#6B7280"),
+            BackgroundColor = Color.FromArgb("#F9FAFB"),
+            Padding         = new Thickness(12, 8, 12, 4)
+        };
+    }
+
+    View MakePickerRow(string date, int drawNum, string gameCode, int index)
+    {
+        var dateLabel = new Label
+        {
+            Text            = date,
+            FontSize        = 14,
+            FontAttributes  = FontAttributes.Bold,
+            TextColor       = Color.FromArgb("#1E2733"),
+            VerticalOptions = LayoutOptions.Center
+        };
+        var drawLabel = new Label
+        {
+            Text                    = drawNum > 0 ? $"Draw #{drawNum}" : "",
+            FontSize                = 12,
+            TextColor               = Color.FromArgb("#6B7280"),
+            HorizontalOptions       = LayoutOptions.End,
+            VerticalOptions         = LayoutOptions.Center,
+            HorizontalTextAlignment = TextAlignment.End
+        };
+        var row = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitionCollection
+            {
+                new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Auto)
+            },
+            Padding = new Thickness(12, 11)
+        };
+        row.Add(dateLabel, 0, 0);
+        row.Add(drawLabel, 1, 0);
+        row.GestureRecognizers.Add(new TapGestureRecognizer
+        {
+            Command = new Command(() => OnDrawPickerItemSelected(gameCode, index))
+        });
+
+        var container = new VerticalStackLayout { Spacing = 0 };
+        container.Children.Add(row);
+        container.Children.Add(new BoxView
+        {
+            HeightRequest = 1,
+            Color         = Color.FromArgb("#E5E7EB")
+        });
+        return container;
+    }
+
+    private void OnDrawDateTapped(object? sender, TappedEventArgs e)
+    {
+        bool open = !drawPickerFrame.IsVisible;
+        drawPickerFrame.IsVisible = open;
+        overlayDropArrow.Text     = open ? "▲" : "▼";
+    }
+
+    void OnDrawPickerItemSelected(string gameCode, int index)
+    {
+        drawPickerFrame.IsVisible = false;
+        overlayDropArrow.Text     = "▼";
+        ShowDrawContent(gameCode, index);
     }
 
     View MakeNumberBall(int number, Color gameColor, bool isSpecial)
@@ -915,6 +1043,16 @@ public partial class JackpotPage : ContentPage
     }
 
     // ── Navigation ───────────────────────────────────────────────────────────
+
+    private async void LblStatus_Tapped(object sender, TappedEventArgs e)
+    {
+        string log = await Services.Logger.ReadLogAsync();
+        await Clipboard.Default.SetTextAsync(log);
+        var orig = lblStatus.Text;
+        lblStatus.Text = "Log copied!";
+        await Task.Delay(1500);
+        lblStatus.Text = orig;
+    }
 
     private async void BtnBack_Clicked(object sender, EventArgs e) => await GoBackWithSlide();
 

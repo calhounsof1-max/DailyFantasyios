@@ -132,6 +132,7 @@ public partial class MainPage : ContentPage
         for (int i = 0; i < _boxes.Length; i++)
         {
             int idx = i;
+            EntryHelper.AttachBackspace(_boxes[i], () => { if (idx > 0) EntryHelper.SelectAll(_boxes[idx - 1]); });
             _boxes[i].TextChanged += (_, _) =>
             {
                 if (_isRestoring) return;

@@ -522,6 +522,7 @@ public partial class MegaMillionsPage : ContentPage
                 var entry = MakeEntry(Color.FromArgb("#FFF8E1"));
                 AttachMaxClamp(entry, MainMax);
                 int row_ = r, col_ = c;
+                EntryHelper.AttachBackspace(entry, () => RetreatFocus(row_, col_));
                 entry.TextChanged += (s, e) =>
                 {
                     // Duplicate prevention (main cols only)
@@ -557,6 +558,7 @@ public partial class MegaMillionsPage : ContentPage
             var mbEntry = MakeEntry(Color.FromArgb("#E3F2FD"));
             AttachMaxClamp(mbEntry, MBMax);
             int mrow = r;
+            EntryHelper.AttachBackspace(mbEntry, () => RetreatFocus(mrow, MBCol));
             mbEntry.TextChanged += (_, _) =>
             {
                 if (!_voiceSettingText && _entries[mrow, MBCol].Text?.Length == 2) AdvanceFocus(mrow, MBCol);
@@ -633,6 +635,13 @@ public partial class MegaMillionsPage : ContentPage
         if (col == MainCols - 1) { _entries[row, MBCol].Focus(); return; }
         ApplyAdvanceToRowIfActive(row);
         if (row + 1 < Rows) _entries[row + 1, 0].Focus();
+    }
+
+    private void RetreatFocus(int row, int col)
+    {
+        if (col == MBCol) { EntryHelper.SelectAll(_entries[row, MainCols - 1]); return; }
+        if (col > 0) { EntryHelper.SelectAll(_entries[row, col - 1]); return; }
+        if (row > 0) EntryHelper.SelectAll(_entries[row - 1, MBCol]);
     }
 
     static void AttachMaxClamp(Entry entry, int max)

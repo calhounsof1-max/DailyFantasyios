@@ -534,6 +534,7 @@ public partial class WinnerPage : ContentPage
 
                 // Capture row/col for the lambda
                 int row_ = r, col_ = c;
+                EntryHelper.AttachBackspace(entry, () => RetreatFocus(row_, col_));
                 entry.TextChanged += (s, e) =>
                 {
                     // Duplicate prevention
@@ -608,6 +609,12 @@ public partial class WinnerPage : ContentPage
         if (nextCol >= Cols) { nextCol = 0; nextRow = row + 1; ApplyAdvanceToRowIfActive(row); }
         if (nextRow < Rows)
             _entries[nextRow, nextCol].Focus();
+    }
+
+    private void RetreatFocus(int row, int col)
+    {
+        if (col > 0) { EntryHelper.SelectAll(_entries[row, col - 1]); return; }
+        if (row > 0) EntryHelper.SelectAll(_entries[row - 1, Cols - 1]);
     }
 
     static void AttachMaxClamp(Entry entry, int max)

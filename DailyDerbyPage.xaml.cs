@@ -52,6 +52,7 @@ public partial class DailyDerbyPage : ContentPage
     bool _suppressPickerEvent = false;
     bool _suppressExcl = false;
     bool _loading = false;
+    bool _retreating = false;
     readonly Dictionary<int, string> _slotCache = new();
     View? _highlightedView;
 
@@ -582,7 +583,8 @@ public partial class DailyDerbyPage : ContentPage
                 AttachMaxClamp(entry, 12);
 
                 int row_ = r, col_ = c;
-                entry.Focused += (_, _) => { if (!_loading) Dispatcher.Dispatch(() => _horseEntries[row_, col_].Text = ""); };
+                entry.Focused += (_, _) => { if (!_loading && !_retreating) Dispatcher.Dispatch(() => _horseEntries[row_, col_].Text = ""); _retreating = false; };
+                EntryHelper.AttachBackspace(entry, () => RetreatHorseFocus(row_, col_));
                 entry.TextChanged += (s, e) =>
                 {
                     if (_loading) return;
@@ -642,7 +644,8 @@ public partial class DailyDerbyPage : ContentPage
             timeEntry.HandlerChanged += ForceBlackText;
 
             int rowT = r;
-            timeEntry.Focused += (_, _) => { if (!_loading) Dispatcher.Dispatch(() => _timeEntries[rowT].Text = ""); };
+            timeEntry.Focused += (_, _) => { if (!_loading && !_retreating) Dispatcher.Dispatch(() => _timeEntries[rowT].Text = ""); _retreating = false; };
+            EntryHelper.AttachBackspace(timeEntry, () => RetreatHorseFocus(rowT, HorseCols));
             timeEntry.TextChanged += (_, _) =>
             {
                 if (_loading) return;
@@ -765,6 +768,13 @@ public partial class DailyDerbyPage : ContentPage
             _timeEntries[row].Text = "";
             Dispatcher.Dispatch(() => _timeEntries[row].Focus());
         }
+    }
+
+    private void RetreatHorseFocus(int row, int col)
+    {
+        _retreating = true;
+        if (col > 0) EntryHelper.SelectAll(_horseEntries[row, col - 1]);
+        else if (row > 0) EntryHelper.SelectAll(_timeEntries[row - 1]);
     }
 
     static void AttachMaxClamp(Entry entry, int max)

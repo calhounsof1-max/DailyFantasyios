@@ -515,6 +515,7 @@ public partial class SuperLottoPage : ContentPage
                 var entry = MakeEntry(Color.FromArgb("#F5F5F5"));
                 AttachMaxClamp(entry, 47);
                 int row_ = r, col_ = c;
+                EntryHelper.AttachBackspace(entry, () => RetreatFocus(row_, col_));
                 entry.TextChanged += (s, e) =>
                 {
                     // Duplicate prevention (main cols only)
@@ -550,6 +551,7 @@ public partial class SuperLottoPage : ContentPage
             var megaEntry = MakeEntry(Color.FromArgb("#FFEBEE"));
             AttachMaxClamp(megaEntry, 27);
             int mrow = r;
+            EntryHelper.AttachBackspace(megaEntry, () => RetreatFocus(mrow, MegaCol));
             megaEntry.TextChanged += (_, _) =>
             {
                 if (!_voiceSettingText && _entries[mrow, MegaCol].Text?.Length == 2) AdvanceFocus(mrow, MegaCol);
@@ -628,6 +630,13 @@ public partial class SuperLottoPage : ContentPage
         // after mega (last col), auto-apply advance then go to next row col 0
         ApplyAdvanceToRowIfActive(row);
         if (row + 1 < Rows) _entries[row + 1, 0].Focus();
+    }
+
+    private void RetreatFocus(int row, int col)
+    {
+        if (col == MegaCol) { EntryHelper.SelectAll(_entries[row, MainCols - 1]); return; }
+        if (col > 0) { EntryHelper.SelectAll(_entries[row, col - 1]); return; }
+        if (row > 0) EntryHelper.SelectAll(_entries[row - 1, MegaCol]);
     }
 
     static void AttachMaxClamp(Entry entry, int max)
