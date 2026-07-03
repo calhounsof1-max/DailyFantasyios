@@ -2,21 +2,24 @@
 /// Helpers for Entry backspace-navigation across number-input boxes.
 /// - Backspace on empty box → navigate back, highlight previous box's content.
 /// - Backspace when all text is selected → navigate back again (without deleting), highlight.
-/// - Typing replaces the highlighted text (standard Android selection behavior).
+/// - Typing replaces the highlighted text (standard selection behavior).
 /// </summary>
 public static class EntryHelper
 {
-    /// <summary>
-    /// Attaches backspace-navigation to an entry. <paramref name="onBackspace"/> should call
-    /// RetreatFocus (which focuses the previous entry and calls SelectAll on it).
-    /// </summary>
     public static void AttachBackspace(Entry entry, Action onBackspace)
     {
         entry.HandlerChanged += (_, _) =>
         {
 #if ANDROID
             if (entry.Handler?.PlatformView is Android.Widget.EditText et)
-                et.SetOnKeyListener(new BackspaceListener(entry, onBackspace));
+                et.SetOnKeyListener(new AndroidBackspaceListener(entry, onBackspace));
+#elif IOS
+            if (entry.Handler?.PlatformView is UIKit.UITextField tf
+                && tf.Delegate is not iOSBackspaceDelegate)
+            {
+                var prev = tf.Delegate;
+                tf.Delegate = new iOSBackspaceDelegate(entry, prev, onBackspace);
+            }
 #endif
         };
     }
@@ -32,16 +35,24 @@ public static class EntryHelper
 #if ANDROID
             if (entry.Handler?.PlatformView is Android.Widget.EditText et)
                 et.SelectAll();
+#elif IOS
+            CoreFoundation.DispatchQueue.MainQueue.DispatchAfter(
+                new Foundation.NSTimeInterval(0.05),
+                () =>
+                {
+                    if (entry.Handler?.PlatformView is UIKit.UITextField tf)
+                        tf.SelectAll(tf);
+                });
 #endif
         });
     }
 
 #if ANDROID
-    class BackspaceListener : Java.Lang.Object, Android.Views.View.IOnKeyListener
+    class AndroidBackspaceListener : Java.Lang.Object, Android.Views.View.IOnKeyListener
     {
         readonly Entry _entry;
         readonly Action _cb;
-        public BackspaceListener(Entry entry, Action cb) { _entry = entry; _cb = cb; }
+        public AndroidBackspaceListener(Entry entry, Action cb) { _entry = entry; _cb = cb; }
 
         public bool OnKey(Android.Views.View? v, Android.Views.Keycode keyCode, Android.Views.KeyEvent? e)
         {
@@ -61,6 +72,59 @@ public static class EntryHelper
             }
             return false;
         }
+    }
+#elif IOS
+    class iOSBackspaceDelegate : UIKit.UITextFieldDelegate
+    {
+        readonly Entry _entry;
+        readonly UIKit.IUITextFieldDelegate? _prev;
+        readonly Action _cb;
+
+        public iOSBackspaceDelegate(Entry entry, UIKit.IUITextFieldDelegate? prev, Action cb)
+        {
+            _entry = entry;
+            _prev  = prev;
+            _cb    = cb;
+        }
+
+        public override bool ShouldChangeCharacters(UIKit.UITextField textField, Foundation.NSRange range, string replacementString)
+        {
+            if (replacementString.Length == 0) // delete/backspace
+            {
+                string text   = textField.Text ?? "";
+                bool isEmpty  = text.Length == 0;
+
+                // All-selected: the selected range spans the entire text AND there is an actual
+                // selection (not just a cursor), so SelectedTextRange is non-empty.
+                bool allSelected = !isEmpty
+                    && textField.SelectedTextRange != null
+                    && !textField.SelectedTextRange.Empty
+                    && range.Location == 0
+                    && (nint)range.Length == (nint)text.Length;
+
+                if (isEmpty || allSelected)
+                {
+                    _cb();
+                    return false; // prevent deletion; for empty there is nothing to delete anyway
+                }
+            }
+            return _prev?.ShouldChangeCharacters(textField, range, replacementString) ?? true;
+        }
+
+        public override bool ShouldReturn(UIKit.UITextField textField)
+            => _prev?.ShouldReturn(textField) ?? true;
+
+        public override bool ShouldBeginEditing(UIKit.UITextField textField)
+            => _prev?.ShouldBeginEditing(textField) ?? true;
+
+        public override bool ShouldEndEditing(UIKit.UITextField textField)
+            => _prev?.ShouldEndEditing(textField) ?? true;
+
+        public override void EditingStarted(UIKit.UITextField textField)
+            => _prev?.EditingStarted(textField);
+
+        public override void EditingEnded(UIKit.UITextField textField)
+            => _prev?.EditingEnded(textField);
     }
 #endif
 }
