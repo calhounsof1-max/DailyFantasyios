@@ -207,6 +207,8 @@ public partial class DailyDerbyPage : ContentPage
             UpdateSlotPicker();
             if (pendingRow >= 0)
                 _ = HighlightRow(pendingRow);
+            int nd = DrawNumberService.GetNextDraw("Daily Derby");
+            if (nd > 0) { entAdvAllStart.Text = nd.ToString(); entAdvAllEnd.Text = nd.ToString(); }
         });
     }
 
@@ -393,6 +395,11 @@ public partial class DailyDerbyPage : ContentPage
             for (int c = 0; c < cols; c++)
                 if (!string.IsNullOrEmpty(_horseEntries[r, c].Text)) { hasNums = true; break; }
             if (!hasNums) continue;
+            if (!_overrideMode)
+            {
+                bool alreadySet = _playStart[r].HasValue || _playEnd[r].HasValue || !string.IsNullOrEmpty(_drawStart[r]);
+                if (alreadySet) continue;
+            }
             if (hasDate) { _playStart[r] = from; _playEnd[r] = to; }
             if (hasDraw) { _drawStart[r] = ds; _drawEnd[r] = string.IsNullOrEmpty(de) ? ds : de; }
         }
@@ -645,13 +652,12 @@ public partial class DailyDerbyPage : ContentPage
 
             int rowT = r;
             timeEntry.Focused += (_, _) => { if (!_loading && !_retreating) Dispatcher.Dispatch(() => _timeEntries[rowT].Text = ""); _retreating = false; };
-            EntryHelper.AttachBackspace(timeEntry, () => RetreatHorseFocus(rowT, HorseCols));
+            EntryHelper.AttachBackspace(timeEntry, () => RetreatHorseFocus(rowT, HorseCols)); // HorseCols = "after last horse col" → retreats to last horse
             timeEntry.TextChanged += (_, _) =>
             {
                 if (_loading) return;
                 if ((_timeEntries[rowT].Text?.Length ?? 0) == 3)
                 {
-                    ApplyAdvanceToRowIfActive(rowT);
                     if (rowT + 1 < Rows)
                     {
                         _horseEntries[rowT + 1, 0].Text = "";

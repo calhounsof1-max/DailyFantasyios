@@ -203,6 +203,8 @@ public partial class SuperLottoPage : ContentPage
             UpdateSlotPicker();
             if (pendingRow >= 0)
                 _ = HighlightRow(pendingRow);
+            int nd = DrawNumberService.GetNextDraw("Super Lotto");
+            if (nd > 0) { entAdvAllStart.Text = nd.ToString(); entAdvAllEnd.Text = nd.ToString(); }
         });
     }
 
@@ -353,6 +355,11 @@ public partial class SuperLottoPage : ContentPage
             for (int c = 0; c < cols; c++)
                 if (!string.IsNullOrEmpty(_entries[r, c].Text)) { hasNums = true; break; }
             if (!hasNums) continue;
+            if (!_overrideMode)
+            {
+                bool alreadySet = _playStart[r].HasValue || _playEnd[r].HasValue || !string.IsNullOrEmpty(_drawStart[r]);
+                if (alreadySet) continue;
+            }
             if (hasDate) { _playStart[r] = from; _playEnd[r] = to; }
             if (hasDraw) { _drawStart[r] = ds; _drawEnd[r] = string.IsNullOrEmpty(de) ? ds : de; }
         }
@@ -627,8 +634,6 @@ public partial class SuperLottoPage : ContentPage
         // col 0-4 = main, col 5 = mega
         if (col < MainCols - 1) { _entries[row, col + 1].Focus(); return; }
         if (col == MainCols - 1) { _entries[row, MegaCol].Focus(); return; }
-        // after mega (last col), auto-apply advance then go to next row col 0
-        ApplyAdvanceToRowIfActive(row);
         if (row + 1 < Rows) _entries[row + 1, 0].Focus();
     }
 

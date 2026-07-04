@@ -197,6 +197,8 @@ public partial class Daily4Page : ContentPage
             UpdateSlotPicker();
             if (pendingRow >= 0)
                 _ = HighlightRow(pendingRow);
+            int nd = DrawNumberService.GetNextDraw("Daily 4");
+            if (nd > 0) { entAdvAllStart.Text = nd.ToString(); entAdvAllEnd.Text = nd.ToString(); }
         });
     }
 
@@ -406,6 +408,11 @@ public partial class Daily4Page : ContentPage
             for (int c = 0; c < cols; c++)
                 if (!string.IsNullOrEmpty(_entries[r, c].Text)) { hasNums = true; break; }
             if (!hasNums) continue;
+            if (!_overrideMode)
+            {
+                bool alreadySet = _playStart[r].HasValue || _playEnd[r].HasValue || !string.IsNullOrEmpty(_drawStart[r]);
+                if (alreadySet) continue;
+            }
             if (hasDate) { _playStart[r] = from; _playEnd[r] = to; }
             if (hasDraw) { _drawStart[r] = ds; _drawEnd[r] = string.IsNullOrEmpty(de) ? ds : de; }
         }
@@ -786,7 +793,7 @@ public partial class Daily4Page : ContentPage
     {
         int nextCol = col + 1;
         int nextRow = row;
-        if (nextCol >= Cols) { nextCol = 0; nextRow = row + 1; ApplyAdvanceToRowIfActive(row); }
+        if (nextCol >= Cols) { nextCol = 0; nextRow = row + 1; }
         if (nextRow < Rows)
         {
             _entries[nextRow, nextCol].Text = "";

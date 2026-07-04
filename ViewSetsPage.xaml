@@ -42,12 +42,17 @@
         </Grid>
 
         <!-- Bottom bar -->
-        <Grid Grid.Row="2" BackgroundColor="#1E2733" ColumnDefinitions="*,Auto">
+        <Grid Grid.Row="2" BackgroundColor="#1E2733" ColumnDefinitions="*,Auto,Auto">
             <Label Grid.Column="0" x:Name="lblStatus"
                    Text="Sets loaded"
                    TextColor="#8B9DC3" FontSize="12" Padding="14,5"
                    VerticalOptions="Center"/>
-            <Button Grid.Column="1" Text="🎲 Generate"
+            <Button Grid.Column="1" Text="🖨 Print"
+                    FontSize="12" FontAttributes="Bold"
+                    BackgroundColor="#1C3A5F" TextColor="#93C5FD"
+                    Padding="14,0" HeightRequest="46" CornerRadius="0"
+                    Clicked="BtnPrint_Clicked"/>
+            <Button Grid.Column="2" Text="🎲 Generate"
                     FontSize="12" FontAttributes="Bold"
                     BackgroundColor="#5D4037" TextColor="White"
                     Padding="14,0" HeightRequest="46" CornerRadius="0"

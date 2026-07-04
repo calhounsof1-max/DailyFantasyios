@@ -437,9 +437,9 @@
         <!-- ══════════════════════════════════════════════
              Row 9 — Bottom nav bar
              ══════════════════════════════════════════════ -->
-        <Grid Grid.Row="9" ColumnDefinitions="*,*,*,*,*,*"
+        <Grid Grid.Row="9" ColumnDefinitions="*,*,*,*,*,*,*"
               HeightRequest="56" BackgroundColor="#080F1A">
-            <BoxView Grid.Column="0" Grid.ColumnSpan="6"
+            <BoxView Grid.Column="0" Grid.ColumnSpan="7"
                      HeightRequest="1" BackgroundColor="#1E3A5F"
                      VerticalOptions="Start"/>
             <Button Grid.Column="0" Text="Results" FontSize="10" FontAttributes="Bold"
@@ -460,6 +460,9 @@
             <Button Grid.Column="5" Text="Save" FontSize="10" FontAttributes="Bold"
                     BackgroundColor="#1E3A8A" TextColor="#93C5FD"
                     CornerRadius="0" Padding="0,0" Clicked="BtnSave_Clicked"/>
+            <Button Grid.Column="6" Text="🖨 Print" FontSize="10" FontAttributes="Bold"
+                    BackgroundColor="#1C2B40" TextColor="#CBD5E1"
+                    CornerRadius="0" Padding="0,0" Clicked="BtnPrint_Clicked"/>
         </Grid>
 
         <!-- ══════════════════════════════════════════════

@@ -60,6 +60,7 @@ public partial class DrawSearchPage : ContentPage
             gamePicker.SelectedIndex = idx;
         }
         UpdateGameUI();
+        ApplyNextDraw();
     }
 
     // ── Collapse / expand numbers ─────────────────────────────────
@@ -275,8 +276,18 @@ public partial class DrawSearchPage : ContentPage
         if (i < 0) return;
         _selGame = i;
         UpdateGameUI();
+        ApplyNextDraw();
         resultsContainer.Children.Clear();
         lblSummary.Text = "";
+    }
+
+    void ApplyNextDraw()
+    {
+        int n = Services.DrawNumberService.GetNextDraw(_games[_selGame].Name);
+        if (n <= 0) return;
+        string s = n.ToString();
+        entryDrawFrom.Text = s;
+        entryDrawTo.Text   = s;
     }
 
     private async void BtnGoHome_Clicked(object? sender, EventArgs e) =>

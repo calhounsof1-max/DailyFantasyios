@@ -327,14 +327,19 @@ public partial class NotificationsPage : ContentPage
 
     async void BtnWinMinAmount_Clicked(object sender, EventArgs e)
     {
-        string? pick = await DisplayActionSheet("Alert when I win at least...", "Cancel", null,
-            "$10", "$25", "$50", "$100", "$200", "$500", "$1,000");
-        if (pick == null || pick == "Cancel") return;
-        string digits = new string(pick.Where(char.IsDigit).ToArray());
-        if (int.TryParse(digits, out int amount))
+        int current = Preferences.Get(PrefWinMinAmount, 100);
+        string? input = await DisplayPromptAsync(
+            "Alert When I Win At Least",
+            "Enter any dollar amount:",
+            initialValue: current.ToString(),
+            keyboard: Keyboard.Numeric,
+            maxLength: 7);
+        if (input == null) return;
+        string digits = new string(input.Where(char.IsDigit).ToArray());
+        if (int.TryParse(digits, out int amount) && amount >= 1)
         {
             Preferences.Set(PrefWinMinAmount, amount);
-            btnWinMinAmount.Text = pick;
+            btnWinMinAmount.Text = "$" + amount.ToString();
             UpdateStatus();
         }
     }

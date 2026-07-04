@@ -225,6 +225,9 @@ public partial class ViewSetsPage : ContentPage
             btn.Text = anyExpanded ? "⊞" : "⊟";
     }
 
+    private async void BtnPrint_Clicked(object sender, EventArgs e)
+        => await Shell.Current.GoToAsync(nameof(PrintPreviewPage), false);
+
     private async void BtnGenerate_Clicked(object sender, EventArgs e)
     {
         AppShell.GeneratePageInstance.PrePosition(true);

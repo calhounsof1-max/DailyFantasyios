@@ -30,6 +30,7 @@ public partial class AppShell : Shell
 	internal static readonly AdvanceGamesPage     AdvanceGamesPageInstance     = new();
 	internal static readonly SummaryPage          SummaryPageInstance          = new();
 	internal static readonly DrawSearchPage       DrawSearchPageInstance        = new();
+	internal static readonly PrintPreviewPage     PrintPreviewPageInstance      = new();
 
 #if IOS
 	protected override void OnNavigated(ShellNavigatedEventArgs args)
@@ -81,5 +82,6 @@ public partial class AppShell : Shell
 		Routing.RegisterRoute(nameof(AdvanceGamesPage),     new SingletonRouteFactory(AdvanceGamesPageInstance));
 		Routing.RegisterRoute(nameof(SummaryPage),           new SingletonRouteFactory(SummaryPageInstance));
 		Routing.RegisterRoute(nameof(DrawSearchPage),        new SingletonRouteFactory(DrawSearchPageInstance));
+		Routing.RegisterRoute(nameof(PrintPreviewPage),      new SingletonRouteFactory(PrintPreviewPageInstance));
 	}
 }

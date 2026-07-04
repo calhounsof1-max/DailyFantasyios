@@ -289,7 +289,7 @@ public partial class MainPage : ContentPage
         if (isFiveNum)
             parts = selected.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
         else
-            parts = selected.ToCharArray().Select(c => c.ToString()).ToArray();
+            parts = selected.Replace(" ", "").ToCharArray().Select(c => c.ToString()).ToArray();
 
         if (!_showingDraws)
         {
@@ -1013,6 +1013,9 @@ public partial class MainPage : ContentPage
 
     private async void BtnSummary_Clicked(object sender, EventArgs e)
         => await Shell.Current.GoToAsync(nameof(SummaryPage), false);
+
+    private async void BtnPrint_Clicked(object sender, EventArgs e)
+        => await Shell.Current.GoToAsync(nameof(PrintPreviewPage), false);
 
     private async void BtnAdvance_Clicked(object sender, EventArgs e)
     {
