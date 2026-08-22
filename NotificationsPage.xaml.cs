@@ -25,6 +25,7 @@ public partial class NotificationsPage : ContentPage
     const string PrefCarrier      = "notif_carrier";
     const string PrefTimes        = "notif_times";       // comma-separated 24h hours e.g. "8,18"
     const string PrefWinEnabled         = "win_alert_enabled";
+    const string PrefJackpotPanel       = JackpotDisplay.PrefShowPanel;
     const string PrefWinTimes           = "win_check_times";      // default "18,19,20,21"
     const string PrefWinMinAmount       = "win_min_amount";       // default 100
     const string PrefWinIntervalEnabled = "win_interval_enabled"; // default false
@@ -73,6 +74,7 @@ public partial class NotificationsPage : ContentPage
         UpdateNotifTimesSummary();
 
         switchWinAlert.IsToggled    = Preferences.Get(PrefWinEnabled, true);
+        switchJackpotPanel.IsToggled = Preferences.Get(PrefJackpotPanel, true);
         btnWinMinAmount.Text        = "$" + Preferences.Get(PrefWinMinAmount, 100).ToString();
         LoadWinSelectedHours();
         UpdateWinTimesSummary();
@@ -323,6 +325,12 @@ public partial class NotificationsPage : ContentPage
         if (_loading) return;
         Preferences.Set(PrefWinEnabled, e.Value);
         UpdateStatus();
+    }
+
+    void SwitchJackpotPanel_Toggled(object sender, ToggledEventArgs e)
+    {
+        if (_loading) return;
+        Preferences.Set(PrefJackpotPanel, e.Value);
     }
 
     async void BtnWinMinAmount_Clicked(object sender, EventArgs e)

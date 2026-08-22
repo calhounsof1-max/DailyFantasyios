@@ -263,6 +263,32 @@
                     </VerticalStackLayout>
                 </Frame>
 
+                <!-- Jackpot Display Card -->
+                <Frame BackgroundColor="White" CornerRadius="12" BorderColor="#E5E7EB"
+                       Padding="16,12" HasShadow="False">
+                    <VerticalStackLayout Spacing="0">
+
+                        <HorizontalStackLayout Spacing="8" Margin="0,0,0,6">
+                            <BoxView WidthRequest="4" HeightRequest="18" CornerRadius="2"
+                                     BackgroundColor="#F59E0B" VerticalOptions="Center"/>
+                            <Label Text="JACKPOT DISPLAY" FontSize="13" FontAttributes="Bold"
+                                   TextColor="#B45309" VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
+
+                        <Grid ColumnDefinitions="*,Auto" Padding="0,8">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2" VerticalOptions="Center">
+                                <Label Text="Show Jackpot Panel" FontSize="15" TextColor="#1F2937"/>
+                                <Label Text="Shows F5, Super Lotto, Powerball &amp; Mega Millions jackpots on home screen"
+                                       FontSize="11" TextColor="#9CA3AF"/>
+                            </VerticalStackLayout>
+                            <Switch Grid.Column="1" x:Name="switchJackpotPanel"
+                                    OnColor="#F59E0B" ThumbColor="White"
+                                    Toggled="SwitchJackpotPanel_Toggled"/>
+                        </Grid>
+
+                    </VerticalStackLayout>
+                </Frame>
+
                 <!-- Status label -->
                 <Label x:Name="lblStatus" Text="" FontSize="12"
                        TextColor="#6B7280" HorizontalOptions="Center"
