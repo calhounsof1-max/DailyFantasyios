@@ -5,6 +5,8 @@ namespace DailyFantasyMAUI;
 
 public partial class MainPage : ContentPage
 {
+    internal const string HotSpotOnlyModeKey = "hotspot_only_mode";
+
     readonly MainViewModel vm = new();
     int _mode = 0; // 0=F5, 1=SL, 2=D3
     bool _isRestoring = false;
@@ -113,6 +115,12 @@ public partial class MainPage : ContentPage
             return;
         }
         _initialized = true;
+
+        // Hot Spot Only mode: skip straight to Hot Spot on cold launch instead of ever
+        // showing Home — everything below still runs unchanged afterward, underneath Hot
+        // Spot, so Home is still fully initialized for whenever the user taps its ⌂ icon.
+        if (Preferences.Get(HotSpotOnlyModeKey, false))
+            await Shell.Current.GoToAsync(nameof(HotSpotPage), false);
 
         // Auto-purge expired advance plays on every app open
         _ = CheckAutoPurgeOnStartupAsync();
@@ -911,7 +919,7 @@ public partial class MainPage : ContentPage
     {
         if (_isPanning) return;
         string result = await DisplayActionSheet(null, "Cancel", null,
-            "Fantasy 5", "Super Lotto", "Daily 3", "Daily 4", "Powerball", "Mega Millions", "Daily Derby", "Jackpot Winners");
+            "Fantasy 5", "Super Lotto", "Daily 3", "Daily 4", "Powerball", "Mega Millions", "Daily Derby", "Hot Spot", "Jackpot Winners");
         if (result == null || result == "Cancel") return;
         SavePreferences();
         vm.IsLoading = true;
@@ -951,6 +959,9 @@ public partial class MainPage : ContentPage
                 DailyDerbyPage.ComingFrom = "main";
                 AppShell.DailyDerbyPageInstance.PrePosition(true);
                 await Shell.Current.GoToAsync(nameof(DailyDerbyPage), false);
+                break;
+            case "Hot Spot":
+                await Shell.Current.GoToAsync(nameof(HotSpotPage), false);
                 break;
             case "Jackpot Winners":
                 AppShell.JackpotPageInstance.PrePosition(true);

@@ -7,6 +7,46 @@ public partial class WinnerPage : ContentPage
     const int Rows = 10;
     const int Cols = 5;
 
+    // Count FP-flagged rows active for TODAY only (advance-play rows only count if start date =
+    // today) — ported from the Android app's WinnerPage.xaml.cs, needed by SpendingTracker.
+    internal static int CountFreePlayRowsToday(string entries, string fpRaw, string adv)
+    {
+        if (string.IsNullOrEmpty(entries) || string.IsNullOrEmpty(fpRaw)) return 0;
+        var vals    = entries.Split('|');
+        var flags   = fpRaw.Split('|');
+        var advRows = string.IsNullOrEmpty(adv) ? Array.Empty<string>() : adv.Split('|');
+        int count   = 0;
+        for (int r = 0; r < 10; r++)
+        {
+            int idx = r * 5;
+            if (idx >= vals.Length || string.IsNullOrWhiteSpace(vals[idx])) continue;
+            if (r >= flags.Length || flags[r] != "1") continue;
+            // If row has advance dates, only count when start date is today
+            // and the end date has not already passed
+            if (r < advRows.Length && !string.IsNullOrEmpty(advRows[r])
+                && advRows[r] != "~~~" && advRows[r] != "~")
+            {
+                var pair = advRows[r].Split('~');
+
+                // If end date is set and already past, ticket is expired — skip
+                if (pair.Length >= 2 && !string.IsNullOrEmpty(pair[1])
+                    && DateTime.TryParseExact(pair[1], "yyyyMMdd", null,
+                        System.Globalization.DateTimeStyles.None, out var ed)
+                    && ed.Date < DateTime.Today)
+                    continue;
+
+                bool startIsToday = pair.Length >= 1
+                    && !string.IsNullOrEmpty(pair[0])
+                    && DateTime.TryParseExact(pair[0], "yyyyMMdd", null,
+                        System.Globalization.DateTimeStyles.None, out var sd)
+                    && sd.Date == DateTime.Today;
+                if (!startIsToday) continue;
+            }
+            count++;
+        }
+        return count;
+    }
+
     readonly Border[] _wBorders;
     readonly Label[]  _wLabels;
 

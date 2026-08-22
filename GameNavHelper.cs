@@ -9,7 +9,7 @@ static class GameNavHelper
     {
         string? result = await caller.DisplayActionSheet(null, "Cancel", null,
             "Fantasy 5", "Super Lotto", "Daily 3", "Daily 4",
-            "Powerball", "Mega Millions", "Daily Derby", "Jackpot Winners", "Notifications");
+            "Powerball", "Mega Millions", "Daily Derby", "Hot Spot", "Jackpot Winners", "Notifications");
         if (result == null || result == "Cancel") return;
 
         switch (result)
@@ -50,6 +50,9 @@ static class GameNavHelper
                 DailyDerbyPage.ComingFrom = "main";
                 AppShell.DailyDerbyPageInstance.PrePosition(true);
                 await Shell.Current.GoToAsync(nameof(DailyDerbyPage), false);
+                break;
+            case "Hot Spot":
+                await Shell.Current.GoToAsync(nameof(HotSpotPage), false);
                 break;
             case "Jackpot Winners":
                 AppShell.JackpotPageInstance.PrePosition(true);

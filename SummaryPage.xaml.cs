@@ -15,6 +15,7 @@ public class WinningRecord
 
 public partial class SummaryPage : ContentPage
 {
+    public static bool NeedsRefresh { get; set; }
     static readonly (string Key, string Name, string Color)[] GameDefs =
     [
         ("F5", "Fantasy 5",     "#FF8F00"),
@@ -24,9 +25,17 @@ public partial class SummaryPage : ContentPage
         ("D3", "Daily 3",       "#1565C0"),
         ("D4", "Daily 4",       "#00695C"),
         ("DD", "Daily Derby",   "#5D4037"),
+        ("HS", "Hot Spot",      "#E65100"),
     ];
 
-    static string DataPath => Path.Combine(FileSystem.AppDataDirectory, "winnings_log.json");
+    static string DataPath    => Path.Combine(FileSystem.AppDataDirectory, "winnings_log.json");
+    static string BlockedPath => Path.Combine(FileSystem.AppDataDirectory, "winnings_blocked.json");
+
+    // Serializes every read-modify-write of winnings_log.json — AddWinAsync is called once per
+    // qualifying win from a foreach loop (Hot Spot's background checker can call it several
+    // times in a row), so concurrent calls without this lock could each load stale data and
+    // overwrite each other's writes. Ported from the Android app's own fix for this exact race.
+    static readonly SemaphoreSlim _fileLock = new(1, 1);
 
     List<WinningRecord> _records = new();
     readonly Dictionary<string, bool> _ftExpanded = new();
@@ -55,17 +64,41 @@ public partial class SummaryPage : ContentPage
 
     // ── Static helpers called from ResultsPage checkbox ───────────────────────
 
-    public static async Task AddWinAsync(WinningRecord record)
+    // Returns whether this call actually added a new record (vs. a dedup no-op) — callers whose
+    // win isn't discovered by a background pipeline (e.g. Hot Spot's live in-app check) use this
+    // to tell a genuinely new win apart from a re-check of an already-recorded one, and only fire
+    // a push notification for the former.
+    public static async Task<bool> AddWinAsync(WinningRecord record)
+    {
+        await _fileLock.WaitAsync();
+        try
+        {
+            if (!string.IsNullOrEmpty(record.SourceKey))
+            {
+                var blocked = await LoadBlockedKeysAsync();
+                if (blocked.Contains(record.SourceKey)) return false;
+            }
+            var records = await LoadAllAsync();
+            if (!string.IsNullOrEmpty(record.SourceKey) &&
+                records.Any(r => r.SourceKey == record.SourceKey)) return false;
+            records.Add(record);
+            await SaveAllAsync(records);
+            return true;
+        }
+        catch { return false; }
+        finally { _fileLock.Release(); }
+    }
+
+    static async Task<HashSet<string>> LoadBlockedKeysAsync()
     {
         try
         {
-            var records = await LoadAllAsync();
-            if (!string.IsNullOrEmpty(record.SourceKey) &&
-                records.Any(r => r.SourceKey == record.SourceKey)) return;
-            records.Add(record);
-            await SaveAllAsync(records);
+            if (!File.Exists(BlockedPath)) return new();
+            string json = await File.ReadAllTextAsync(BlockedPath);
+            var list = JsonSerializer.Deserialize<List<string>>(json) ?? new();
+            return new HashSet<string>(list);
         }
-        catch { }
+        catch { return new(); }
     }
 
     public static async Task RemoveWinByKeyAsync(string sourceKey)

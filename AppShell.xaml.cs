@@ -6,6 +6,17 @@ class SingletonRouteFactory(Element instance) : RouteFactory
     public override Element GetOrCreate(IServiceProvider services) => instance;
 }
 
+// HotSpotPage's constructor eagerly builds an ~8,000-line UI tree — unlike every other page
+// here (constructed eagerly at AppShell's static-init time), it's built lazily on first
+// navigation instead, so a user who never opens Hot Spot never pays that cold-start cost.
+// Matches the Android app's own AppShell.xaml.cs pattern for this same page.
+class LazySingletonRouteFactory(Func<Element> factory) : RouteFactory
+{
+    Element? _instance;
+    public override Element GetOrCreate() => _instance ??= factory();
+    public override Element GetOrCreate(IServiceProvider services) => _instance ??= factory();
+}
+
 public partial class AppShell : Shell
 {
 	internal static readonly WinnerPage     WinnerPageInstance     = new();
@@ -31,6 +42,9 @@ public partial class AppShell : Shell
 	internal static readonly SummaryPage          SummaryPageInstance          = new();
 	internal static readonly DrawSearchPage       DrawSearchPageInstance        = new();
 	internal static readonly PrintPreviewPage     PrintPreviewPageInstance      = new();
+
+	static HotSpotPage? _hotSpotPage;
+	internal static HotSpotPage HotSpotPageInstance => _hotSpotPage ??= new();
 
 #if IOS
 	protected override void OnNavigated(ShellNavigatedEventArgs args)
@@ -83,5 +97,6 @@ public partial class AppShell : Shell
 		Routing.RegisterRoute(nameof(SummaryPage),           new SingletonRouteFactory(SummaryPageInstance));
 		Routing.RegisterRoute(nameof(DrawSearchPage),        new SingletonRouteFactory(DrawSearchPageInstance));
 		Routing.RegisterRoute(nameof(PrintPreviewPage),      new SingletonRouteFactory(PrintPreviewPageInstance));
+		Routing.RegisterRoute(nameof(HotSpotPage),           new LazySingletonRouteFactory(() => HotSpotPageInstance));
 	}
 }
