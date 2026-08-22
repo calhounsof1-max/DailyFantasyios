@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="DailyFantasyMAUI.StatsAnalyzePage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#0D1B2A">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- ── Header ──────────────────────────────────────────────────── -->
+        <Grid Grid.Row="0" BackgroundColor="#0A1628" Padding="14,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Label Grid.Column="0" Text="← Back" TextColor="#90CAF9"
+                   FontSize="13" FontAttributes="Bold" VerticalOptions="Center">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="Back_Tapped"/>
+                </Label.GestureRecognizers>
+            </Label>
+            <VerticalStackLayout Grid.Column="1" HorizontalOptions="Center"
+                                 VerticalOptions="Center" Spacing="1">
+                <Label Text="📊 STATS REPORT" TextColor="White"
+                       FontSize="14" FontAttributes="Bold"
+                       HorizontalOptions="Center"/>
+                <Label x:Name="lblModel" Text="Built-in Report"
+                       TextColor="#607D8B" FontSize="10"
+                       HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+            <!-- spacer to balance layout -->
+            <BoxView Grid.Column="2" WidthRequest="60" Color="Transparent"/>
+        </Grid>
+
+        <!-- ── Content area ────────────────────────────────────────────── -->
+        <Grid Grid.Row="1">
+
+            <!-- Loading -->
+            <VerticalStackLayout x:Name="loadingView"
+                                 VerticalOptions="Center"
+                                 HorizontalOptions="Center"
+                                 Spacing="18">
+                <ActivityIndicator IsRunning="True" Color="#4FC3F7"
+                                   WidthRequest="44" HeightRequest="44"
+                                   HorizontalOptions="Center"/>
+                <Label Text="Preparing your report…"
+                       TextColor="#90CAF9" FontSize="15"
+                       FontAttributes="Bold" HorizontalOptions="Center"/>
+                <Label x:Name="lblStatus" TextColor="#607D8B" FontSize="12"
+                       HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+
+            <!-- API Key entry -->
+            <ScrollView x:Name="keyView" IsVisible="False">
+                <VerticalStackLayout VerticalOptions="Center" Padding="28,40"
+                                     Spacing="18">
+                    <Label Text="🤖 One-Time AI Setup" TextColor="#F59E0B"
+                           FontSize="18" FontAttributes="Bold"
+                           HorizontalOptions="Center"/>
+
+                    <!-- Free badge -->
+                    <Border BackgroundColor="#0A2A0A" Stroke="#2E7D32"
+                            StrokeThickness="1" Padding="10,6">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="6"/></Border.StrokeShape>
+                        <Label Text="✅  100% FREE — No credit card required"
+                               TextColor="#66BB6A" FontSize="13" FontAttributes="Bold"
+                               HorizontalOptions="Center"/>
+                    </Border>
+
+                    <!-- Step 1 -->
+                    <Border BackgroundColor="#0E2039" Stroke="#1A3A5F"
+                            StrokeThickness="1" Padding="14,12">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="8"/></Border.StrokeShape>
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="STEP 1 — Get your FREE Google AI key"
+                                   TextColor="#64B5F6" FontSize="12" FontAttributes="Bold"/>
+                            <Label TextColor="#90CAF9" FontSize="13"
+                                   Text="Tap the link below. Sign in with your Google account — completely free, no credit card."/>
+                            <Label Text="🔗 Tap here → Google AI Studio (aistudio.google.com)"
+                                   TextColor="#4FC3F7" FontSize="13"
+                                   FontAttributes="Bold"
+                                   TextDecorations="Underline">
+                                <Label.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="GetKey_Tapped"/>
+                                </Label.GestureRecognizers>
+                            </Label>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <!-- Step 2 -->
+                    <Border BackgroundColor="#0E2039" Stroke="#1A3A5F"
+                            StrokeThickness="1" Padding="14,12">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="8"/></Border.StrokeShape>
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="STEP 2 — Copy your key and paste it here"
+                                   TextColor="#64B5F6" FontSize="12" FontAttributes="Bold"/>
+                            <Label TextColor="#90CAF9" FontSize="12"
+                                   Text="After signing in, go to API Keys, create one, copy it, then come back and paste it below."/>
+                            <Entry x:Name="entryApiKey" Placeholder="Paste your key here…"
+                                   PlaceholderColor="#334455" TextColor="White"
+                                   BackgroundColor="Transparent" FontSize="13"/>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Label TextColor="#445566" FontSize="11"
+                           HorizontalTextAlignment="Center"
+                           Text="Your key is saved only on this device and is never shared."/>
+
+                    <Button Text="Save Key &amp; Get AI Analysis  →"
+                            BackgroundColor="#1565C0" TextColor="White"
+                            FontAttributes="Bold" CornerRadius="8"
+                            HeightRequest="48"
+                            Clicked="SaveKey_Clicked"/>
+
+                    <Button Text="← Cancel / View Basic Report"
+                            BackgroundColor="Transparent" TextColor="#607D8B"
+                            BorderColor="#2A3A4A" BorderWidth="1"
+                            CornerRadius="8" HeightRequest="44"
+                            Clicked="CancelKey_Clicked"/>
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <!-- Error -->
+            <VerticalStackLayout x:Name="errorView" IsVisible="False"
+                                 VerticalOptions="Center" Padding="28" Spacing="16">
+                <Label Text="⚠ Report Unavailable" TextColor="#EF5350"
+                       FontSize="16" FontAttributes="Bold"
+                       HorizontalOptions="Center"/>
+                <Border BackgroundColor="#1A0A0A" Stroke="#5C1A1A"
+                        StrokeThickness="1" Padding="14">
+                    <Border.StrokeShape><RoundRectangle CornerRadius="8"/></Border.StrokeShape>
+                    <Label x:Name="lblError" TextColor="#EF9A9A" FontSize="13"
+                           HorizontalTextAlignment="Center"/>
+                </Border>
+                <Button Text="← Go Back"
+                        BackgroundColor="#1A2E45" TextColor="White"
+                        CornerRadius="8" HeightRequest="44"
+                        Clicked="BackError_Clicked"/>
+            </VerticalStackLayout>
+
+            <!-- Result: WebView -->
+            <WebView x:Name="resultView" IsVisible="False"/>
+        </Grid>
+
+        <!-- ── Action bar (shown after report loads) ───────────────────── -->
+        <VerticalStackLayout Grid.Row="2" x:Name="actionBar" IsVisible="False"
+                             BackgroundColor="#0A1628" Padding="12,10" Spacing="8">
+
+            <!-- AI Enhance button -->
+            <Button x:Name="enhanceAiBtn"
+                    Text="✨ Enhance with AI  →  Get Personalized Insights (Free)"
+                    BackgroundColor="#0A2A1A" TextColor="#66BB6A"
+                    BorderColor="#2E7D32" BorderWidth="1"
+                    FontSize="12" FontAttributes="Bold"
+                    CornerRadius="7" HeightRequest="44"
+                    Clicked="EnhanceAi_Clicked"/>
+
+            <!-- Utility buttons -->
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                <Button Grid.Column="0" Text="📤 Share"
+                        BackgroundColor="#1A2E45" TextColor="White"
+                        FontSize="12" CornerRadius="7" HeightRequest="42"
+                        Clicked="Share_Clicked"/>
+                <Button Grid.Column="1" Text="🖨 Print PDF"
+                        BackgroundColor="#1A2E45" TextColor="White"
+                        FontSize="12" CornerRadius="7" HeightRequest="42"
+                        Clicked="PrintPdf_Clicked"/>
+                <Button Grid.Column="2" Text="📊 Export CSV"
+                        BackgroundColor="#1A2E45" TextColor="White"
+                        FontSize="12" CornerRadius="7" HeightRequest="42"
+                        Clicked="ExportCsv_Clicked"/>
+            </Grid>
+        </VerticalStackLayout>
+
+    </Grid>
+</ContentPage>

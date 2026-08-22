@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
+             x:Class="DailyFantasyMAUI.SpendingLogPage"
+             BackgroundColor="#0F1923"
+             Shell.NavBarIsVisible="False">
+
+    <Grid x:Name="rootGrid" RowDefinitions="Auto,Auto,*,Auto">
+
+        <!-- Header -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="4,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <GraphicsView Grid.ColumnSpan="3"
+                          Opacity="0.70" HeightRequest="54" WidthRequest="54"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
+            <Button Grid.Column="0" Text="← Back" Clicked="BtnBack_Clicked"
+                    BackgroundColor="Transparent" TextColor="White" FontSize="12" Padding="2,0"/>
+            <Label Grid.Column="1" Text="Spending Log"
+                   FontSize="13" FontAttributes="Bold" TextColor="White"
+                   HorizontalOptions="Center" VerticalOptions="Center"/>
+            <StackLayout Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalOptions="Center">
+                <Label Text="⌂" FontSize="20" TextColor="White" VerticalOptions="Center" Padding="4,0" Margin="0,0,6,0">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="BtnHome_Clicked"/>
+                    </Label.GestureRecognizers>
+                </Label>
+                <Border BackgroundColor="Transparent" Stroke="#90CAF9" StrokeThickness="1"
+                        Padding="8,4" VerticalOptions="Center">
+                    <Border.StrokeShape><RoundRectangle CornerRadius="4"/></Border.StrokeShape>
+                    <Label Text="Verify" TextColor="#90CAF9" FontSize="11" VerticalOptions="Center">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="BtnVerify_Clicked"/>
+                        </Label.GestureRecognizers>
+                    </Label>
+                </Border>
+                <Border BackgroundColor="Transparent" Stroke="#FFD54F" StrokeThickness="1"
+                        Padding="8,4" VerticalOptions="Center">
+                    <Border.StrokeShape><RoundRectangle CornerRadius="4"/></Border.StrokeShape>
+                    <Label Text="Log Today" TextColor="#FFD54F" FontSize="11" VerticalOptions="Center">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="BtnLogToday_Clicked"/>
+                        </Label.GestureRecognizers>
+                    </Label>
+                </Border>
+            </StackLayout>
+        </Grid>
+
+        <!-- Total bar -->
+        <Grid Grid.Row="1" BackgroundColor="#263545" Padding="16,8" ColumnDefinitions="*,*,*">
+            <Label x:Name="lblTotalSpent" Grid.Column="0"
+                   FontSize="12" FontAttributes="Bold" TextColor="#EF9A9A"
+                   HorizontalOptions="Center"/>
+            <Label x:Name="lblTotalWon" Grid.Column="1"
+                   FontSize="12" FontAttributes="Bold" TextColor="#A5D6A7"
+                   HorizontalOptions="Center"/>
+            <Label x:Name="lblNet" Grid.Column="2"
+                   FontSize="12" FontAttributes="Bold" TextColor="White"
+                   HorizontalOptions="Center"/>
+        </Grid>
+
+        <!-- Scrollable daily rows -->
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout x:Name="mainContainer" Padding="0,4,0,8" Spacing="0"/>
+        </ScrollView>
+
+        <!-- Bottom month filter -->
+        <Grid Grid.Row="3" BackgroundColor="#1E2733" Padding="8,6">
+            <ScrollView Orientation="Horizontal">
+                <HorizontalStackLayout x:Name="monthFilterBar" Spacing="6" Padding="4,0"/>
+            </ScrollView>
+        </Grid>
+
+    </Grid>
+</ContentPage>

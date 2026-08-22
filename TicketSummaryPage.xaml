@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
+             x:Class="DailyFantasyMAUI.TicketSummaryPage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#0D1B2A">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+        <!-- Nav bar -->
+        <Grid Grid.Row="0" BackgroundColor="#0A1628" Padding="14,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <GraphicsView Grid.ColumnSpan="3"
+                          Opacity="0.70" HeightRequest="54" WidthRequest="54"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
+            <Label Grid.Column="0" Text="← Back" TextColor="#90CAF9"
+                   FontSize="13" FontAttributes="Bold" VerticalOptions="Center">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="Back_Tapped"/>
+                </Label.GestureRecognizers>
+            </Label>
+            <Label Grid.Column="1" Text="TICKETS PURCHASED"
+                   TextColor="White" FontSize="14" FontAttributes="Bold"
+                   HorizontalOptions="Center" VerticalOptions="Center"/>
+            <Border Grid.Column="2"
+                    BackgroundColor="Transparent" Stroke="#80CBC4" StrokeThickness="1"
+                    Padding="10,4" VerticalOptions="Center">
+                <Border.StrokeShape><RoundRectangle CornerRadius="4"/></Border.StrokeShape>
+                <Label Text="Stats" TextColor="#80CBC4" FontSize="11" VerticalOptions="Center">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="Stats_Tapped"/>
+                    </Label.GestureRecognizers>
+                </Label>
+            </Border>
+        </Grid>
+
+        <!-- Column headers -->
+        <Grid Grid.Row="1" BackgroundColor="#0E2039"
+              ColumnDefinitions="4,*,70,70,36,26" Padding="0,10,10,10">
+            <Label Grid.Column="1" Text="Games"
+                   TextColor="#90CAF9" FontSize="13" FontAttributes="Bold"
+                   Margin="14,0,0,0"/>
+            <Label Grid.Column="2" Text="Today"
+                   TextColor="#64B5F6" FontSize="11" FontAttributes="Bold"
+                   HorizontalOptions="End"/>
+            <Label Grid.Column="3" Text="Total"
+                   TextColor="#90CAF9" FontSize="11" FontAttributes="Bold"
+                   HorizontalOptions="End"/>
+        </Grid>
+
+        <!-- Game rows (built in code) -->
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout x:Name="gameRows" Spacing="0"/>
+        </ScrollView>
+
+        <!-- Total footer -->
+        <Grid Grid.Row="3" BackgroundColor="#0E2039"
+              ColumnDefinitions="4,*,70,70,36,26" Padding="0,12,10,12">
+            <Label Grid.Column="1" Text="TOTAL"
+                   TextColor="#F59E0B" FontSize="14" FontAttributes="Bold"
+                   Margin="14,0,0,0"/>
+            <Label Grid.Column="2" x:Name="lblTodayTotal"
+                   TextColor="#64B5F6" FontSize="14" FontAttributes="Bold"
+                   HorizontalOptions="End"/>
+            <Label Grid.Column="3" x:Name="lblTotal"
+                   TextColor="#F59E0B" FontSize="14" FontAttributes="Bold"
+                   HorizontalOptions="End"/>
+        </Grid>
+
+    </Grid>
+</ContentPage>

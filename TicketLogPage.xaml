@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
+             x:Class="DailyFantasyMAUI.TicketLogPage"
+             BackgroundColor="#0A1520">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+        <!-- Header -->
+        <Grid Grid.Row="0" BackgroundColor="#0D1F30" Padding="12,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <GraphicsView Grid.ColumnSpan="3"
+                          Opacity="0.70" HeightRequest="54" WidthRequest="54"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
+            <Button Grid.Column="0" Text="← Back" FontSize="13" BackgroundColor="Transparent"
+                    TextColor="#90CAF9" Clicked="BtnBack_Clicked" Padding="0"/>
+            <Label Grid.Column="1" Text="Ticket Log" FontSize="15" FontAttributes="Bold"
+                   TextColor="White" HorizontalOptions="Center" VerticalOptions="Center"/>
+            <Button Grid.Column="2" Text="Menu ▾" FontSize="12" FontAttributes="Bold"
+                    BackgroundColor="#132540" TextColor="#5B9BD5"
+                    Padding="14,0" HeightRequest="30" CornerRadius="8"
+                    Clicked="BtnMenu_Clicked"/>
+        </Grid>
+
+        <!-- Today label -->
+        <Label Grid.Row="1" x:Name="lblToday" FontSize="11" TextColor="#90CAF9"
+               Padding="12,4" BackgroundColor="#0D1F30"/>
+
+        <!-- Content -->
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout Padding="0,4" Spacing="0">
+                <VerticalStackLayout x:Name="recentContainer" Spacing="0"/>
+                <VerticalStackLayout x:Name="olderContainer" Spacing="0" IsVisible="False"/>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Footer -->
+        <Label Grid.Row="3" x:Name="lblFooter" FontSize="11" TextColor="#AAAAAA"
+               Padding="12,6" BackgroundColor="#0D1F30" HorizontalTextAlignment="Center"/>
+
+        <!-- Scanning overlay -->
+        <Grid x:Name="scanOverlay" Grid.Row="0" Grid.RowSpan="4"
+              BackgroundColor="#000000" Opacity="0.001" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator x:Name="scanSpinner" IsRunning="False" Color="#90CAF9"
+                                   WidthRequest="40" HeightRequest="40"/>
+                <Label x:Name="lblScanStatus" Text="Checking all games for today's purchases..." FontSize="13"
+                       TextColor="#90CAF9" HorizontalTextAlignment="Center"/>
+            </VerticalStackLayout>
+        </Grid>
+    </Grid>
+</ContentPage>

@@ -46,6 +46,50 @@ public partial class AppShell : Shell
 	static HotSpotPage? _hotSpotPage;
 	internal static HotSpotPage HotSpotPageInstance => _hotSpotPage ??= new();
 
+	// Stage 2 port — same lazy-construct pattern as HotSpotPage above, matching how the
+	// Android app's AppShell.xaml.cs lazily constructs every one of its own routes.
+	static AboutPage?               _aboutPage;
+	static BackTestPage?            _backTestPage;
+	static BalanceCheckPage?        _balanceCheckPage;
+	static ComboFilterPage?         _comboFilterPage;
+	static GapTrackerPage?          _gapTrackerPage;
+	static HotColdPage?             _hotColdPage;
+	static PairsTripletsPage?       _pairsTripletsPage;
+	static PositionalFreqPage?      _positionalFreqPage;
+	static RundownPage?             _rundownPage;
+	static ScatchersPage?           _scatchersPage;
+	static SpendingLogPage?         _spendingLogPage;
+	static SumRangePage?            _sumRangePage;
+	static TicketScorerPage?        _ticketScorerPage;
+	static WheelingPage?            _wheelingPage;
+	static TicketPurchaseStatsPage? _ticketPurchaseStatsPage;
+	static TicketSummaryPage?       _ticketSummaryPage;
+	static ImportTicketPage?        _importTicketPage;
+	static CheckMyNumber?           _checkMyNumberPage;
+	static TicketLogPage?           _ticketLogPage;
+	static TicketCalendarPage?      _ticketCalendarPage;
+
+	internal static AboutPage               AboutPageInstance               => _aboutPage               ??= new();
+	internal static BackTestPage            BackTestPageInstance            => _backTestPage            ??= new();
+	internal static BalanceCheckPage        BalanceCheckPageInstance        => _balanceCheckPage        ??= new();
+	internal static ComboFilterPage         ComboFilterPageInstance         => _comboFilterPage         ??= new();
+	internal static GapTrackerPage          GapTrackerPageInstance          => _gapTrackerPage          ??= new();
+	internal static HotColdPage             HotColdPageInstance             => _hotColdPage             ??= new();
+	internal static PairsTripletsPage       PairsTripletsPageInstance       => _pairsTripletsPage       ??= new();
+	internal static PositionalFreqPage      PositionalFreqPageInstance      => _positionalFreqPage      ??= new();
+	internal static RundownPage             RundownPageInstance             => _rundownPage             ??= new();
+	internal static ScatchersPage           ScatchersPageInstance           => _scatchersPage           ??= new();
+	internal static SpendingLogPage         SpendingLogPageInstance         => _spendingLogPage         ??= new();
+	internal static SumRangePage            SumRangePageInstance            => _sumRangePage            ??= new();
+	internal static TicketScorerPage        TicketScorerPageInstance        => _ticketScorerPage        ??= new();
+	internal static WheelingPage            WheelingPageInstance            => _wheelingPage            ??= new();
+	internal static TicketPurchaseStatsPage TicketPurchaseStatsPageInstance => _ticketPurchaseStatsPage ??= new();
+	internal static TicketSummaryPage       TicketSummaryPageInstance       => _ticketSummaryPage       ??= new();
+	internal static ImportTicketPage        ImportTicketPageInstance        => _importTicketPage        ??= new();
+	internal static CheckMyNumber           CheckMyNumberPageInstance       => _checkMyNumberPage       ??= new();
+	internal static TicketLogPage           TicketLogPageInstance           => _ticketLogPage           ??= new();
+	internal static TicketCalendarPage      TicketCalendarPageInstance      => _ticketCalendarPage      ??= new();
+
 #if IOS
 	protected override void OnNavigated(ShellNavigatedEventArgs args)
 	{
@@ -98,5 +142,26 @@ public partial class AppShell : Shell
 		Routing.RegisterRoute(nameof(DrawSearchPage),        new SingletonRouteFactory(DrawSearchPageInstance));
 		Routing.RegisterRoute(nameof(PrintPreviewPage),      new SingletonRouteFactory(PrintPreviewPageInstance));
 		Routing.RegisterRoute(nameof(HotSpotPage),           new LazySingletonRouteFactory(() => HotSpotPageInstance));
+
+		Routing.RegisterRoute(nameof(AboutPage),               new LazySingletonRouteFactory(() => AboutPageInstance));
+		Routing.RegisterRoute(nameof(BackTestPage),            new LazySingletonRouteFactory(() => BackTestPageInstance));
+		Routing.RegisterRoute(nameof(BalanceCheckPage),        new LazySingletonRouteFactory(() => BalanceCheckPageInstance));
+		Routing.RegisterRoute(nameof(ComboFilterPage),         new LazySingletonRouteFactory(() => ComboFilterPageInstance));
+		Routing.RegisterRoute(nameof(GapTrackerPage),          new LazySingletonRouteFactory(() => GapTrackerPageInstance));
+		Routing.RegisterRoute(nameof(HotColdPage),             new LazySingletonRouteFactory(() => HotColdPageInstance));
+		Routing.RegisterRoute(nameof(PairsTripletsPage),       new LazySingletonRouteFactory(() => PairsTripletsPageInstance));
+		Routing.RegisterRoute(nameof(PositionalFreqPage),      new LazySingletonRouteFactory(() => PositionalFreqPageInstance));
+		Routing.RegisterRoute(nameof(RundownPage),             new LazySingletonRouteFactory(() => RundownPageInstance));
+		Routing.RegisterRoute(nameof(ScatchersPage),           new LazySingletonRouteFactory(() => ScatchersPageInstance));
+		Routing.RegisterRoute(nameof(SpendingLogPage),         new LazySingletonRouteFactory(() => SpendingLogPageInstance));
+		Routing.RegisterRoute(nameof(SumRangePage),            new LazySingletonRouteFactory(() => SumRangePageInstance));
+		Routing.RegisterRoute(nameof(TicketScorerPage),        new LazySingletonRouteFactory(() => TicketScorerPageInstance));
+		Routing.RegisterRoute(nameof(WheelingPage),            new LazySingletonRouteFactory(() => WheelingPageInstance));
+		Routing.RegisterRoute(nameof(TicketPurchaseStatsPage), new LazySingletonRouteFactory(() => TicketPurchaseStatsPageInstance));
+		Routing.RegisterRoute(nameof(TicketSummaryPage),       new LazySingletonRouteFactory(() => TicketSummaryPageInstance));
+		Routing.RegisterRoute(nameof(ImportTicketPage),        new LazySingletonRouteFactory(() => ImportTicketPageInstance));
+		Routing.RegisterRoute(nameof(CheckMyNumber),           new LazySingletonRouteFactory(() => CheckMyNumberPageInstance));
+		Routing.RegisterRoute(nameof(TicketLogPage),           new LazySingletonRouteFactory(() => TicketLogPageInstance));
+		Routing.RegisterRoute(nameof(TicketCalendarPage),      new LazySingletonRouteFactory(() => TicketCalendarPageInstance));
 	}
 }

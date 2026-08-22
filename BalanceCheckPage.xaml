@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
+             x:Class="DailyFantasyMAUI.BalanceCheckPage"
+             Title="Balance Check"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F0F4F8">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto,1">
+
+        <!-- Row 0: Nav header -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="14,10"
+              ColumnDefinitions="Auto,*,Auto">
+            <GraphicsView Grid.ColumnSpan="3"
+                          Opacity="0.70" HeightRequest="54" WidthRequest="54"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
+            <Button Grid.Column="0" Text="⌂" FontSize="14" FontAttributes="Bold"
+                    BackgroundColor="#2D3D50" TextColor="White" Padding="10,0"
+                    HeightRequest="34" CornerRadius="17"
+                    Clicked="BtnGoHome_Clicked" Margin="0,0,6,0"/>
+            <Label Grid.Column="1" Text="Odd/Even · High/Low Balance" TextColor="White" FontSize="13"
+                   FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center"/>
+            <Picker Grid.Column="2" x:Name="gamePicker" FontSize="11"
+                    TextColor="White" BackgroundColor="#2D3D50"
+                    WidthRequest="110" HeightRequest="34"
+                    SelectedIndexChanged="GamePicker_Changed"/>
+        </Grid>
+
+        <!-- Row 1: Game logo banner -->
+        <Border Grid.Row="1" BackgroundColor="White" StrokeThickness="0" Padding="8,6">
+            <Image x:Name="imgGameLogo" HeightRequest="80"
+                   Aspect="AspectFit" HorizontalOptions="Center"/>
+        </Border>
+
+        <!-- Row 2: Period pills -->
+        <ScrollView Grid.Row="2" Orientation="Horizontal" BackgroundColor="White"
+                    HeightRequest="48" HorizontalScrollBarVisibility="Never">
+            <HorizontalStackLayout x:Name="periodBar" Spacing="6" Padding="12,8"/>
+        </ScrollView>
+
+        <!-- Row 3: Pick entry -->
+        <Border Grid.Row="3" BackgroundColor="White" StrokeThickness="0"
+                StrokeShape="RoundRectangle 0" Margin="0,0,0,1">
+            <VerticalStackLayout Padding="12,8" Spacing="6">
+                <Label x:Name="lblEntryHint" Text="Enter your numbers:"
+                       FontSize="12" TextColor="#6B7280"/>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <ScrollView Grid.Column="0" Orientation="Horizontal"
+                                HorizontalScrollBarVisibility="Never" HeightRequest="44">
+                        <HorizontalStackLayout x:Name="entryBoxesLayout" Spacing="6"
+                                               VerticalOptions="Center"/>
+                    </ScrollView>
+                    <Border Grid.Column="1" x:Name="balanceBadge"
+                            BackgroundColor="#9E9E9E" StrokeThickness="0"
+                            StrokeShape="RoundRectangle 8" Padding="8,4"
+                            IsVisible="False" VerticalOptions="Center">
+                        <Label x:Name="lblBalanceScore" Text="" FontSize="11"
+                               FontAttributes="Bold" TextColor="White"/>
+                    </Border>
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Row 4: Charts scroll -->
+        <ScrollView Grid.Row="4" BackgroundColor="#F0F4F8">
+            <VerticalStackLayout x:Name="contentContainer" Padding="10,10" Spacing="12"/>
+        </ScrollView>
+
+        <!-- Row 5: Status bar -->
+        <Label Grid.Row="5" x:Name="lblStatus"
+               Text="Select a game to see balance statistics."
+               BackgroundColor="#1E2733" TextColor="#8B9DC3"
+               FontSize="12" Padding="14,6" LineBreakMode="TailTruncation"/>
+
+        <!-- Loading overlay -->
+        <Grid Grid.Row="0" Grid.RowSpan="7" x:Name="loadingOverlay"
+              BackgroundColor="#CC1E2733" IsVisible="False" InputTransparent="False">
+            <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="16">
+                <ActivityIndicator IsRunning="True" Color="White"
+                                   WidthRequest="56" HeightRequest="56"/>
+                <Label x:Name="lblLoadingMsg" Text="Loading draws..."
+                       TextColor="White" FontSize="16" FontAttributes="Bold"
+                       HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+        </Grid>
+
+    </Grid>
+</ContentPage>

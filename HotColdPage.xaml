@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
+             x:Class="DailyFantasyMAUI.HotColdPage"
+             Title="Hot &amp; Cold Numbers"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F0F4F8">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto,1">
+
+        <!-- Row 0: Nav header -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="14,10"
+              ColumnDefinitions="Auto,*,Auto">
+            <GraphicsView Grid.ColumnSpan="3"
+                          Opacity="0.70" HeightRequest="54" WidthRequest="54"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
+            <Button Grid.Column="0" Text="⌂" FontSize="14" FontAttributes="Bold"
+                    BackgroundColor="#2D3D50" TextColor="White" Padding="10,0"
+                    HeightRequest="34" CornerRadius="17"
+                    Clicked="BtnGoHome_Clicked" Margin="0,0,6,0"/>
+            <Label Grid.Column="1" Text="Hot &amp; Cold Numbers" TextColor="White" FontSize="14"
+                   FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center"/>
+            <Picker Grid.Column="2" x:Name="gamePicker" FontSize="11"
+                    TextColor="White" BackgroundColor="#2D3D50"
+                    WidthRequest="110" HeightRequest="34"
+                    SelectedIndexChanged="GamePicker_Changed"/>
+        </Grid>
+
+        <!-- Row 1: Game logo banner -->
+        <Border Grid.Row="1" BackgroundColor="White" StrokeThickness="0" Padding="8,6">
+            <Image x:Name="imgGameLogo" HeightRequest="80"
+                   Aspect="AspectFit" HorizontalOptions="Center"/>
+        </Border>
+
+        <!-- Row 2: Period selector pills -->
+        <ScrollView Grid.Row="2" Orientation="Horizontal" BackgroundColor="White"
+                    HeightRequest="48" HorizontalScrollBarVisibility="Never">
+            <HorizontalStackLayout x:Name="periodBar" Spacing="6" Padding="12,8"/>
+        </ScrollView>
+
+        <!-- Row 3: Hot/Cold summary strip -->
+        <Grid Grid.Row="3" BackgroundColor="White" Padding="12,8"
+              ColumnDefinitions="*,*" ColumnSpacing="8"
+              x:Name="summaryStrip" IsVisible="False">
+            <Border Grid.Column="0" BackgroundColor="#FFF3E0" StrokeThickness="0"
+                    StrokeShape="RoundRectangle 8" Padding="10,6">
+                <VerticalStackLayout Spacing="2">
+                    <Label Text="🔥 Hottest" FontSize="11" FontAttributes="Bold"
+                           TextColor="#E65100"/>
+                    <Label x:Name="lblHotNums" Text="" FontSize="12" FontAttributes="Bold"
+                           TextColor="#BF360C" LineBreakMode="WordWrap"/>
+                </VerticalStackLayout>
+            </Border>
+            <Border Grid.Column="1" BackgroundColor="#E3F2FD" StrokeThickness="0"
+                    StrokeShape="RoundRectangle 8" Padding="10,6">
+                <VerticalStackLayout Spacing="2">
+                    <Label Text="🧊 Coldest" FontSize="11" FontAttributes="Bold"
+                           TextColor="#1565C0"/>
+                    <Label x:Name="lblColdNums" Text="" FontSize="12" FontAttributes="Bold"
+                           TextColor="#0D47A1" LineBreakMode="WordWrap"/>
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+
+        <!-- Row 4: Number grid scroll -->
+        <ScrollView Grid.Row="4" BackgroundColor="#F0F4F8">
+            <VerticalStackLayout x:Name="gridContainer" Padding="10,10" Spacing="14"/>
+        </ScrollView>
+
+        <!-- Row 5: Status bar -->
+        <Label Grid.Row="5" x:Name="lblStatus"
+               Text="Select a game to see hot &amp; cold numbers."
+               BackgroundColor="#1E2733" TextColor="#8B9DC3"
+               FontSize="12" Padding="14,6" LineBreakMode="TailTruncation"/>
+
+        <!-- Loading overlay -->
+        <Grid Grid.Row="0" Grid.RowSpan="7" x:Name="loadingOverlay"
+              BackgroundColor="#CC1E2733" IsVisible="False" InputTransparent="False">
+            <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="16">
+                <ActivityIndicator IsRunning="True" Color="White"
+                                   WidthRequest="56" HeightRequest="56"/>
+                <Label x:Name="lblLoadingMsg" Text="Loading draws..."
+                       TextColor="White" FontSize="16" FontAttributes="Bold"
+                       HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+        </Grid>
+
+    </Grid>
+</ContentPage>

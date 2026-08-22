@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
+             x:Class="DailyFantasyMAUI.ComboFilterPage"
+             Title="Combo Filter"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F0F4F8">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+        <!-- ── Header ── -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="14,10"
+              ColumnDefinitions="Auto,*,Auto">
+            <GraphicsView Grid.ColumnSpan="3"
+                          Opacity="0.70" HeightRequest="54" WidthRequest="54"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
+            <Button Grid.Column="0" Text="⌂" FontSize="14" FontAttributes="Bold"
+                    BackgroundColor="#2D3D50" TextColor="White" Padding="10,0"
+                    HeightRequest="34" CornerRadius="17"
+                    Clicked="BtnGoHome_Clicked" Margin="0,0,6,0"/>
+            <Label Grid.Column="1" Text="Combo Filter Generator" TextColor="White"
+                   FontSize="14" FontAttributes="Bold"
+                   HorizontalOptions="Center" VerticalOptions="Center"/>
+            <Picker Grid.Column="2" x:Name="gamePicker" FontSize="11"
+                    TextColor="White" BackgroundColor="#2D3D50"
+                    WidthRequest="120" HeightRequest="34"
+                    SelectedIndexChanged="GamePicker_Changed"/>
+        </Grid>
+
+        <!-- Row 1: Game logo banner -->
+        <Border Grid.Row="1" BackgroundColor="White" StrokeThickness="0" Padding="8,6">
+            <Image x:Name="imgGameLogo" HeightRequest="80"
+                   Aspect="AspectFit" HorizontalOptions="Center"/>
+        </Border>
+
+        <!-- ── Scrollable content ── -->
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout Padding="12,10" Spacing="10">
+
+                <!-- Pool card -->
+                <Border BackgroundColor="White" StrokeThickness="0"
+                        StrokeShape="RoundRectangle 10" Padding="12,10">
+                    <VerticalStackLayout Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0" Text="Tap numbers to build your pool:"
+                                   FontSize="12" TextColor="#6B7280" VerticalOptions="Center"/>
+                            <Button Grid.Column="1" Text="Clear" FontSize="11"
+                                    BackgroundColor="#6B7280" TextColor="White"
+                                    HeightRequest="32" CornerRadius="8" Padding="10,0"
+                                    Clicked="BtnClearPool_Clicked"/>
+                        </Grid>
+                        <FlexLayout x:Name="poolGrid"
+                                    Wrap="Wrap" Direction="Row"
+                                    JustifyContent="Start" AlignItems="Center"/>
+                        <Label x:Name="lblPoolCount"
+                               Text="Pool: 0 numbers selected"
+                               FontSize="12" TextColor="#6B7280"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Filters card -->
+                <Border BackgroundColor="White" StrokeThickness="0"
+                        StrokeShape="RoundRectangle 10" Padding="12,12">
+                    <VerticalStackLayout Spacing="10">
+
+                        <VerticalStackLayout Spacing="1">
+                            <Label Text="Filters" FontSize="13" FontAttributes="Bold"
+                                   TextColor="#1E2733"/>
+                            <Label Text="Tap ON / OFF to enable each filter"
+                                   FontSize="10" TextColor="#9CA3AF"/>
+                        </VerticalStackLayout>
+
+                        <!-- ── Sum Range ── -->
+                        <Grid ColumnDefinitions="*,Auto" RowSpacing="6">
+                            <VerticalStackLayout Grid.Column="0" Spacing="1" VerticalOptions="Center">
+                                <Label Text="Sum Range" FontSize="12" FontAttributes="Bold" TextColor="#374151"/>
+                                <Label Text="Total of all numbers in the pick" FontSize="10" TextColor="#9CA3AF"/>
+                            </VerticalStackLayout>
+                            <Border Grid.Column="1" x:Name="toggleSumBorder"
+                                    BackgroundColor="#1565C0" StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 10" Padding="12,5">
+                                <Label x:Name="toggleSumLabel" Text="ON"
+                                       FontSize="11" FontAttributes="Bold"
+                                       TextColor="White" HorizontalOptions="Center">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="ToggleSum_Tapped"/>
+                                    </Label.GestureRecognizers>
+                                </Label>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="ToggleSum_Tapped"/>
+                                </Border.GestureRecognizers>
+                            </Border>
+                        </Grid>
+                        <Grid x:Name="sumPanel" ColumnDefinitions="*,Auto,*" ColumnSpacing="8">
+                            <Entry Grid.Column="0" x:Name="entrySumMin"
+                                   Placeholder="Min" Keyboard="Numeric" MaxLength="3"
+                                   HeightRequest="40" FontSize="15"
+                                   HorizontalTextAlignment="Center"
+                                   BackgroundColor="#EFF6FF"
+                                   TextChanged="FilterEntry_Changed"/>
+                            <Label Grid.Column="1" Text="–" FontSize="18" FontAttributes="Bold"
+                                   TextColor="#374151" VerticalOptions="Center"
+                                   HorizontalOptions="Center"/>
+                            <Entry Grid.Column="2" x:Name="entrySumMax"
+                                   Placeholder="Max" Keyboard="Numeric" MaxLength="3"
+                                   HeightRequest="40" FontSize="15"
+                                   HorizontalTextAlignment="Center"
+                                   BackgroundColor="#EFF6FF"
+                                   TextChanged="FilterEntry_Changed"/>
+                        </Grid>
+
+                        <BoxView HeightRequest="1" BackgroundColor="#F3F4F6" Margin="0,2"/>
+
+                        <!-- ── Odd Count ── -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <VerticalStackLayout Grid.Column="0" Spacing="1" VerticalOptions="Center">
+                                <Label Text="Odd Count" FontSize="12" FontAttributes="Bold" TextColor="#374151"/>
+                                <Label Text="How many odd numbers in the pick" FontSize="10" TextColor="#9CA3AF"/>
+                            </VerticalStackLayout>
+                            <Border Grid.Column="1" x:Name="toggleOddBorder"
+                                    BackgroundColor="#6B7280" StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 10" Padding="12,5">
+                                <Label x:Name="toggleOddLabel" Text="OFF"
+                                       FontSize="11" FontAttributes="Bold"
+                                       TextColor="White" HorizontalOptions="Center">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="ToggleOdd_Tapped"/>
+                                    </Label.GestureRecognizers>
+                                </Label>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="ToggleOdd_Tapped"/>
+                                </Border.GestureRecognizers>
+                            </Border>
+                        </Grid>
+                        <Grid x:Name="oddPanel" IsVisible="False"
+                              ColumnDefinitions="*,Auto,*" ColumnSpacing="8">
+                            <Entry Grid.Column="0" x:Name="entryOddMin"
+                                   Placeholder="Min odd" Keyboard="Numeric" MaxLength="1"
+                                   HeightRequest="40" FontSize="15"
+                                   HorizontalTextAlignment="Center"
+                                   BackgroundColor="#EFF6FF"
+                                   TextChanged="FilterEntry_Changed"/>
+                            <Label Grid.Column="1" Text="–" FontSize="18" FontAttributes="Bold"
+                                   TextColor="#374151" VerticalOptions="Center"
+                                   HorizontalOptions="Center"/>
+                            <Entry Grid.Column="2" x:Name="entryOddMax"
+                                   Placeholder="Max odd" Keyboard="Numeric" MaxLength="1"
+                                   HeightRequest="40" FontSize="15"
+                                   HorizontalTextAlignment="Center"
+                                   BackgroundColor="#EFF6FF"
+                                   TextChanged="FilterEntry_Changed"/>
+                        </Grid>
+
+                        <BoxView HeightRequest="1" BackgroundColor="#F3F4F6" Margin="0,2"/>
+
+                        <!-- ── High Count ── -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label Grid.Column="0"
+                                   x:Name="lblHighTitle"
+                                   Text="High Count  (above midpoint)"
+                                   FontSize="12" FontAttributes="Bold"
+                                   TextColor="#374151" VerticalOptions="Center"/>
+                            <Border Grid.Column="1" x:Name="toggleHighBorder"
+                                    BackgroundColor="#6B7280" StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 10" Padding="12,5">
+                                <Label x:Name="toggleHighLabel" Text="OFF"
+                                       FontSize="11" FontAttributes="Bold"
+                                       TextColor="White" HorizontalOptions="Center">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="ToggleHigh_Tapped"/>
+                                    </Label.GestureRecognizers>
+                                </Label>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="ToggleHigh_Tapped"/>
+                                </Border.GestureRecognizers>
+                            </Border>
+                        </Grid>
+                        <Grid x:Name="highPanel" IsVisible="False"
+                              ColumnDefinitions="*,Auto,*" ColumnSpacing="8">
+                            <Entry Grid.Column="0" x:Name="entryHighMin"
+                                   Placeholder="Min high" Keyboard="Numeric" MaxLength="1"
+                                   HeightRequest="40" FontSize="15"
+                                   HorizontalTextAlignment="Center"
+                                   BackgroundColor="#EFF6FF"
+                                   TextChanged="FilterEntry_Changed"/>
+                            <Label Grid.Column="1" Text="–" FontSize="18" FontAttributes="Bold"
+                                   TextColor="#374151" VerticalOptions="Center"
+                                   HorizontalOptions="Center"/>
+                            <Entry Grid.Column="2" x:Name="entryHighMax"
+                                   Placeholder="Max high" Keyboard="Numeric" MaxLength="1"
+                                   HeightRequest="40" FontSize="15"
+                                   HorizontalTextAlignment="Center"
+                                   BackgroundColor="#EFF6FF"
+                                   TextChanged="FilterEntry_Changed"/>
+                        </Grid>
+
+                        <BoxView HeightRequest="1" BackgroundColor="#F3F4F6" Margin="0,2"/>
+
+                        <!-- ── Max Consecutive Pairs ── -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <VerticalStackLayout Grid.Column="0" Spacing="1" VerticalOptions="Center">
+                                <Label Text="Max Consecutive Pairs" FontSize="12" FontAttributes="Bold" TextColor="#374151"/>
+                                <Label Text="Back-to-back numbers, e.g. 5 &amp; 6 = 1 pair" FontSize="10" TextColor="#9CA3AF"/>
+                            </VerticalStackLayout>
+                            <Border Grid.Column="1" x:Name="toggleConsecBorder"
+                                    BackgroundColor="#6B7280" StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 10" Padding="12,5">
+                                <Label x:Name="toggleConsecLabel" Text="OFF"
+                                       FontSize="11" FontAttributes="Bold"
+                                       TextColor="White" HorizontalOptions="Center">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="ToggleConsec_Tapped"/>
+                                    </Label.GestureRecognizers>
+                                </Label>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="ToggleConsec_Tapped"/>
+                                </Border.GestureRecognizers>
+                            </Border>
+                        </Grid>
+                        <HorizontalStackLayout x:Name="consecPanel" IsVisible="False" Spacing="10">
+                            <Button Text="−" FontSize="18"
+                                    BackgroundColor="#E5E7EB" TextColor="#374151"
+                                    WidthRequest="44" HeightRequest="40" CornerRadius="8"
+                                    Clicked="BtnConsecMinus_Clicked"/>
+                            <Label x:Name="lblConsecVal" Text="1"
+                                   FontSize="18" FontAttributes="Bold"
+                                   TextColor="#1E2733" WidthRequest="44"
+                                   HorizontalTextAlignment="Center"
+                                   VerticalOptions="Center"/>
+                            <Button Text="+" FontSize="18"
+                                    BackgroundColor="#E5E7EB" TextColor="#374151"
+                                    WidthRequest="44" HeightRequest="40" CornerRadius="8"
+                                    Clicked="BtnConsecPlus_Clicked"/>
+                            <Label Text="pairs max" FontSize="12" TextColor="#6B7280"
+                                   VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
+
+                        <BoxView HeightRequest="1" BackgroundColor="#F3F4F6" Margin="0,2"/>
+
+                        <!-- ── Group Spread (decades) ── -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <VerticalStackLayout Grid.Column="0" Spacing="1" VerticalOptions="Center">
+                                <Label Text="Min Decade Groups" FontSize="12" FontAttributes="Bold" TextColor="#374151"/>
+                                <Label Text="Number ranges covered: 1–9, 10–19, 20–29…" FontSize="10" TextColor="#9CA3AF"/>
+                            </VerticalStackLayout>
+                            <Border Grid.Column="1" x:Name="toggleGroupBorder"
+                                    BackgroundColor="#6B7280" StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 10" Padding="12,5">
+                                <Label x:Name="toggleGroupLabel" Text="OFF"
+                                       FontSize="11" FontAttributes="Bold"
+                                       TextColor="White" HorizontalOptions="Center">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="ToggleGroup_Tapped"/>
+                                    </Label.GestureRecognizers>
+                                </Label>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="ToggleGroup_Tapped"/>
+                                </Border.GestureRecognizers>
+                            </Border>
+                        </Grid>
+                        <HorizontalStackLayout x:Name="groupPanel" IsVisible="False" Spacing="10">
+                            <Button Text="−" FontSize="18"
+                                    BackgroundColor="#E5E7EB" TextColor="#374151"
+                                    WidthRequest="44" HeightRequest="40" CornerRadius="8"
+                                    Clicked="BtnGroupMinus_Clicked"/>
+                            <Label x:Name="lblGroupVal" Text="2"
+                                   FontSize="18" FontAttributes="Bold"
+                                   TextColor="#1E2733" WidthRequest="44"
+                                   HorizontalTextAlignment="Center"
+                                   VerticalOptions="Center"/>
+                            <Button Text="+" FontSize="18"
+                                    BackgroundColor="#E5E7EB" TextColor="#374151"
+                                    WidthRequest="44" HeightRequest="40" CornerRadius="8"
+                                    Clicked="BtnGroupPlus_Clicked"/>
+                            <Label Text="groups min" FontSize="12" TextColor="#6B7280"
+                                   VerticalOptions="Center"/>
+                        </HorizontalStackLayout>
+
+                        <BoxView HeightRequest="1" BackgroundColor="#F3F4F6" Margin="0,2"/>
+
+                        <!-- ── Digital Root ── -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <VerticalStackLayout Grid.Column="0" Spacing="1" VerticalOptions="Center">
+                                <Label Text="Digital Root" FontSize="12" FontAttributes="Bold" TextColor="#374151"/>
+                                <Label Text="Sum all digits until one remains, e.g. 38 → 11 → 2" FontSize="10" TextColor="#9CA3AF"/>
+                            </VerticalStackLayout>
+                            <Border Grid.Column="1" x:Name="toggleRootBorder"
+                                    BackgroundColor="#6B7280" StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 10" Padding="12,5">
+                                <Label x:Name="toggleRootLabel" Text="OFF"
+                                       FontSize="11" FontAttributes="Bold"
+                                       TextColor="White" HorizontalOptions="Center">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="ToggleRoot_Tapped"/>
+                                    </Label.GestureRecognizers>
+                                </Label>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="ToggleRoot_Tapped"/>
+                                </Border.GestureRecognizers>
+                            </Border>
+                        </Grid>
+                        <VerticalStackLayout x:Name="rootPanel" IsVisible="False" Spacing="8">
+                            <Label Text="Tap to allow those root values  (combo sum → single digit):"
+                                   FontSize="11" TextColor="#6B7280"/>
+                            <FlexLayout x:Name="rootButtonRow" Direction="Row" Wrap="NoWrap"
+                                        JustifyContent="SpaceBetween"/>
+                        </VerticalStackLayout>
+
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Estimate + Reset defaults row -->
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Grid.Column="0" x:Name="lblEstimate"
+                           Text="Select at least (pick) numbers to see an estimate."
+                           FontSize="12" TextColor="#6B7280" VerticalOptions="Center"/>
+                    <Button Grid.Column="1" Text="Defaults" FontSize="11"
+                            BackgroundColor="#E5E7EB" TextColor="#374151"
+                            HeightRequest="32" CornerRadius="8" Padding="10,0"
+                            Clicked="BtnResetDefaults_Clicked"/>
+                </Grid>
+
+                <!-- Apply button -->
+                <Button x:Name="btnApply" Text="Apply Filters"
+                        BackgroundColor="#1565C0" TextColor="White"
+                        FontSize="15" FontAttributes="Bold"
+                        CornerRadius="10" HeightRequest="48"
+                        Clicked="BtnApply_Clicked"/>
+
+                <!-- Results -->
+                <VerticalStackLayout x:Name="resultsContainer" Spacing="4"/>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- ── Status bar ── -->
+        <Label Grid.Row="3" x:Name="lblStatus"
+               Text="Pick your pool, configure filters, then tap Apply Filters."
+               BackgroundColor="#1E2733" TextColor="#8B9DC3"
+               FontSize="12" Padding="14,6" LineBreakMode="TailTruncation"/>
+
+        <!-- ── Loading overlay ── -->
+        <Grid Grid.Row="0" Grid.RowSpan="4" x:Name="loadingOverlay"
+              BackgroundColor="#CC1E2733" IsVisible="False" InputTransparent="False">
+            <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="16">
+                <ActivityIndicator IsRunning="True" Color="White"
+                                   WidthRequest="56" HeightRequest="56"/>
+                <Label x:Name="lblLoadingMsg" Text="Filtering combinations..."
+                       TextColor="White" FontSize="16" FontAttributes="Bold"
+                       HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+        </Grid>
+
+    </Grid>
+</ContentPage>

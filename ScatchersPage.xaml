@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
+             x:Class="DailyFantasyMAUI.ScatchersPage"
+             BackgroundColor="#0D1B2A"
+             Shell.NavBarIsVisible="False">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
+
+        <!-- Header -->
+        <Grid Grid.Row="0" BackgroundColor="#0A1628" Padding="14,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <GraphicsView Grid.ColumnSpan="3"
+                          Opacity="0.70" HeightRequest="54" WidthRequest="54"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
+            <Button Grid.Column="0" Text="← Back" Clicked="BtnBack_Clicked"
+                    BackgroundColor="Transparent" TextColor="#5B9BD5"
+                    FontSize="12" Padding="2,0"/>
+            <Label Grid.Column="1" Text="Scratchers" FontSize="15" FontAttributes="Bold"
+                   TextColor="#90CAF9" HorizontalOptions="Center" VerticalOptions="Center"/>
+            <Label Grid.Column="2" Text="⌂" FontSize="20" TextColor="White"
+                   VerticalOptions="Center" Padding="4,0">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="BtnHome_Clicked"/>
+                </Label.GestureRecognizers>
+            </Label>
+        </Grid>
+
+        <!-- Hot New Plays banner -->
+        <Image x:Name="bannerImage" Grid.Row="1" Source="scratchers_banner.png" Aspect="AspectFit" HeightRequest="70"/>
+
+        <!-- Total bar -->
+        <Grid Grid.Row="2" BackgroundColor="#0E2039" Padding="12,8"
+              ColumnDefinitions="*,*,*">
+            <Label x:Name="lblSpent" Grid.Column="0" FontSize="12" FontAttributes="Bold"
+                   TextColor="#EF9A9A" HorizontalOptions="Center"/>
+            <Label x:Name="lblWon"   Grid.Column="1" FontSize="12" FontAttributes="Bold"
+                   TextColor="#A5D6A7" HorizontalOptions="Center"/>
+            <Label x:Name="lblNet"   Grid.Column="2" FontSize="12" FontAttributes="Bold"
+                   TextColor="White"  HorizontalOptions="Center"/>
+        </Grid>
+
+        <!-- Input area -->
+        <Border Grid.Row="3" BackgroundColor="#0E2039" Stroke="#1E3A5F"
+                StrokeThickness="1" StrokeShape="RoundRectangle 10"
+                Margin="12,10,12,4" Padding="14,12">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="10">
+
+                <!-- Date -->
+                <Grid Grid.Row="0" ColumnDefinitions="*,*" ColumnSpacing="10">
+                    <Label Grid.Column="0" Text="Date" FontSize="11" TextColor="#4A7FB5"
+                           VerticalOptions="Center" FontAttributes="Bold"/>
+                    <DatePicker Grid.Column="1" x:Name="datePicker"
+                                Format="MM/dd/yyyy" TextColor="White"
+                                BackgroundColor="#132540" FontSize="12"/>
+                </Grid>
+
+                <!-- Tickets and Price entry -->
+                <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="10">
+                    <Border Grid.Column="0" BackgroundColor="#132540" Stroke="#1E3A5F"
+                            StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="0">
+                        <Grid RowDefinitions="Auto,*">
+                            <Label Grid.Row="0" Text="# TICKETS" FontSize="8" FontAttributes="Bold"
+                                   TextColor="#4A7FB5" CharacterSpacing="0.5"
+                                   HorizontalOptions="Center" Margin="0,4,0,0"/>
+                            <Entry Grid.Row="1" x:Name="entryQty" Text="1" Keyboard="Numeric"
+                                   FontSize="18" FontAttributes="Bold"
+                                   HorizontalTextAlignment="Center"
+                                   TextColor="Black" BackgroundColor="#D6E8FF"
+                                   HeightRequest="40"/>
+                        </Grid>
+                    </Border>
+                    <Border Grid.Column="1" BackgroundColor="#132540" Stroke="#1E3A5F"
+                            StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="0">
+                        <Grid RowDefinitions="Auto,*">
+                            <Label Grid.Row="0" Text="PRICE EACH ($)" FontSize="8" FontAttributes="Bold"
+                                   TextColor="#4A7FB5" CharacterSpacing="0.5"
+                                   HorizontalOptions="Center" Margin="0,4,0,0"/>
+                            <Entry Grid.Row="1" x:Name="entryPrice" Text="" Keyboard="Numeric"
+                                   Placeholder="tap below"
+                                   PlaceholderColor="#6B8FAF"
+                                   FontSize="18" FontAttributes="Bold"
+                                   HorizontalTextAlignment="Center"
+                                   TextColor="Black" BackgroundColor="#D6E8FF"
+                                   HeightRequest="40"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- Price quick-select buttons -->
+                <Grid Grid.Row="2" ColumnDefinitions="*,*,*,*" ColumnSpacing="5" RowDefinitions="Auto,Auto" RowSpacing="5">
+                    <Button Grid.Row="0" Grid.Column="0" Text="$1"  FontSize="12" FontAttributes="Bold"
+                            BackgroundColor="#1E3A5F" TextColor="#90CAF9"
+                            HeightRequest="34" CornerRadius="8" Padding="0"
+                            Clicked="PriceBtn_Clicked" CommandParameter="1"/>
+                    <Button Grid.Row="0" Grid.Column="1" Text="$2"  FontSize="12" FontAttributes="Bold"
+                            BackgroundColor="#1E3A5F" TextColor="#90CAF9"
+                            HeightRequest="34" CornerRadius="8" Padding="0"
+                            Clicked="PriceBtn_Clicked" CommandParameter="2"/>
+                    <Button Grid.Row="0" Grid.Column="2" Text="$3"  FontSize="12" FontAttributes="Bold"
+                            BackgroundColor="#1E3A5F" TextColor="#90CAF9"
+                            HeightRequest="34" CornerRadius="8" Padding="0"
+                            Clicked="PriceBtn_Clicked" CommandParameter="3"/>
+                    <Button Grid.Row="0" Grid.Column="3" Text="$5"  FontSize="12" FontAttributes="Bold"
+                            BackgroundColor="#1E3A5F" TextColor="#90CAF9"
+                            HeightRequest="34" CornerRadius="8" Padding="0"
+                            Clicked="PriceBtn_Clicked" CommandParameter="5"/>
+                    <Button Grid.Row="1" Grid.Column="0" Text="$10" FontSize="12" FontAttributes="Bold"
+                            BackgroundColor="#1E3A5F" TextColor="#90CAF9"
+                            HeightRequest="34" CornerRadius="8" Padding="0"
+                            Clicked="PriceBtn_Clicked" CommandParameter="10"/>
+                    <Button Grid.Row="1" Grid.Column="1" Text="$20" FontSize="12" FontAttributes="Bold"
+                            BackgroundColor="#1E3A5F" TextColor="#90CAF9"
+                            HeightRequest="34" CornerRadius="8" Padding="0"
+                            Clicked="PriceBtn_Clicked" CommandParameter="20"/>
+                    <Button Grid.Row="1" Grid.Column="2" Text="$30" FontSize="12" FontAttributes="Bold"
+                            BackgroundColor="#1E3A5F" TextColor="#90CAF9"
+                            HeightRequest="34" CornerRadius="8" Padding="0"
+                            Clicked="PriceBtn_Clicked" CommandParameter="30"/>
+                    <Button Grid.Row="1" Grid.Column="3" Text="$40" FontSize="12" FontAttributes="Bold"
+                            BackgroundColor="#1E3A5F" TextColor="#90CAF9"
+                            HeightRequest="34" CornerRadius="8" Padding="0"
+                            Clicked="PriceBtn_Clicked" CommandParameter="40"/>
+                </Grid>
+
+                <!-- Memo -->
+                <Border Grid.Row="3" BackgroundColor="#132540" Stroke="#1E3A5F"
+                        StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="0">
+                    <Grid RowDefinitions="Auto,Auto,Auto">
+                        <Label Grid.Row="0" Text="MEMO (optional)" FontSize="8" FontAttributes="Bold"
+                               TextColor="#4A7FB5" CharacterSpacing="0.5"
+                               HorizontalOptions="Start" Margin="10,4,0,0"/>
+                        <Entry Grid.Row="1" x:Name="entryMemo" Text="" Keyboard="Default"
+                               Placeholder="e.g. Gold Rush 200x, Gas station"
+                               PlaceholderColor="#6B8FAF"
+                               FontSize="13"
+                               TextColor="Black" BackgroundColor="#D6E8FF"
+                               HeightRequest="36" Margin="0"
+                               TextChanged="EntryMemo_TextChanged"
+                               Focused="EntryMemo_Focused"
+                               Unfocused="EntryMemo_Unfocused"/>
+                        <CollectionView Grid.Row="2" x:Name="lstMemoSuggestions"
+                                        IsVisible="False" SelectionMode="Single"
+                                        SelectionChanged="MemoSuggestions_SelectionChanged"
+                                        MaximumHeightRequest="150" Margin="0,3,0,4">
+                            <CollectionView.ItemsLayout>
+                                <LinearItemsLayout Orientation="Vertical" ItemSpacing="2"/>
+                            </CollectionView.ItemsLayout>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate>
+                                    <Label Text="{Binding .}" FontSize="12" TextColor="#D6E8FF"
+                                           BackgroundColor="#1E3A5F" Padding="10,8"/>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </Grid>
+                </Border>
+
+                <!-- Add button -->
+                <Button Grid.Row="4" Text="Add Entry"
+                        BackgroundColor="#6D28D9" TextColor="White"
+                        FontSize="13" FontAttributes="Bold"
+                        HeightRequest="42" CornerRadius="10"
+                        Clicked="BtnAdd_Clicked"/>
+            </Grid>
+        </Border>
+
+        <!-- Log list -->
+        <CollectionView Grid.Row="4" x:Name="lstLog" Margin="12,4,12,0">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Padding="10,6" RowDefinitions="Auto,Auto,Auto" RowSpacing="2"
+                          ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto">
+
+                        <!-- Row 0: date | qty×price | cost | 💰 | ✏ | ✕ -->
+                        <Label Grid.Row="0" Grid.Column="0" Text="{Binding Date}" FontSize="12"
+                               TextColor="#94B8D8" VerticalOptions="Center"/>
+                        <Label Grid.Row="0" Grid.Column="1" FontSize="12" TextColor="#E2E8F0"
+                               VerticalOptions="Center" Margin="0,0,6,0">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="{Binding TicketCount}" FontAttributes="Bold"/>
+                                    <Span Text=" x "/>
+                                    <Span Text="{Binding CostEach, StringFormat='${0:F2}'}"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                        <Label Grid.Row="0" Grid.Column="2"
+                               Text="{Binding TotalCost, StringFormat='${0:F2}'}"
+                               FontSize="12" FontAttributes="Bold" TextColor="#F59E0B"
+                               VerticalOptions="Center" Margin="0,0,6,0"/>
+                        <Button Grid.Row="0" Grid.Column="3" Text="💰" FontSize="11"
+                                BackgroundColor="#14532D" TextColor="#4ADE80"
+                                HeightRequest="30" WidthRequest="34" CornerRadius="6" Padding="0"
+                                CommandParameter="{Binding .}" Clicked="BtnWin_Clicked"/>
+                        <Button Grid.Row="0" Grid.Column="4" Text="✏" FontSize="11"
+                                BackgroundColor="#1E3A5F" TextColor="#90CAF9"
+                                HeightRequest="30" WidthRequest="30" CornerRadius="6" Padding="0"
+                                CommandParameter="{Binding .}" Clicked="BtnEdit_Clicked"/>
+                        <Button Grid.Row="0" Grid.Column="5" Text="✕" FontSize="11"
+                                BackgroundColor="#7F1D1D" TextColor="White"
+                                HeightRequest="30" WidthRequest="30" CornerRadius="6" Padding="0"
+                                CommandParameter="{Binding .}" Clicked="BtnDelete_Clicked"/>
+
+                        <!-- Row 1: memo (only visible when set) -->
+                        <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="6"
+                               Text="{Binding Memo}"
+                               IsVisible="{Binding HasMemo}"
+                               FontSize="11" TextColor="#94B8D8" FontAttributes="Italic"
+                               Margin="2,0,0,1"/>
+
+                        <!-- Row 2: win amount (only visible when a win is logged) -->
+                        <Label Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="6"
+                               Text="{Binding WinLabel}"
+                               IsVisible="{Binding HasWin}"
+                               FontSize="12" FontAttributes="Bold" TextColor="#4ADE80"
+                               Margin="2,0,0,2"/>
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Bottom spacer -->
+        <BoxView Grid.Row="5" HeightRequest="12" Color="Transparent"/>
+
+    </Grid>
+</ContentPage>

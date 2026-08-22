@@ -5,7 +5,7 @@ namespace DailyFantasyMAUI.Services;
 /// <summary>
 /// Fetches the latest completed draw number for each CA Lottery game on app launch,
 /// adds +1, and caches it. Daily 3 is re-fetched after 1 pm because it draws twice daily.
-/// New game sales start at 6 am, so we treat the cache as fresh for the current calendar day.
+/// _next is ONLY populated by live API calls — never by preferences or backup restores.
 /// </summary>
 public static class DrawNumberService
 {
@@ -22,30 +22,91 @@ public static class DrawNumberService
         new("Daily Derby",  11, ""),
     ];
 
-    // in-memory cache: game name → next draw number
+    // in-memory cache: game name → next draw number (live-fetched only)
     static readonly Dictionary<string, int> _next = new();
+
+    // games that have been successfully fetched from the API this session
+    static readonly HashSet<string> _fetched = new();
 
     // when did we last fetch Daily 3?
     static DateTime _d3FetchedAt = DateTime.MinValue;
 
+    // task for the in-progress FetchAllAsync, so callers can await it
+    static Task? _fetchAllTask;
+    // date of the last completed full fetch (yyyyMMdd)
+    static string _lastFetchDate = "";
+
     // ── Public API ────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Call once on app startup. Loads today's cached values immediately,
-    /// then fetches fresh numbers from the CA Lottery API in the background.
+    /// Call on app startup and on app resume. Fetches fresh draw numbers from
+    /// the CA Lottery API. Safe to call multiple times — only re-fetches on a
+    /// new calendar day. Never loads from preferences or backup.
     /// </summary>
     public static async Task InitAsync()
     {
-        LoadFromPrefs();                   // instant — show cached values right away
-        await FetchAllAsync();             // background refresh
+        // If a fetch is already in progress, just wait for it
+        if (_fetchAllTask != null) { await _fetchAllTask; return; }
+
+        string today = DateTime.Today.ToString("yyyyMMdd");
+        // Already fetched successfully today — nothing to do
+        if (_lastFetchDate == today) return;
+
+        // New day: clear previous session's cached values
+        _next.Clear();
+        _fetched.Clear();
+
+        _fetchAllTask = FetchAllAsync();
+        await _fetchAllTask;
+        _fetchAllTask  = null;
+        _lastFetchDate = today;
     }
 
     /// <summary>
     /// Returns the next (upcoming) draw number for the given game name,
-    /// or 0 if not yet fetched.
+    /// or 0 if not yet fetched this session.
     /// </summary>
     public static int GetNextDraw(string gameName) =>
-        _next.TryGetValue(gameName, out int n) ? n : 0;
+        _fetched.Contains(gameName) && _next.TryGetValue(gameName, out int n) ? n : 0;
+
+    /// <summary>
+    /// Returns the next draw number from a live API fetch, waiting up to 8 seconds.
+    /// If the batch fetch fails for this game, retries once with a direct call.
+    /// Falls back to last stored preference only as absolute last resort.
+    /// </summary>
+    public static async Task<int> EnsureNextDrawAsync(string gameName)
+    {
+        // Wait for any in-progress batch fetch to complete
+        var t = _fetchAllTask;
+        if (t != null)
+        {
+            try { await t.WaitAsync(TimeSpan.FromSeconds(8)); }
+            catch { /* timeout or cancelled */ }
+        }
+
+        // If the live fetch succeeded for this game, return it
+        if (_fetched.Contains(gameName) && _next.TryGetValue(gameName, out int n) && n > 0)
+            return n;
+
+        // Batch fetch failed or timed out for this game — try a direct fetch,
+        // with one extra retry after a short delay in case of a transient
+        // weak-signal blip (a single attempt was found to fail intermittently).
+        var game = _games.FirstOrDefault(g => g.Name == gameName);
+        if (game != null)
+        {
+            await FetchGameAsync(game);
+            if (!_fetched.Contains(gameName))
+            {
+                await Task.Delay(1500);
+                await FetchGameAsync(game);
+            }
+        }
+
+        // Return live value if a retry succeeded, else stale pref as last resort
+        return _fetched.Contains(gameName) && _next.TryGetValue(gameName, out n) && n > 0
+            ? n
+            : Preferences.Get($"nd_{gameName}", 0);
+    }
 
     /// <summary>
     /// Re-fetches Daily 3 if it is after 1 pm and we haven't fetched it
@@ -63,19 +124,6 @@ public static class DrawNumberService
     }
 
     // ── Implementation ────────────────────────────────────────────────────────
-
-    static void LoadFromPrefs()
-    {
-        string today = DateTime.Today.ToString("yyyyMMdd");
-        foreach (var g in _games)
-        {
-            if (Preferences.Get($"nd_date_{g.Name}", "") == today)
-            {
-                int n = Preferences.Get($"nd_{g.Name}", 0);
-                if (n > 0) _next[g.Name] = n;
-            }
-        }
-    }
 
     static Task FetchAllAsync() =>
         Task.WhenAll(_games.Select(g => FetchGameAsync(g)));
@@ -113,16 +161,19 @@ public static class DrawNumberService
             if (latest <= 0) return;
 
             int next = latest + 1;
-            _next[game.Name] = next;
+            _next[game.Name]   = next;
+            _fetched.Add(game.Name);                                   // mark as live-fetched
             Preferences.Set($"nd_{game.Name}", next);
             Preferences.Set($"nd_date_{game.Name}", DateTime.Today.ToString("yyyyMMdd"));
 
             if (game.Name == "Daily 3")
                 _d3FetchedAt = DateTime.Now;
         }
-        catch
+        catch (Exception ex)
         {
-            // silently fail — cached value remains
+            // _next not updated, _fetched not updated — logged so a future
+            // "draw# didn't fill in" report can be diagnosed from logcat
+            System.Diagnostics.Debug.WriteLine($"[DrawNumberService] fetch failed for {game.Name}: {ex.Message}");
         }
     }
 }

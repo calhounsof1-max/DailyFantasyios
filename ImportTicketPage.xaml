@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
+             x:Class="DailyFantasyMAUI.ImportTicketPage"
+             Title="Import Tickets"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="Black">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- Header -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="10,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <GraphicsView Grid.ColumnSpan="3"
+                          Opacity="0.70" HeightRequest="54" WidthRequest="54"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
+            <Button Grid.Column="0" Text="←" FontSize="16" TextColor="White"
+                    BackgroundColor="Transparent" Padding="6,0"
+                    HeightRequest="36" MinimumWidthRequest="36"
+                    Clicked="BtnBack_Clicked"/>
+            <Label Grid.Column="1" Text="Import Tickets"
+                   TextColor="White" FontSize="14" FontAttributes="Bold"
+                   VerticalOptions="Center" HorizontalOptions="Center"/>
+        </Grid>
+
+        <!-- Center panel -->
+        <ScrollView Grid.Row="1" BackgroundColor="#0D1117">
+            <VerticalStackLayout Padding="18,20" Spacing="16">
+
+                <!-- Empty state / instructions -->
+                <VerticalStackLayout x:Name="stkEmptyState" Spacing="10">
+                    <Label Text="📥" FontSize="56" HorizontalOptions="Center"/>
+                    <Label Text="Choose a .txt or .csv file with your ticket rows."
+                           TextColor="#9CA3AF" FontSize="14"
+                           HorizontalTextAlignment="Center" HorizontalOptions="Center"/>
+                    <Label Text="Each line: a game code (F5, SL, PB, MM, D3, D4, DD) then its numbers — e.g. &quot;F5, 12, 5, 22, 31, 9&quot;. Numbers can be separated by commas, spaces or tabs."
+                           TextColor="#6B7280" FontSize="12"
+                           HorizontalTextAlignment="Center" HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+
+                <!-- File summary -->
+                <Label x:Name="lblFileSummary" IsVisible="False"
+                       TextColor="White" FontSize="13" FontAttributes="Bold"
+                       HorizontalTextAlignment="Center"/>
+
+                <!-- Per-game preview cards -->
+                <VerticalStackLayout x:Name="stkGames" Spacing="10"/>
+
+                <!-- Skipped lines -->
+                <VerticalStackLayout x:Name="stkSkipped" Spacing="6" IsVisible="False">
+                    <Label x:Name="lblSkippedHeader" TextColor="#F9A825" FontSize="13" FontAttributes="Bold"/>
+                    <VerticalStackLayout x:Name="stkSkippedList" Spacing="3"/>
+                </VerticalStackLayout>
+
+                <!-- Result summary after insert -->
+                <Label x:Name="lblResult" IsVisible="False"
+                       TextColor="#66BB6A" FontSize="13" FontAttributes="Bold"
+                       HorizontalTextAlignment="Center"/>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Bottom panel -->
+        <VerticalStackLayout Grid.Row="2" BackgroundColor="#1E2733" Padding="14,12" Spacing="8">
+            <Button x:Name="btnChooseFile"
+                    Text="📄  Choose File"
+                    FontSize="15" FontAttributes="Bold"
+                    BackgroundColor="#1565C0" TextColor="White"
+                    HeightRequest="50" CornerRadius="10"
+                    Clicked="BtnChooseFile_Clicked"/>
+            <Button x:Name="btnInsert"
+                    Text="Insert All Rows"
+                    FontSize="15" FontAttributes="Bold"
+                    BackgroundColor="#2E7D32" TextColor="White"
+                    HeightRequest="50" CornerRadius="10"
+                    IsVisible="False" IsEnabled="False"
+                    Clicked="BtnInsert_Clicked"/>
+        </VerticalStackLayout>
+
+        <!-- Loading overlay -->
+        <Grid Grid.Row="0" Grid.RowSpan="3"
+              x:Name="loadingOverlay" IsVisible="False"
+              BackgroundColor="#A0000000">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="12">
+                <ActivityIndicator IsRunning="True" Color="White"
+                                   WidthRequest="48" HeightRequest="48"/>
+                <Label x:Name="lblLoading" Text="Reading file…" TextColor="White" FontSize="14"
+                       HorizontalOptions="Center"/>
+                <Button x:Name="btnCancelLoad" Text="Cancel"
+                        FontSize="13" TextColor="White"
+                        BackgroundColor="#455A64" CornerRadius="8"
+                        Padding="20,6" Margin="0,8,0,0"
+                        Clicked="BtnCancelLoad_Clicked"/>
+            </VerticalStackLayout>
+        </Grid>
+
+    </Grid>
+</ContentPage>

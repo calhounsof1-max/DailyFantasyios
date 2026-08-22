@@ -1378,23 +1378,33 @@ namespace DailyFantasyMAUI.Services
 
         // ── Next-draw jackpot amounts ─────────────────────────────────────────
 
-        public static async Task<(decimal? F5, decimal? SL, decimal? PB, decimal? MM, decimal? DD)> GetNextJackpotAmounts()
+        public static async Task<(decimal? F5, string F5Date, decimal? SL, string SLDate, decimal? PB, string PBDate, decimal? MM, string MMDate, decimal? DD, string DDDate)> GetNextJackpotAmounts()
         {
-            static decimal? ExtractJackpot(string json)
+            static (decimal? amount, string date) ExtractNext(string json)
             {
                 try
                 {
                     using var doc = JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty("NextDraw", out var nd) &&
-                        nd.TryGetProperty("JackpotAmount", out var ja) &&
-                        ja.ValueKind == JsonValueKind.Number)
+                    if (doc.RootElement.TryGetProperty("NextDraw", out var nd))
                     {
-                        double v = ja.GetDouble();
-                        return v > 0 ? (decimal)v : null;
+                        decimal? amount = null;
+                        string date = "";
+                        if (nd.TryGetProperty("JackpotAmount", out var ja) && ja.ValueKind == JsonValueKind.Number)
+                        {
+                            double v = ja.GetDouble();
+                            if (v > 0) amount = (decimal)v;
+                        }
+                        if (nd.TryGetProperty("DrawDate", out var dd) && dd.ValueKind == JsonValueKind.String)
+                        {
+                            string raw = dd.GetString() ?? "";
+                            if (DateTime.TryParse(raw, out var dt))
+                                date = dt.ToString("ddd, MMM d");
+                        }
+                        return (amount, date);
                     }
                 }
                 catch { }
-                return null;
+                return (null, "");
             }
 
             int f5Id = Preferences.Get(PrefGameId, DefaultId);
@@ -1403,20 +1413,23 @@ namespace DailyFantasyMAUI.Services
             int mmId = Preferences.Get(PrefMMGameId, DefaultMMId);
             int ddId = DDGameId;
 
-            async Task<(int id, decimal? amount)> Fetch(int id)
+            async Task<(int id, decimal? amount, string date)> Fetch(int id)
             {
                 try
                 {
                     using var client = MakeClient(10);
                     var url  = $"https://www.calottery.com/api/DrawGameApi/DrawGamePastDrawResults/{id}/1/1";
                     var json = await client.GetStringAsync(url).ConfigureAwait(false);
-                    return (id, ExtractJackpot(json));
+                    var (amount, date) = ExtractNext(json);
+                    return (id, amount, date);
                 }
-                catch { return (id, null); }
+                catch { return (id, null, ""); }
             }
 
             var results = await Task.WhenAll(Fetch(f5Id), Fetch(slId), Fetch(pbId), Fetch(mmId), Fetch(ddId));
-            return (results[0].amount, results[1].amount, results[2].amount, results[3].amount, results[4].amount);
+            return (results[0].amount, results[0].date, results[1].amount, results[1].date,
+                    results[2].amount, results[2].date, results[3].amount, results[3].date,
+                    results[4].amount, results[4].date);
         }
 
         // ── Fetch latest single draw ──────────────────────────────────────────
@@ -1459,7 +1472,8 @@ namespace DailyFantasyMAUI.Services
 
                 var jp = jpTask.Result;
                 SavePrizeCache(today,
-                    f5Task.Result, slTask.Result, pbTask.Result, mmTask.Result, ddTask.Result, d3Task.Result, d4Task.Result, jp);
+                    f5Task.Result, slTask.Result, pbTask.Result, mmTask.Result, ddTask.Result, d3Task.Result, d4Task.Result,
+                    (jp.F5, jp.SL, jp.PB, jp.MM, jp.DD));
 
                 Preferences.Set(PrefJackpotDate, today);
                 _ = Logger.LogAsync($"Jackpot results cached for {today}");

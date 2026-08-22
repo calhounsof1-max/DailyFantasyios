@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
+             x:Class="DailyFantasyMAUI.AboutPage"
+             BackgroundColor="#0A1628">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- Header -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="12,10"
+              ColumnDefinitions="Auto,*">
+            <Button Grid.Column="0" Text="← Back" FontSize="13"
+                    BackgroundColor="Transparent" TextColor="#90CAF9"
+                    Padding="0" WidthRequest="70"
+                    Clicked="BtnBack_Clicked"/>
+            <Label Grid.Column="1" Text="About" FontSize="16"
+                   FontAttributes="Bold" TextColor="White"
+                   VerticalOptions="Center" HorizontalOptions="Center"
+                   Margin="-70,0,0,0"/>
+        </Grid>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="20,28,20,40" Spacing="0">
+
+                <!-- Hero Card -->
+                <Frame BackgroundColor="#111E2E" BorderColor="#1E3A5F"
+                       CornerRadius="16" Padding="24,28" Margin="0,0,0,20">
+                    <VerticalStackLayout Spacing="10" HorizontalOptions="Center">
+
+                        <!-- App logo (same ball watermark as main header) -->
+                        <GraphicsView HorizontalOptions="Center"
+                                      HeightRequest="90" WidthRequest="90">
+                            <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+                        </GraphicsView>
+
+                        <Label Text="CA 7 Tracker" FontSize="26" FontAttributes="Bold"
+                               TextColor="White" HorizontalOptions="Center"/>
+
+                        <Label x:Name="lblVersion" Text="Version 1.0"
+                               FontSize="12" TextColor="#607D8B"
+                               HorizontalOptions="Center"/>
+
+                        <!-- Divider -->
+                        <BoxView HeightRequest="1" BackgroundColor="#1E3A5F"
+                                 Margin="0,8,0,8"/>
+
+                        <Label Text="California Lottery Tracker" FontSize="13"
+                               TextColor="#90CAF9" HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Supported Games -->
+                <Frame BackgroundColor="#111E2E" BorderColor="#1E3A5F"
+                       CornerRadius="12" Padding="18,16" Margin="0,0,0,16">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="Supported Games" FontSize="13"
+                               FontAttributes="Bold" TextColor="#90CAF9"/>
+                        <FlexLayout Wrap="Wrap" JustifyContent="Start" AlignItems="Center">
+                            <!-- F5 -->
+                            <Frame BackgroundColor="#1A1200" BorderColor="#FF8F00" CornerRadius="8" Padding="10,6" Margin="0,0,6,6">
+                                <Label Text="Fantasy 5" FontSize="12" FontAttributes="Bold" TextColor="#FF8F00"/>
+                            </Frame>
+                            <!-- SL -->
+                            <Frame BackgroundColor="#1A0A1A" BorderColor="#7B1FA2" CornerRadius="8" Padding="10,6" Margin="0,0,6,6">
+                                <Label Text="Super Lotto" FontSize="12" FontAttributes="Bold" TextColor="#CE93D8"/>
+                            </Frame>
+                            <!-- PB -->
+                            <Frame BackgroundColor="#1A0808" BorderColor="#C62828" CornerRadius="8" Padding="10,6" Margin="0,0,6,6">
+                                <Label Text="Powerball" FontSize="12" FontAttributes="Bold" TextColor="#EF9A9A"/>
+                            </Frame>
+                            <!-- MM -->
+                            <Frame BackgroundColor="#1A1500" BorderColor="#F57F17" CornerRadius="8" Padding="10,6" Margin="0,0,6,6">
+                                <Label Text="Mega Millions" FontSize="12" FontAttributes="Bold" TextColor="#FFE082"/>
+                            </Frame>
+                            <!-- D3 -->
+                            <Frame BackgroundColor="#061428" BorderColor="#1565C0" CornerRadius="8" Padding="10,6" Margin="0,0,6,6">
+                                <Label Text="Daily 3" FontSize="12" FontAttributes="Bold" TextColor="#90CAF9"/>
+                            </Frame>
+                            <!-- D4 -->
+                            <Frame BackgroundColor="#06141A" BorderColor="#00695C" CornerRadius="8" Padding="10,6" Margin="0,0,6,6">
+                                <Label Text="Daily 4" FontSize="12" FontAttributes="Bold" TextColor="#80CBC4"/>
+                            </Frame>
+                            <!-- DD -->
+                            <Frame BackgroundColor="#120E08" BorderColor="#5D4037" CornerRadius="8" Padding="10,6" Margin="0,0,6,6">
+                                <Label Text="Daily Derby" FontSize="12" FontAttributes="Bold" TextColor="#BCAAA4"/>
+                            </Frame>
+                            <!-- SC -->
+                            <Frame BackgroundColor="#061A06" BorderColor="#2E7D32" CornerRadius="8" Padding="10,6" Margin="0,0,6,6">
+                                <Label Text="Scratchers" FontSize="12" FontAttributes="Bold" TextColor="#A5D6A7"/>
+                            </Frame>
+                        </FlexLayout>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Description -->
+                <Frame BackgroundColor="#111E2E" BorderColor="#1E3A5F"
+                       CornerRadius="12" Padding="18,16" Margin="0,0,0,16">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="About This App" FontSize="13"
+                               FontAttributes="Bold" TextColor="#90CAF9"/>
+                        <Label Text="CA 7 Tracker is a personal lottery companion built for California Lottery players. Track your advance play tickets across all major California games — Fantasy 5, Super Lotto Plus, Powerball, Mega Millions, Daily 3, Daily 4, and Daily Derby — all in one place."
+                               FontSize="13" TextColor="#B0BEC5" LineBreakMode="WordWrap"/>
+                        <Label Text="Never lose track of what you played or how much you spent. CA 7 Tracker automatically logs your tickets as you enter them, records your winnings, and keeps a full spending history so you always know where you stand. Built-in draw history and number analysis tools help you spot trends and make smarter picks."
+                               FontSize="13" TextColor="#B0BEC5" LineBreakMode="WordWrap" Margin="0,6,0,0"/>
+                        <Label Text="Your data is automatically backed up every time you close the app, so it&#8217;s always safe."
+                               FontSize="13" TextColor="#B0BEC5" LineBreakMode="WordWrap" Margin="0,6,0,0"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Developer -->
+                <Frame BackgroundColor="#111E2E" BorderColor="#1E3A5F"
+                       CornerRadius="12" Padding="18,16" Margin="0,0,0,16">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Developer" FontSize="13"
+                               FontAttributes="Bold" TextColor="#90CAF9"/>
+                        <Label Text="[Your Name / Company Name]"
+                               FontSize="13" TextColor="White"/>
+                        <Label Text="[your@email.com]"
+                               FontSize="12" TextColor="#607D8B"/>
+                        <Label Text="[www.yourwebsite.com]"
+                               FontSize="12" TextColor="#607D8B"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Legal -->
+                <Frame BackgroundColor="#111E2E" BorderColor="#1E3A5F"
+                       CornerRadius="12" Padding="18,16" Margin="0,0,0,0">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="Legal" FontSize="13"
+                               FontAttributes="Bold" TextColor="#90CAF9"/>
+                        <Label Text="This app is for tracking and analysis purposes only. It is not affiliated with the California Lottery or any lottery organization."
+                               FontSize="12" TextColor="#B0BEC5" LineBreakMode="WordWrap"/>
+                        <Label x:Name="lblCopyright" Text="© 2026 [Your Name]. All rights reserved."
+                               FontSize="11" TextColor="#546E7A"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+    </Grid>
+</ContentPage>

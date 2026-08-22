@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
+             x:Class="DailyFantasyMAUI.TicketPurchaseStatsPage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#0D1B2A">
+
+    <Grid RowDefinitions="Auto,Auto,*">
+
+        <!-- Header -->
+        <Grid Grid.Row="0" BackgroundColor="#0A1628" Padding="14,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <GraphicsView Grid.ColumnSpan="3"
+                          Opacity="0.55" HeightRequest="48" WidthRequest="48"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
+            <Label Grid.Column="0" Text="← Back" TextColor="#90CAF9"
+                   FontSize="13" FontAttributes="Bold" VerticalOptions="Center">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="Back_Tapped"/>
+                </Label.GestureRecognizers>
+            </Label>
+            <Label Grid.Column="1" Text="TICKET STATS"
+                   TextColor="White" FontSize="14" FontAttributes="Bold"
+                   HorizontalOptions="Center" VerticalOptions="Center"/>
+            <Border Grid.Column="2"
+                    BackgroundColor="Transparent" Stroke="#4FC3F7" StrokeThickness="1"
+                    Padding="10,4" VerticalOptions="Center">
+                <Border.StrokeShape><RoundRectangle CornerRadius="4"/></Border.StrokeShape>
+                <Label x:Name="lblChartBtn" Text="✕ Chart" TextColor="#EF9A9A" FontSize="11" VerticalOptions="Center">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="ChartBtn_Tapped"/>
+                    </Label.GestureRecognizers>
+                </Label>
+            </Border>
+        </Grid>
+
+        <!-- Grand total bar -->
+        <Grid Grid.Row="1" BackgroundColor="#0E2039" Padding="16,10"
+              ColumnDefinitions="Auto,*,Auto">
+            <StackLayout Orientation="Horizontal" Spacing="6" VerticalOptions="Center">
+                <Label Text="TOTAL" TextColor="#90CAF9" FontSize="11" FontAttributes="Bold" VerticalOptions="Center"/>
+                <Label x:Name="lblGrandTotal" TextColor="#F59E0B" FontSize="18" FontAttributes="Bold" VerticalOptions="Center"/>
+                <Label Text="tickets" TextColor="#90CAF9" FontSize="11" VerticalOptions="Center"/>
+            </StackLayout>
+            <StackLayout Grid.Column="1" Orientation="Horizontal" Spacing="4"
+                         HorizontalOptions="Center" VerticalOptions="Center">
+                <Label Text="avg/day" TextColor="#607D8B" FontSize="10" VerticalOptions="Center"/>
+                <Label x:Name="lblAvgPerDay" TextColor="#80CBC4" FontSize="15" FontAttributes="Bold" VerticalOptions="Center"/>
+            </StackLayout>
+            <Label Grid.Column="2" x:Name="lblGenerated"
+                   TextColor="#445566" FontSize="10"
+                   HorizontalOptions="End" VerticalOptions="Center"/>
+        </Grid>
+
+        <!-- Scrollable content -->
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout Spacing="0">
+
+                <!-- Optional bar chart -->
+                <GraphicsView x:Name="chartView" IsVisible="True"
+                              HeightRequest="320" Margin="0,8,0,0"/>
+
+                <!-- Spent vs Won Line Chart -->
+                <VerticalStackLayout x:Name="lineChartSection" IsVisible="True" Spacing="0">
+                    <VerticalStackLayout BackgroundColor="#112233" Spacing="4" Padding="16,8" Margin="0,8,0,0">
+                        <Label Text="SPENT vs WON — CUMULATIVE"
+                               TextColor="#64B5F6" FontSize="11" FontAttributes="Bold"/>
+                        <HorizontalStackLayout Spacing="14">
+                            <HorizontalStackLayout Spacing="5">
+                                <BoxView Color="#EF5350" WidthRequest="14" HeightRequest="4" VerticalOptions="Center"/>
+                                <Label Text="Spent" TextColor="#EF5350" FontSize="10" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                            <HorizontalStackLayout Spacing="5">
+                                <BoxView Color="#66BB6A" WidthRequest="14" HeightRequest="4" VerticalOptions="Center"/>
+                                <Label Text="Won" TextColor="#66BB6A" FontSize="10" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                            <HorizontalStackLayout Spacing="5">
+                                <BoxView Color="#FFD54F" WidthRequest="14" HeightRequest="4" VerticalOptions="Center"/>
+                                <Label Text="Net" TextColor="#FFD54F" FontSize="10" VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                    <GraphicsView x:Name="lineChartView" HeightRequest="260"
+                                  BackgroundColor="#0D1B2A">
+                        <GraphicsView.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="LineChart_Tapped"/>
+                        </GraphicsView.GestureRecognizers>
+                    </GraphicsView>
+                    <!-- Chart type selector + Analyze button -->
+                    <Grid BackgroundColor="#0A1222" Padding="12,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Label Text="Tap chart to cycle type"
+                               TextColor="#445566" FontSize="10" VerticalOptions="Center"/>
+                        <Picker x:Name="chartTypePicker" Grid.Column="1"
+                                TextColor="White" FontSize="12"
+                                WidthRequest="130"/>
+                        <Border Grid.Column="2" Margin="8,0,0,0"
+                                BackgroundColor="#1565C0" Stroke="Transparent"
+                                StrokeThickness="0" Padding="12,5"
+                                VerticalOptions="Center">
+                            <Border.StrokeShape><RoundRectangle CornerRadius="6"/></Border.StrokeShape>
+                            <Label Text="🤖 Analyze" TextColor="White"
+                                   FontSize="12" FontAttributes="Bold"
+                                   VerticalOptions="Center">
+                                <Label.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="Analyze_Tapped"/>
+                                </Label.GestureRecognizers>
+                            </Label>
+                        </Border>
+                    </Grid>
+                </VerticalStackLayout>
+
+                <!-- By Game section header -->
+                <Grid BackgroundColor="#112233" Padding="16,10">
+                    <Label Text="BY GAME — ALL TIME (sorted by most tickets)"
+                           TextColor="#64B5F6" FontSize="11" FontAttributes="Bold"/>
+                </Grid>
+
+                <!-- Game rows (built in code) -->
+                <VerticalStackLayout x:Name="gameRows" Spacing="0"/>
+
+                <!-- Daily Breakdown section header -->
+                <Grid BackgroundColor="#112233" Padding="16,10" Margin="0,16,0,0"
+                      ColumnDefinitions="*,Auto">
+                    <Label Text="DAILY BREAKDOWN (newest first)"
+                           TextColor="#64B5F6" FontSize="11" FontAttributes="Bold"
+                           VerticalOptions="Center"/>
+                    <Border Grid.Column="1" BackgroundColor="#1565C0" Stroke="Transparent"
+                            StrokeThickness="0" Padding="10,4" VerticalOptions="Center">
+                        <Border.StrokeShape><RoundRectangle CornerRadius="4"/></Border.StrokeShape>
+                        <Label x:Name="lblSplitGamesBtn" Text="Split Games" TextColor="White"
+                               FontSize="11" FontAttributes="Bold" VerticalOptions="Center">
+                            <Label.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="SplitGames_Tapped"/>
+                            </Label.GestureRecognizers>
+                        </Label>
+                    </Border>
+                </Grid>
+
+                <!-- Daily rows (built in code) -->
+                <VerticalStackLayout x:Name="dailyRows" Spacing="0"/>
+
+                <!-- Split Games rows (built in code, hidden by default) -->
+                <VerticalStackLayout x:Name="splitGamesRows" Spacing="0" IsVisible="False"/>
+
+                <!-- File path -->
+                <Grid BackgroundColor="#080F18" Padding="16,10">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="STATS FILE LOCATION"
+                               TextColor="#334455" FontSize="9" FontAttributes="Bold"/>
+                        <Label x:Name="lblFilePath"
+                               TextColor="#445566" FontSize="10"
+                               LineBreakMode="CharacterWrap"/>
+                    </VerticalStackLayout>
+                </Grid>
+
+                <!-- Bottom padding -->
+                <BoxView HeightRequest="32" Color="Transparent"/>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+    </Grid>
+</ContentPage>

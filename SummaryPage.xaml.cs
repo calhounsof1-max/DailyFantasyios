@@ -123,7 +123,7 @@ public partial class SummaryPage : ContentPage
         catch { return new(); }
     }
 
-    static async Task SaveAllAsync(List<WinningRecord> records)
+    internal static async Task SaveAllAsync(List<WinningRecord> records)
     {
         string json = JsonSerializer.Serialize(records,
             new JsonSerializerOptions { WriteIndented = false });

@@ -995,16 +995,19 @@ public partial class MainPage : ContentPage
     private async void BtnOptions_Clicked(object sender, EventArgs e)
     {
         string action = await DisplayActionSheet("Options", "Cancel", null,
-            "Data Files", "My Favorites", "Load Picks", "Generate Numbers",
-            "Clear List", "Delete Multiple...", "Search Sets", "Check Wins for Draw#");
+            "Data Files", "🗓 Ticket Calendar", "My Favorites", "Load Picks", "Import Tickets...", "Generate Numbers",
+            "Clear List", "Delete Multiple...", "Search Sets", "Check Wins for Draw#", "Today Purchase Tickets");
         switch (action)
         {
             case "Data Files":              await Shell.Current.GoToAsync(nameof(DataViewerPage), false); break;
+            case "🗓 Ticket Calendar":       await Shell.Current.GoToAsync(nameof(TicketCalendarPage), false); break;
             case "My Favorites":            await Shell.Current.GoToAsync(nameof(MyFavoritePage), false); break;
             case "Load Picks":              await Task.Delay(300); await LoadPicksFromFileAsync(); break;
+            case "Import Tickets...":       await Shell.Current.GoToAsync(nameof(ImportTicketPage), false); break;
             case "Generate Numbers":        BtnGenerateNumbers_Clicked(sender, e); break;
             case "Search Sets":             await Task.Delay(300); await SearchSetsAsync(); break;
             case "Check Wins for Draw#":    DrawSearchPage.PresetGame = "Daily 3"; await Shell.Current.GoToAsync(nameof(DrawSearchPage), false); break;
+            case "Today Purchase Tickets":  await Shell.Current.GoToAsync(nameof(TicketLogPage), false); break;
             case "Clear List":
                 if (vm.Picks.Count == 0) { vm.StatusMessage = "List is already empty"; break; }
                 bool confirmClear = await DisplayAlert("Clear List", $"Remove all {vm.Picks.Count} items from the list?", "Clear All", "Cancel");
@@ -1033,7 +1036,7 @@ public partial class MainPage : ContentPage
         string action = await DisplayActionSheet("Advance", "Cancel", null,
             "View Sets", "Archive", "Export Sets", "Refresh Data",
             "Voice Settings", "Notifications", "Games Expiration", "Purge All Games",
-            "Backup Data", "Restore Data");
+            "Backup Data", "Restore Data", "About");
         switch (action)
         {
             case "View Sets":        BtnViewSets_Clicked(sender, e); break;
@@ -1046,6 +1049,7 @@ public partial class MainPage : ContentPage
             case "Purge All Games":  await PurgeAllGamesAsync(); break;
             case "Backup Data":      await BackupDataAsync(); break;
             case "Restore Data":     await RestoreDataAsync(); break;
+            case "About":            await Shell.Current.GoToAsync(nameof(AboutPage), false); break;
         }
     }
 

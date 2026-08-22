@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
+             x:Class="DailyFantasyMAUI.PairsTripletsPage"
+             Title="Pairs &amp; Triplets"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F0F4F8">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto,1">
+
+        <!-- Row 0: Nav header -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="14,10"
+              ColumnDefinitions="Auto,*,Auto">
+            <GraphicsView Grid.ColumnSpan="3"
+                          Opacity="0.70" HeightRequest="54" WidthRequest="54"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
+            <Button Grid.Column="0" Text="⌂" FontSize="14" FontAttributes="Bold"
+                    BackgroundColor="#2D3D50" TextColor="White" Padding="10,0"
+                    HeightRequest="34" CornerRadius="17"
+                    Clicked="BtnGoHome_Clicked" Margin="0,0,6,0"/>
+            <Label Grid.Column="1" Text="Pairs &amp; Triplets" TextColor="White" FontSize="14"
+                   FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center"/>
+            <Picker Grid.Column="2" x:Name="gamePicker" FontSize="11"
+                    TextColor="White" BackgroundColor="#2D3D50"
+                    WidthRequest="110" HeightRequest="34"
+                    SelectedIndexChanged="GamePicker_Changed"/>
+        </Grid>
+
+        <!-- Row 1: Game logo banner -->
+        <Border Grid.Row="1" BackgroundColor="White" StrokeThickness="0" Padding="8,6">
+            <Image x:Name="imgGameLogo" HeightRequest="80"
+                   Aspect="AspectFit" HorizontalOptions="Center"/>
+        </Border>
+
+        <!-- Row 2: Period pills -->
+        <ScrollView Grid.Row="2" Orientation="Horizontal" BackgroundColor="White"
+                    HeightRequest="48" HorizontalScrollBarVisibility="Never">
+            <HorizontalStackLayout x:Name="periodBar" Spacing="6" Padding="12,8"/>
+        </ScrollView>
+
+        <!-- Row 3: Ticket entry -->
+        <Border Grid.Row="3" BackgroundColor="White" StrokeThickness="0"
+                StrokeShape="RoundRectangle 0" Margin="0,0,0,1">
+            <VerticalStackLayout Padding="12,8" Spacing="6">
+                <Label x:Name="lblEntryHint" Text="Enter your ticket to see its pairs:"
+                       FontSize="12" TextColor="#6B7280"/>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <ScrollView Grid.Column="0" Orientation="Horizontal"
+                                HorizontalScrollBarVisibility="Never" HeightRequest="44">
+                        <HorizontalStackLayout x:Name="entryBoxesLayout" Spacing="6"
+                                               VerticalOptions="Center"/>
+                    </ScrollView>
+                    <Button Grid.Column="1" Text="Clear" FontSize="11"
+                            BackgroundColor="#6B7280" TextColor="White"
+                            HeightRequest="38" CornerRadius="8" Padding="10,0"
+                            Clicked="BtnClearSearch_Clicked"/>
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Row 4: Pairs / Triplets tab toggle -->
+        <Grid Grid.Row="4" BackgroundColor="White" Padding="12,6"
+              ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Border Grid.Column="0" x:Name="tabPairsBorder"
+                    BackgroundColor="#1565C0" StrokeThickness="0"
+                    StrokeShape="RoundRectangle 8" Padding="0,8">
+                <Label x:Name="tabPairsLabel" Text="🔗 Pairs"
+                       FontSize="13" FontAttributes="Bold" TextColor="White"
+                       HorizontalOptions="Center">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="TabPairs_Tapped"/>
+                    </Label.GestureRecognizers>
+                </Label>
+            </Border>
+            <Border Grid.Column="1" x:Name="tabTripletsBorder"
+                    BackgroundColor="#E3F2FD" StrokeThickness="0"
+                    StrokeShape="RoundRectangle 8" Padding="0,8">
+                <Label x:Name="tabTripletsLabel" Text="🔗🔗 Triplets"
+                       FontSize="13" FontAttributes="Bold" TextColor="#1565C0"
+                       HorizontalOptions="Center">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="TabTriplets_Tapped"/>
+                    </Label.GestureRecognizers>
+                </Label>
+            </Border>
+        </Grid>
+
+        <!-- Row 5: Results scroll -->
+        <ScrollView Grid.Row="5" BackgroundColor="#F0F4F8">
+            <VerticalStackLayout x:Name="contentContainer" Padding="10,10" Spacing="4"/>
+        </ScrollView>
+
+        <!-- Row 6: Status bar -->
+        <Label Grid.Row="6" x:Name="lblStatus"
+               Text="Select a game to see number pairs."
+               BackgroundColor="#1E2733" TextColor="#8B9DC3"
+               FontSize="12" Padding="14,6" LineBreakMode="TailTruncation"/>
+
+        <!-- Loading overlay -->
+        <Grid Grid.Row="0" Grid.RowSpan="8" x:Name="loadingOverlay"
+              BackgroundColor="#CC1E2733" IsVisible="False" InputTransparent="False">
+            <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="16">
+                <ActivityIndicator IsRunning="True" Color="White"
+                                   WidthRequest="56" HeightRequest="56"/>
+                <Label x:Name="lblLoadingMsg" Text="Analyzing pairs..."
+                       TextColor="White" FontSize="16" FontAttributes="Bold"
+                       HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+        </Grid>
+
+    </Grid>
+</ContentPage>

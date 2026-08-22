@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
+             x:Class="DailyFantasyMAUI.WheelingPage"
+             Title="Wheeling System"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#F0F4F8">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+        <!-- Row 0: Nav header -->
+        <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="14,10"
+              ColumnDefinitions="Auto,*,Auto">
+            <GraphicsView Grid.ColumnSpan="3"
+                          Opacity="0.70" HeightRequest="54" WidthRequest="54"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
+            <Button Grid.Column="0" Text="⌂" FontSize="14" FontAttributes="Bold"
+                    BackgroundColor="#2D3D50" TextColor="White" Padding="10,0"
+                    HeightRequest="34" CornerRadius="17"
+                    Clicked="BtnGoHome_Clicked" Margin="0,0,6,0"/>
+            <Label Grid.Column="1" Text="Wheeling System" TextColor="White" FontSize="14"
+                   FontAttributes="Bold" HorizontalOptions="Center" VerticalOptions="Center"/>
+            <Picker Grid.Column="2" x:Name="gamePicker" FontSize="11"
+                    TextColor="White" BackgroundColor="#2D3D50"
+                    WidthRequest="110" HeightRequest="34"
+                    SelectedIndexChanged="GamePicker_Changed"/>
+        </Grid>
+
+        <!-- Row 1: Game logo banner -->
+        <Border Grid.Row="1" BackgroundColor="White" StrokeThickness="0" Padding="8,6">
+            <Image x:Name="imgGameLogo" HeightRequest="80"
+                   Aspect="AspectFit" HorizontalOptions="Center"/>
+        </Border>
+
+        <!-- Row 2: Scrollable content -->
+        <ScrollView Grid.Row="2">
+            <VerticalStackLayout Padding="12,10" Spacing="10">
+
+                <!-- Pool card -->
+                <Border BackgroundColor="White" StrokeThickness="0"
+                        StrokeShape="RoundRectangle 10" Padding="12,10">
+                    <VerticalStackLayout Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label x:Name="lblPoolHint" Grid.Column="0"
+                                   Text="Tap numbers to build your pool:"
+                                   FontSize="12" TextColor="#6B7280"
+                                   VerticalOptions="Center"/>
+                            <Button Grid.Column="1" Text="Clear" FontSize="11"
+                                    BackgroundColor="#6B7280" TextColor="White"
+                                    HeightRequest="32" CornerRadius="8" Padding="10,0"
+                                    Clicked="BtnClearPool_Clicked"/>
+                        </Grid>
+                        <FlexLayout x:Name="poolGrid"
+                                    Wrap="Wrap" Direction="Row"
+                                    JustifyContent="Start" AlignItems="Center"/>
+                        <Label x:Name="lblPoolCount"
+                               Text="Pool: 0 numbers selected"
+                               FontSize="12" TextColor="#6B7280"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Settings card -->
+                <Border BackgroundColor="White" StrokeThickness="0"
+                        StrokeShape="RoundRectangle 10" Padding="12,10">
+                    <VerticalStackLayout Spacing="10">
+
+                        <Label Text="Wheel Type" FontSize="13"
+                               FontAttributes="Bold" TextColor="#1E2733"/>
+
+                        <!-- Wheel type tabs -->
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+                            <Border Grid.Column="0" x:Name="tabFullBorder"
+                                    BackgroundColor="#1565C0" StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 8" Padding="0,8">
+                                <Label x:Name="tabFullLabel" Text="Full Wheel"
+                                       FontSize="12" FontAttributes="Bold"
+                                       TextColor="White" HorizontalOptions="Center">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="TabFull_Tapped"/>
+                                    </Label.GestureRecognizers>
+                                </Label>
+                            </Border>
+                            <Border Grid.Column="1" x:Name="tabAbbrevBorder"
+                                    BackgroundColor="#E3F2FD" StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 8" Padding="0,8">
+                                <Label x:Name="tabAbbrevLabel" Text="Abbreviated"
+                                       FontSize="12" FontAttributes="Bold"
+                                       TextColor="#1565C0" HorizontalOptions="Center">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="TabAbbrev_Tapped"/>
+                                    </Label.GestureRecognizers>
+                                </Label>
+                            </Border>
+                            <Border Grid.Column="2" x:Name="tabKeyBorder"
+                                    BackgroundColor="#E3F2FD" StrokeThickness="0"
+                                    StrokeShape="RoundRectangle 8" Padding="0,8">
+                                <Label x:Name="tabKeyLabel" Text="Key Number"
+                                       FontSize="12" FontAttributes="Bold"
+                                       TextColor="#1565C0" HorizontalOptions="Center">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="TabKey_Tapped"/>
+                                    </Label.GestureRecognizers>
+                                </Label>
+                            </Border>
+                        </Grid>
+
+                        <!-- Abbreviated guarantee picker (hidden unless Abbreviated selected) -->
+                        <Grid x:Name="abbrevPanel" ColumnDefinitions="Auto,*"
+                              ColumnSpacing="10" IsVisible="False">
+                            <Label Grid.Column="0" Text="Guarantee:"
+                                   FontSize="12" TextColor="#374151"
+                                   VerticalOptions="Center"/>
+                            <Picker Grid.Column="1" x:Name="guaranteePicker"
+                                    FontSize="12" TextColor="#1E2733"
+                                    SelectedIndexChanged="GuaranteePicker_Changed"/>
+                        </Grid>
+
+                        <!-- Key number hint -->
+                        <Border x:Name="keyHintPanel" IsVisible="False"
+                                BackgroundColor="#FFF3E0" StrokeThickness="0"
+                                StrokeShape="RoundRectangle 6" Padding="10,6">
+                            <Label Text="Tap a pool number AGAIN to mark it as Key ★ (orange). Key numbers appear on every ticket."
+                                   FontSize="11" TextColor="#E65100"/>
+                        </Border>
+
+                        <!-- Ticket count estimate -->
+                        <Label x:Name="lblEstimate"
+                               Text="Select numbers to see ticket estimate."
+                               FontSize="12" TextColor="#6B7280"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Generate button -->
+                <Button x:Name="btnGenerate" Text="Generate Tickets"
+                        BackgroundColor="#1565C0" TextColor="White"
+                        FontSize="15" FontAttributes="Bold"
+                        CornerRadius="10" HeightRequest="48"
+                        Clicked="BtnGenerate_Clicked"/>
+
+                <!-- Results -->
+                <VerticalStackLayout x:Name="resultsContainer" Spacing="4"/>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Row 3: Status bar -->
+        <Label Grid.Row="3" x:Name="lblStatus"
+               Text="Select a game, pick your numbers, then tap Generate."
+               BackgroundColor="#1E2733" TextColor="#8B9DC3"
+               FontSize="12" Padding="14,6" LineBreakMode="TailTruncation"/>
+
+        <!-- Loading overlay -->
+        <Grid Grid.Row="0" Grid.RowSpan="4" x:Name="loadingOverlay"
+              BackgroundColor="#CC1E2733" IsVisible="False" InputTransparent="False">
+            <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="16">
+                <ActivityIndicator IsRunning="True" Color="White"
+                                   WidthRequest="56" HeightRequest="56"/>
+                <Label x:Name="lblLoadingMsg" Text="Generating wheel..."
+                       TextColor="White" FontSize="16" FontAttributes="Bold"
+                       HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+        </Grid>
+
+    </Grid>
+</ContentPage>
