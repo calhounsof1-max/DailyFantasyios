@@ -47,6 +47,27 @@ public partial class JackpotPage : ContentPage
         ["D3M"] = Color.FromArgb("#1976D2"),
     };
 
+    static string FormatJackpot(decimal amount)
+    {
+        if (amount >= 1_000_000)
+            return $"${amount / 1_000_000:0.##} MILLION";
+        if (amount >= 1_000)
+            return $"${amount / 1_000:0.##}K";
+        return $"${amount:N0}";
+    }
+
+    static readonly Dictionary<string, string> GameLogos = new()
+    {
+        ["F5"]  = "logo_fantasy5.png",
+        ["SL"]  = "logo_superlotto.png",
+        ["PB"]  = "logo_powerball.png",
+        ["MM"]  = "logo_megamillions.png",
+        ["DD"]  = "logo_dailyderby.png",
+        ["D4"]  = "logo_daily4.png",
+        ["D3E"] = "logo_daily3.png",
+        ["D3M"] = "logo_daily3.png",
+    };
+
     List<string> _gameOrder = new();
     string _currentGameCode = "";
 
@@ -170,83 +191,94 @@ public partial class JackpotPage : ContentPage
         }
         foreach (var lbl in new[] { lblF5Date, lblSLDate, lblPBDate, lblMMDate, lblDDDate, lblD3EveDate, lblD3MidDate, lblD4Date })
             lbl.Text = "";
-        foreach (var lbl in new[] { lblF5Numbers, lblSLNumbers, lblPBNumbers, lblMMNumbers, lblDDNumbers, lblD3EveNumbers, lblD3MidNumbers, lblD4Numbers })
-            lbl.Text = "";
+        foreach (var fl in new[] { ballsF5, ballsSL, ballsPB, ballsMM, ballsDD, ballsD3Eve, ballsD3Mid, ballsD4 })
+            fl.Children.Clear();
         foreach (var lbl in new[] { lblF5Result, lblSLResult, lblPBResult, lblMMResult, lblDDResult, lblD3EveResult, lblD3MidResult, lblD4Result })
             lbl.Text = "";
         foreach (var lbl in new[] { lblF5Jackpot, lblSLJackpot, lblPBJackpot, lblMMJackpot, lblDDJackpot })
             lbl.Text = "";
-        foreach (var card in new[] { cardF5, cardSL, cardPB, cardMM, cardDD, cardD3Eve, cardD3Mid, cardD4 })
-            card.BackgroundColor = Colors.White;
+        // cards always stay white
     }
 
     void UpdateF5Card(List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> draws, decimal? nextJackpot)
     {
-        if (draws.Count == 0) { SetCardError(cardF5, lblF5Badge, lblF5Date, lblF5Numbers, lblF5Result); return; }
+        if (draws.Count == 0) { SetCardError(cardF5, lblF5Badge, lblF5Date, ballsF5, lblF5Result); return; }
         var d = draws[0];
-        lblF5Date.Text    = d.DrawNumber > 0 ? $"{d.DrawDate}  •  Draw #{d.DrawNumber}" : d.DrawDate;
-        lblF5Numbers.Text = string.Join("  ", d.Numbers.Select(n => n.ToString()));
+        lblF5Date.Text = d.DrawNumber > 0 ? $"{d.DrawDate}  •  Draw #{d.DrawNumber}" : d.DrawDate;
+        ballsF5.Children.Clear();
+        var f5c = Color.FromArgb("#FF8F00");
+        foreach (var n in d.Numbers) ballsF5.Children.Add(MakeCardBall(n, f5c, false));
         var tier1 = d.Prizes.FirstOrDefault(p => p.Tier == 1);
         SetWinnerResult(cardF5, lblF5Badge, lblF5Result, tier1, "Match 5/5");
-        lblF5Jackpot.Text = nextJackpot.HasValue ? $"Next jackpot: ${nextJackpot.Value:N0}" : "";
+        lblF5Jackpot.Text = nextJackpot.HasValue ? FormatJackpot(nextJackpot.Value) : "";
     }
 
     void UpdateSLCard(List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> draws, decimal? nextJackpot)
     {
-        if (draws.Count == 0) { SetCardError(cardSL, lblSLBadge, lblSLDate, lblSLNumbers, lblSLResult); return; }
+        if (draws.Count == 0) { SetCardError(cardSL, lblSLBadge, lblSLDate, ballsSL, lblSLResult); return; }
         var d = draws[0];
-        lblSLDate.Text    = d.DrawNumber > 0 ? $"{d.DrawDate}  •  Draw #{d.DrawNumber}" : d.DrawDate;
-        lblSLNumbers.Text = string.Join("  ", d.MainNumbers.Select(n => n.ToString())) +
-                            "  +" + d.MegaNumber.ToString();
+        lblSLDate.Text = d.DrawNumber > 0 ? $"{d.DrawDate}  •  Draw #{d.DrawNumber}" : d.DrawDate;
+        ballsSL.Children.Clear();
+        var slc = Color.FromArgb("#7B1FA2");
+        foreach (var n in d.MainNumbers) ballsSL.Children.Add(MakeCardBall(n, slc, false));
+        ballsSL.Children.Add(MakeCardPlusSep());
+        ballsSL.Children.Add(MakeCardBall(d.MegaNumber, slc, true));
         var tier1 = d.Prizes.FirstOrDefault(p => p.Tier == 1);
         SetWinnerResult(cardSL, lblSLBadge, lblSLResult, tier1, "Match 5+Mega");
-        lblSLJackpot.Text = nextJackpot.HasValue ? $"Next jackpot: ${nextJackpot.Value:N0}" : "";
+        lblSLJackpot.Text = nextJackpot.HasValue ? FormatJackpot(nextJackpot.Value) : "";
     }
 
     void UpdatePBCard(List<(string DrawDate, int DrawNumber, int[] MainNumbers, int PBNumber, DrawPrizeTier[] Prizes)> draws, decimal? nextJackpot)
     {
-        if (draws.Count == 0) { SetCardError(cardPB, lblPBBadge, lblPBDate, lblPBNumbers, lblPBResult); return; }
+        if (draws.Count == 0) { SetCardError(cardPB, lblPBBadge, lblPBDate, ballsPB, lblPBResult); return; }
         var d = draws[0];
-        lblPBDate.Text    = d.DrawNumber > 0 ? $"{d.DrawDate}  •  Draw #{d.DrawNumber}" : d.DrawDate;
-        lblPBNumbers.Text = string.Join("  ", d.MainNumbers.Select(n => n.ToString())) +
-                            "  +" + d.PBNumber.ToString();
+        lblPBDate.Text = d.DrawNumber > 0 ? $"{d.DrawDate}  •  Draw #{d.DrawNumber}" : d.DrawDate;
+        ballsPB.Children.Clear();
+        var pbc = Color.FromArgb("#C62828");
+        foreach (var n in d.MainNumbers) ballsPB.Children.Add(MakeCardBall(n, pbc, false));
+        ballsPB.Children.Add(MakeCardPlusSep());
+        ballsPB.Children.Add(MakeCardBall(d.PBNumber, pbc, true));
         var tier1 = d.Prizes.FirstOrDefault(p => p.Tier == 1);
         SetWinnerResult(cardPB, lblPBBadge, lblPBResult, tier1, "Match 5+PB");
-        lblPBJackpot.Text = nextJackpot.HasValue ? $"Next jackpot: ${nextJackpot.Value:N0}" : "";
+        lblPBJackpot.Text = nextJackpot.HasValue ? FormatJackpot(nextJackpot.Value) : "";
     }
 
     void UpdateMMCard(List<(string DrawDate, int DrawNumber, int[] MainNumbers, int MegaNumber, DrawPrizeTier[] Prizes)> draws, decimal? nextJackpot)
     {
-        if (draws.Count == 0) { SetCardError(cardMM, lblMMBadge, lblMMDate, lblMMNumbers, lblMMResult); return; }
+        if (draws.Count == 0) { SetCardError(cardMM, lblMMBadge, lblMMDate, ballsMM, lblMMResult); return; }
         var d = draws[0];
-        lblMMDate.Text    = d.DrawNumber > 0 ? $"{d.DrawDate}  •  Draw #{d.DrawNumber}" : d.DrawDate;
-        lblMMNumbers.Text = string.Join("  ", d.MainNumbers.Select(n => n.ToString())) +
-                            "  +" + d.MegaNumber.ToString();
+        lblMMDate.Text = d.DrawNumber > 0 ? $"{d.DrawDate}  •  Draw #{d.DrawNumber}" : d.DrawDate;
+        ballsMM.Children.Clear();
+        var mmc = Color.FromArgb("#1565C0");
+        foreach (var n in d.MainNumbers) ballsMM.Children.Add(MakeCardBall(n, mmc, false));
+        ballsMM.Children.Add(MakeCardPlusSep());
+        ballsMM.Children.Add(MakeCardBall(d.MegaNumber, mmc, true));
         var tier1 = d.Prizes.FirstOrDefault(p => p.Tier == 1);
         SetWinnerResult(cardMM, lblMMBadge, lblMMResult, tier1, "Match 5+Mega");
-        lblMMJackpot.Text = nextJackpot.HasValue ? $"Next jackpot: ${nextJackpot.Value:N0}" : "";
+        lblMMJackpot.Text = nextJackpot.HasValue ? FormatJackpot(nextJackpot.Value) : "";
     }
 
     void UpdateDDCard(List<(string DrawDate, int DrawNumber, int[] Horses, string RaceTime, DrawPrizeTier[] Prizes)> draws, decimal? nextJackpot)
     {
-        if (draws.Count == 0) { SetCardError(cardDD, lblDDBadge, lblDDDate, lblDDNumbers, lblDDResult); return; }
+        if (draws.Count == 0) { SetCardError(cardDD, lblDDBadge, lblDDDate, ballsDD, lblDDResult); return; }
         var d = draws[0];
         lblDDDate.Text = d.DrawNumber > 0 ? $"{d.DrawDate}  •  Draw #{d.DrawNumber}" : d.DrawDate;
 
-        string horses = d.Horses.Length >= 3
-            ? $"1st: {d.Horses[0]}  2nd: {d.Horses[1]}  3rd: {d.Horses[2]}"
-            : string.Join("  ", d.Horses);
-        lblDDNumbers.Text = string.IsNullOrEmpty(d.RaceTime)
-            ? horses
-            : horses + "   ⏱ " + d.RaceTime;
+        ballsDD.Children.Clear();
+        var ddc = Color.FromArgb("#5D4037");
+        string[] ddPos = { "1st", "2nd", "3rd" };
+        for (int i = 0; i < d.Horses.Length && i < 3; i++)
+            ballsDD.Children.Add(MakeCardHorseBall(d.Horses[i], ddPos[i], ddc));
+        if (!string.IsNullOrEmpty(d.RaceTime))
+            ballsDD.Children.Add(new Label { Text = "⏱ " + d.RaceTime, FontSize = 12, TextColor = Color.FromArgb("#6B7280"), VerticalOptions = LayoutOptions.Center, Margin = new Thickness(8, 0, 0, 0) });
 
         var grandTier = d.Prizes.FirstOrDefault(p => p.Tier == 7);
         SetWinnerResult(cardDD, lblDDBadge, lblDDResult, grandTier, "Grand Prize");
 
         if (nextJackpot.HasValue)
-            lblDDJackpot.Text = $"Next Grand Prize: ~${nextJackpot.Value:N0}";
+            lblDDJackpot.Text = FormatJackpot(nextJackpot.Value);
         else if (grandTier != null && grandTier.Amount > 0)
-            lblDDJackpot.Text = $"Grand Prize: ${grandTier.Amount:N0}";
+            lblDDJackpot.Text = FormatJackpot(grandTier.Amount);
         else
             lblDDJackpot.Text = "";
     }
@@ -279,11 +311,13 @@ public partial class JackpotPage : ContentPage
 
     void UpdateD3EveCard(List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> draws)
     {
-        if (draws.Count == 0) { SetCardError(cardD3Eve, lblD3EveBadge, lblD3EveDate, lblD3EveNumbers, lblD3EveResult); return; }
+        if (draws.Count == 0) { SetCardError(cardD3Eve, lblD3EveBadge, lblD3EveDate, ballsD3Eve, lblD3EveResult); return; }
         var d = draws[0];
         string drawLabel = d.DrawNumber > 0 ? $"  •  Draw #{d.DrawNumber} Evening" : "";
-        lblD3EveDate.Text    = d.DrawDate + drawLabel;
-        lblD3EveNumbers.Text = string.Join("  ", d.Numbers);
+        lblD3EveDate.Text = d.DrawDate + drawLabel;
+        ballsD3Eve.Children.Clear();
+        var d3c = Color.FromArgb("#1976D2");
+        foreach (var n in d.Numbers) ballsD3Eve.Children.Add(MakeCardBall(n, d3c, false));
         var tier1 = d.Prizes.FirstOrDefault(p => p.Tier == 1);
         if (tier1 != null && tier1.Amount > 0)
         {
@@ -291,7 +325,6 @@ public partial class JackpotPage : ContentPage
             lblD3EveBadge.BackgroundColor = Color.FromArgb("#1565C0");
             lblD3EveResult.Text           = $"Straight: ${tier1.Amount:N0}  •  {tier1.Count} winner{(tier1.Count != 1 ? "s" : "")}";
             lblD3EveResult.TextColor      = Color.FromArgb("#1565C0");
-            cardD3Eve.BackgroundColor     = Color.FromArgb("#E3F2FD");
         }
         else
         {
@@ -299,17 +332,18 @@ public partial class JackpotPage : ContentPage
             lblD3EveBadge.BackgroundColor = Color.FromArgb("#9CA3AF");
             lblD3EveResult.Text           = "Prize data unavailable";
             lblD3EveResult.TextColor      = Color.FromArgb("#6B7280");
-            cardD3Eve.BackgroundColor     = Colors.White;
         }
     }
 
     void UpdateD3MidCard(List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> draws)
     {
-        if (draws.Count == 0) { SetCardError(cardD3Mid, lblD3MidBadge, lblD3MidDate, lblD3MidNumbers, lblD3MidResult); return; }
+        if (draws.Count == 0) { SetCardError(cardD3Mid, lblD3MidBadge, lblD3MidDate, ballsD3Mid, lblD3MidResult); return; }
         var d = draws[0];
         string drawLabel = d.DrawNumber > 0 ? $"  •  Draw #{d.DrawNumber} Midday" : "";
-        lblD3MidDate.Text    = d.DrawDate + drawLabel;
-        lblD3MidNumbers.Text = string.Join("  ", d.Numbers);
+        lblD3MidDate.Text = d.DrawDate + drawLabel;
+        ballsD3Mid.Children.Clear();
+        var d3mc = Color.FromArgb("#1976D2");
+        foreach (var n in d.Numbers) ballsD3Mid.Children.Add(MakeCardBall(n, d3mc, false));
         var tier1 = d.Prizes.FirstOrDefault(p => p.Tier == 1);
         if (tier1 != null && tier1.Amount > 0)
         {
@@ -317,7 +351,6 @@ public partial class JackpotPage : ContentPage
             lblD3MidBadge.BackgroundColor = Color.FromArgb("#1565C0");
             lblD3MidResult.Text           = $"Straight: ${tier1.Amount:N0}  •  {tier1.Count} winner{(tier1.Count != 1 ? "s" : "")}";
             lblD3MidResult.TextColor      = Color.FromArgb("#1565C0");
-            cardD3Mid.BackgroundColor     = Color.FromArgb("#E3F2FD");
         }
         else
         {
@@ -325,16 +358,17 @@ public partial class JackpotPage : ContentPage
             lblD3MidBadge.BackgroundColor = Color.FromArgb("#9CA3AF");
             lblD3MidResult.Text           = "Prize data unavailable";
             lblD3MidResult.TextColor      = Color.FromArgb("#6B7280");
-            cardD3Mid.BackgroundColor     = Colors.White;
         }
     }
 
     void UpdateD4Card(List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)> draws)
     {
-        if (draws.Count == 0) { SetCardError(cardD4, lblD4Badge, lblD4Date, lblD4Numbers, lblD4Result); return; }
+        if (draws.Count == 0) { SetCardError(cardD4, lblD4Badge, lblD4Date, ballsD4, lblD4Result); return; }
         var d = draws[0];
-        lblD4Date.Text    = d.DrawNumber > 0 ? $"{d.DrawDate}  •  Draw #{d.DrawNumber}" : d.DrawDate;
-        lblD4Numbers.Text = string.Join("  ", d.Numbers);
+        lblD4Date.Text = d.DrawNumber > 0 ? $"{d.DrawDate}  •  Draw #{d.DrawNumber}" : d.DrawDate;
+        ballsD4.Children.Clear();
+        var d4c = Color.FromArgb("#00695C");
+        foreach (var n in d.Numbers) ballsD4.Children.Add(MakeCardBall(n, d4c, false));
         var tier1 = d.Prizes.FirstOrDefault(p => p.Tier == 1);
         if (tier1 != null && tier1.Amount > 0)
         {
@@ -342,7 +376,6 @@ public partial class JackpotPage : ContentPage
             lblD4Badge.BackgroundColor = Color.FromArgb("#00695C");
             lblD4Result.Text           = $"Straight: ${tier1.Amount:N0}  •  {tier1.Count} winner{(tier1.Count != 1 ? "s" : "")}";
             lblD4Result.TextColor      = Color.FromArgb("#00695C");
-            cardD4.BackgroundColor     = Color.FromArgb("#E0F2F1");
         }
         else
         {
@@ -350,7 +383,6 @@ public partial class JackpotPage : ContentPage
             lblD4Badge.BackgroundColor = Color.FromArgb("#9CA3AF");
             lblD4Result.Text           = "Prize data unavailable";
             lblD4Result.TextColor      = Color.FromArgb("#6B7280");
-            cardD4.BackgroundColor     = Colors.White;
         }
     }
 
@@ -362,7 +394,6 @@ public partial class JackpotPage : ContentPage
             badge.BackgroundColor = Color.FromArgb("#78909C");
             resultLbl.Text        = $"No {matchLabel} jackpot winner this draw";
             resultLbl.TextColor   = Color.FromArgb("#6B7280");
-            card.BackgroundColor  = Colors.White;
         }
         else
         {
@@ -371,19 +402,17 @@ public partial class JackpotPage : ContentPage
             badge.BackgroundColor = Color.FromArgb("#1B5E20");
             resultLbl.Text        = $"{matchLabel}  •  {cnt} winner{(cnt != 1 ? "s" : "")}  •  ${tier1.Amount:N0} each";
             resultLbl.TextColor   = Color.FromArgb("#1B5E20");
-            card.BackgroundColor  = Color.FromArgb("#F0FDF4");
         }
     }
 
-    void SetCardError(Frame card, Label badge, Label dateLbl, Label numbersLbl, Label resultLbl)
+    void SetCardError(Frame card, Label badge, Label dateLbl, FlexLayout numbersBalls, Label resultLbl)
     {
         badge.Text            = "N/A";
         badge.BackgroundColor = Color.FromArgb("#DC2626");
         dateLbl.Text          = "";
-        numbersLbl.Text       = "";
+        numbersBalls.Children.Clear();
         resultLbl.Text        = "Could not load data";
         resultLbl.TextColor   = Color.FromArgb("#9CA3AF");
-        card.BackgroundColor  = Colors.White;
     }
 
     // ── Draw Results Overlay ─────────────────────────────────────────────────
@@ -530,6 +559,7 @@ public partial class JackpotPage : ContentPage
         }
 
         overlayHeader.BackgroundColor = gameColor;
+        overlayGameLogo.Source        = GameLogos.TryGetValue(gameCode, out var logoSrc) ? logoSrc : "";
         overlayGameName.Text          = gameName;
         overlayGameName.TextColor     = gameColor;
         overlayDrawDate.Text          = drawDate;
@@ -660,6 +690,51 @@ public partial class JackpotPage : ContentPage
         drawPickerFrame.IsVisible = false;
         overlayDropArrow.Text     = "▼";
         ShowDrawContent(gameCode, index);
+    }
+
+    // Card-sized balls (smaller than overlay balls)
+    View MakeCardBall(int number, Color gameColor, bool isSpecial)
+    {
+        return new Frame
+        {
+            WidthRequest    = 40,
+            HeightRequest   = 40,
+            CornerRadius    = 20,
+            BackgroundColor = isSpecial ? gameColor : Colors.White,
+            BorderColor     = isSpecial ? gameColor : Color.FromArgb("#CCCCCC"),
+            HasShadow       = false,
+            Padding         = new Thickness(0),
+            Margin          = new Thickness(3, 3),
+            Content         = new Label
+            {
+                Text                    = number.ToString(),
+                TextColor               = isSpecial ? Colors.White : Color.FromArgb("#1E2733"),
+                FontAttributes          = FontAttributes.Bold,
+                FontSize                = 14,
+                HorizontalOptions       = LayoutOptions.Fill,
+                VerticalOptions         = LayoutOptions.Fill,
+                HorizontalTextAlignment = TextAlignment.Center,
+                VerticalTextAlignment   = TextAlignment.Center
+            }
+        };
+    }
+
+    View MakeCardPlusSep() => new Label
+    {
+        Text            = "+",
+        FontSize        = 16,
+        FontAttributes  = FontAttributes.Bold,
+        TextColor       = Color.FromArgb("#9CA3AF"),
+        VerticalOptions = LayoutOptions.Center,
+        Margin          = new Thickness(2, 0)
+    };
+
+    View MakeCardHorseBall(int horseNumber, string position, Color gameColor)
+    {
+        var outer = new VerticalStackLayout { Spacing = 1, Margin = new Thickness(4, 2), HorizontalOptions = LayoutOptions.Center };
+        outer.Children.Add(new Label { Text = position, FontSize = 9, FontAttributes = FontAttributes.Bold, TextColor = gameColor, HorizontalOptions = LayoutOptions.Center, HorizontalTextAlignment = TextAlignment.Center });
+        outer.Children.Add(new Frame { WidthRequest = 40, HeightRequest = 40, CornerRadius = 20, BackgroundColor = Colors.White, BorderColor = gameColor, HasShadow = false, Padding = new Thickness(0), Content = new Label { Text = horseNumber.ToString(), TextColor = gameColor, FontAttributes = FontAttributes.Bold, FontSize = 15, HorizontalOptions = LayoutOptions.Fill, VerticalOptions = LayoutOptions.Fill, HorizontalTextAlignment = TextAlignment.Center, VerticalTextAlignment = TextAlignment.Center } });
+        return outer;
     }
 
     View MakeNumberBall(int number, Color gameColor, bool isSpecial)

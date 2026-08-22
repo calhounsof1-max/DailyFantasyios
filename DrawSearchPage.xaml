@@ -1,16 +1,23 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
              x:Class="DailyFantasyMAUI.DrawSearchPage"
              Title="Draw Search"
              Shell.NavBarIsVisible="False"
              BackgroundColor="#F0F4F8">
 
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto,1">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto,1">
 
         <!-- Row 0: Nav header -->
         <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="14,10"
               ColumnDefinitions="Auto,*,Auto">
+            <GraphicsView Grid.ColumnSpan="3"
+                          Opacity="0.70" HeightRequest="54" WidthRequest="54"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
             <Button Grid.Column="0" Text="⌂" FontSize="14" FontAttributes="Bold"
                     BackgroundColor="#2D3D50" TextColor="White" Padding="10,0"
                     HeightRequest="34" CornerRadius="17"
@@ -23,34 +30,43 @@
                     SelectedIndexChanged="GamePicker_Changed"/>
         </Grid>
 
-        <!-- Row 1: Draw# range (always visible) -->
-        <Border Grid.Row="1" BackgroundColor="White" StrokeThickness="0"
-                StrokeShape="RoundRectangle 0" Margin="0">
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto,*" ColumnSpacing="8"
-                  Padding="14,10">
-                <Label Grid.Column="0" Text="Draw# From:" FontSize="13" FontAttributes="Bold"
-                       TextColor="#374151" VerticalOptions="Center"/>
-                <Border Grid.Column="1" BackgroundColor="#F8F9FA" StrokeThickness="1"
-                        Stroke="#D1D5DB" StrokeShape="RoundRectangle 8">
-                    <Entry x:Name="entryDrawFrom" Keyboard="Numeric" FontSize="15"
-                           FontAttributes="Bold" HorizontalTextAlignment="Center"
-                           TextColor="Black" BackgroundColor="Transparent"
-                           HeightRequest="40" Placeholder="21081" PlaceholderColor="#BDBDBD"/>
-                </Border>
-                <Label Grid.Column="2" Text="To (opt):" FontSize="12"
-                       TextColor="#9CA3AF" VerticalOptions="Center" Margin="4,0,0,0"/>
-                <Border Grid.Column="4" BackgroundColor="#F8F9FA" StrokeThickness="1"
-                        Stroke="#D1D5DB" StrokeShape="RoundRectangle 8">
-                    <Entry x:Name="entryDrawTo" Keyboard="Numeric" FontSize="15"
-                           FontAttributes="Bold" HorizontalTextAlignment="Center"
-                           TextColor="Black" BackgroundColor="Transparent"
-                           HeightRequest="40" Placeholder="range end" PlaceholderColor="#BDBDBD"/>
-                </Border>
-            </Grid>
+        <!-- Row 1: Game logo banner -->
+        <Border Grid.Row="1" BackgroundColor="White" StrokeThickness="0" Padding="8,6">
+            <Image x:Name="imgGameLogo" HeightRequest="80"
+                   Aspect="AspectFit" HorizontalOptions="Center"/>
         </Border>
 
-        <!-- Row 2: Numbers section header (tap label to collapse/expand) -->
-        <Grid Grid.Row="2" BackgroundColor="White" Padding="14,8"
+        <!-- Row 2: Draw# range (always visible) -->
+        <Border Grid.Row="2" BackgroundColor="White" StrokeThickness="0"
+                StrokeShape="RoundRectangle 0" Margin="0">
+            <VerticalStackLayout Padding="14,10,14,8" Spacing="6">
+                <Label Text="Search past draws by draw number — enter one number or a range"
+                       FontSize="11" TextColor="#6B7A90"/>
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto,*" ColumnSpacing="8">
+                    <Label Grid.Column="0" Text="Start #" FontSize="13" FontAttributes="Bold"
+                           TextColor="#374151" VerticalOptions="Center"/>
+                    <Border Grid.Column="1" BackgroundColor="#F8F9FA" StrokeThickness="1"
+                            Stroke="#D1D5DB" StrokeShape="RoundRectangle 8">
+                        <Entry x:Name="entryDrawFrom" Keyboard="Numeric" FontSize="15"
+                               FontAttributes="Bold" HorizontalTextAlignment="Center"
+                               TextColor="Black" BackgroundColor="Transparent"
+                               HeightRequest="40" Placeholder="draw #" PlaceholderColor="#BDBDBD"/>
+                    </Border>
+                    <Label Grid.Column="2" Text="End #" FontSize="12"
+                           TextColor="#9CA3AF" VerticalOptions="Center" Margin="4,0,0,0"/>
+                    <Border Grid.Column="4" BackgroundColor="#F8F9FA" StrokeThickness="1"
+                            Stroke="#D1D5DB" StrokeShape="RoundRectangle 8">
+                        <Entry x:Name="entryDrawTo" Keyboard="Numeric" FontSize="15"
+                               FontAttributes="Bold" HorizontalTextAlignment="Center"
+                               TextColor="Black" BackgroundColor="Transparent"
+                               HeightRequest="40" Placeholder="optional" PlaceholderColor="#BDBDBD"/>
+                    </Border>
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Row 3: Numbers section header (tap label to collapse/expand) -->
+        <Grid Grid.Row="3" BackgroundColor="White" Padding="14,8"
               ColumnDefinitions="Auto,*,Auto,Auto">
             <Label Grid.Column="0" x:Name="lblChevron" Text="▼"
                    FontSize="13" TextColor="#1565C0" VerticalOptions="Center" Margin="0,0,8,0">
@@ -58,7 +74,7 @@
                     <TapGestureRecognizer Tapped="NumbersHeader_Tapped"/>
                 </Label.GestureRecognizers>
             </Label>
-            <Label Grid.Column="1" x:Name="lblNumsHeader" Text="Numbers to Check (tap to hide)"
+            <Label Grid.Column="1" x:Name="lblNumsHeader" Text="Your Numbers to Check  (tap to collapse)"
                    FontSize="13" FontAttributes="Bold" TextColor="#374151" VerticalOptions="Center">
                 <Label.GestureRecognizers>
                     <TapGestureRecognizer Tapped="NumbersHeader_Tapped"/>
@@ -68,35 +84,42 @@
                     BackgroundColor="#1565C0" TextColor="White"
                     HeightRequest="32" WidthRequest="32" CornerRadius="16" Padding="0"
                     Clicked="BtnAddRow_Clicked" Margin="0,0,6,0"/>
-            <Button Grid.Column="3" Text="Clr" FontSize="11"
+            <Button Grid.Column="3" Text="Clear" FontSize="11"
                     BackgroundColor="#FF7043" TextColor="White"
                     HeightRequest="32" CornerRadius="8" Padding="6,0"
                     Clicked="BtnClearRows_Clicked"/>
         </Grid>
 
-        <!-- Row 3: Number rows (collapsible body) -->
-        <ScrollView Grid.Row="3" x:Name="numbersScrollView" BackgroundColor="White"
+        <!-- Row 4: Number rows (collapsible body) -->
+        <ScrollView Grid.Row="4" x:Name="numbersScrollView" BackgroundColor="White"
                     MaximumHeightRequest="340">
             <VerticalStackLayout x:Name="numbersContainer" Padding="10,4,10,8" Spacing="5"/>
         </ScrollView>
 
-        <!-- Row 4: Results scroll -->
-        <Grid Grid.Row="4" BackgroundColor="#F0F4F8">
+        <!-- Row 5: Results scroll -->
+        <Grid Grid.Row="5" BackgroundColor="#F0F4F8">
             <!-- Search + summary bar -->
             <Grid RowDefinitions="Auto,*">
                 <Grid Grid.Row="0" BackgroundColor="White" Padding="14,8,14,8"
                       ColumnDefinitions="Auto,Auto,*">
-                    <Button Grid.Column="0" x:Name="btnSearch" Text="  Search  "
-                            FontSize="14" FontAttributes="Bold"
-                            BackgroundColor="#1565C0" TextColor="White"
-                            HeightRequest="42" CornerRadius="21" Padding="16,0"
-                            Clicked="BtnSearch_Clicked"/>
-                    <Button Grid.Column="1" x:Name="btnLookup" Text="Lookup"
-                            FontSize="13" FontAttributes="Bold"
-                            BackgroundColor="#00897B" TextColor="White"
-                            HeightRequest="42" CornerRadius="21" Padding="14,0"
-                            Margin="8,0,0,0"
-                            Clicked="BtnLookup_Clicked"/>
+                    <VerticalStackLayout Grid.Column="0" Spacing="2" VerticalOptions="Center">
+                        <Button x:Name="btnSearch" Text="Search Draws"
+                                FontSize="13" FontAttributes="Bold"
+                                BackgroundColor="#1565C0" TextColor="White"
+                                HeightRequest="42" CornerRadius="21" Padding="16,0"
+                                Clicked="BtnSearch_Clicked"/>
+                        <Label Text="Check your numbers against the draw range"
+                               FontSize="9" TextColor="#9CA3AF" HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center" Margin="8,0,0,0">
+                        <Button x:Name="btnLookup" Text="Lookup Draw"
+                                FontSize="13" FontAttributes="Bold"
+                                BackgroundColor="#00897B" TextColor="White"
+                                HeightRequest="42" CornerRadius="21" Padding="14,0"
+                                Clicked="BtnLookup_Clicked"/>
+                        <Label Text="See winning numbers for a specific draw #"
+                               FontSize="9" TextColor="#9CA3AF" HorizontalOptions="Center"/>
+                    </VerticalStackLayout>
                     <Label Grid.Column="2" x:Name="lblSummary" Text=""
                            FontSize="11" TextColor="#374151"
                            HorizontalOptions="Center" VerticalOptions="Center"
@@ -108,14 +131,14 @@
             </Grid>
         </Grid>
 
-        <!-- Row 5: Status bar -->
-        <Label Grid.Row="5" x:Name="lblStatus"
+        <!-- Row 6: Status bar -->
+        <Label Grid.Row="6" x:Name="lblStatus"
                Text="Enter Draw# range, add your numbers, then tap Search."
                BackgroundColor="#1E2733" TextColor="#8B9DC3"
                FontSize="12" Padding="14,6" LineBreakMode="TailTruncation"/>
 
         <!-- Loading overlay -->
-        <Grid Grid.Row="0" Grid.RowSpan="7" x:Name="loadingOverlay"
+        <Grid Grid.Row="0" Grid.RowSpan="8" x:Name="loadingOverlay"
               BackgroundColor="#CC1E2733" IsVisible="False" InputTransparent="False">
             <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="16">
                 <ActivityIndicator IsRunning="True" Color="White"

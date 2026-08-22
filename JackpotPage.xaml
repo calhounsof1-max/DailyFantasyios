@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
              x:Class="DailyFantasyMAUI.JackpotPage"
              Title="Jackpot Winners"
              Shell.NavBarIsVisible="False"
@@ -19,6 +20,12 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
+            <GraphicsView Grid.ColumnSpan="4"
+                          Opacity="0.70" HeightRequest="54" WidthRequest="54"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
             <Button Grid.Column="0" Text="◀" FontSize="16" BackgroundColor="Transparent"
                     TextColor="White" Padding="4,0" HeightRequest="34" WidthRequest="40"
                     Clicked="BtnBack_Clicked"/>
@@ -40,197 +47,260 @@
 
         <!-- Cards -->
         <ScrollView Grid.Row="2">
-            <VerticalStackLayout x:Name="cardsStack" Spacing="10" Padding="12,12,12,12">
+            <VerticalStackLayout x:Name="cardsStack" Spacing="8" Padding="10,8,10,8">
 
                 <Label x:Name="lblLastChecked" Text="" HorizontalOptions="Center"
                        FontSize="11" TextColor="#9CA3AF"/>
 
                 <!-- Fantasy 5 -->
-                <Frame x:Name="cardF5" BackgroundColor="White" CornerRadius="12"
-                       BorderColor="#E5E7EB" Padding="14,12" HasShadow="False">
+                <Frame x:Name="cardF5" BackgroundColor="White" CornerRadius="16"
+                       BorderColor="#E5E7EB" Padding="0" HasShadow="False"
+                       IsClippedToBounds="True">
                     <Frame.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnCardTapped" CommandParameter="F5"/>
                     </Frame.GestureRecognizers>
-                    <VerticalStackLayout Spacing="5">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <Label Grid.Column="0" Text="Fantasy 5" FontSize="14"
-                                   FontAttributes="Bold" TextColor="#FF8F00"/>
-                            <Label Grid.Column="1" x:Name="lblF5Badge" Text=""
-                                   FontSize="11" FontAttributes="Bold"
-                                   TextColor="White" BackgroundColor="#9CA3AF"
-                                   Padding="8,3" VerticalOptions="Center"/>
-                        </Grid>
-                        <Label x:Name="lblF5Date" Text="" FontSize="11" TextColor="#6B7280"/>
-                        <Label x:Name="lblF5Numbers" Text="" FontFamily="Monospace"
-                               FontSize="20" FontAttributes="Bold" TextColor="#1E2733"/>
-                        <Label x:Name="lblF5Result" Text="" FontSize="12" TextColor="#6B7280"/>
-                        <Label x:Name="lblF5Jackpot" Text="" FontSize="13" FontAttributes="Bold" TextColor="#FF8F00"/>
-                        <Label Text="Tap to see payout details ▶" FontSize="10" TextColor="#9CA3AF" HorizontalOptions="End"/>
+                    <VerticalStackLayout Spacing="0">
+                        <BoxView HeightRequest="10" Color="#FF8F00"/>
+                        <Image Source="logo_fantasy5.png" HeightRequest="80"
+                               HorizontalOptions="Center" Aspect="AspectFit" Margin="16,8,16,4"/>
+                        <VerticalStackLayout Padding="14,0,14,0" Spacing="2">
+                            <Label x:Name="lblF5Jackpot" Text="" FontSize="26"
+                                   FontAttributes="Bold" TextColor="#1E2733"/>
+                            <Label x:Name="lblF5Result" Text="" FontSize="13" TextColor="#6B7280"/>
+                        </VerticalStackLayout>
+                        <BoxView HeightRequest="1" Color="#E5E7EB" Margin="14,8,14,8"/>
+                        <VerticalStackLayout Padding="14,0,14,10" Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Grid.Column="0" x:Name="lblF5Date" Text=""
+                                       FontSize="13" TextColor="#6B7280"/>
+                                <Label Grid.Column="1" x:Name="lblF5Badge" Text=""
+                                       FontSize="11" FontAttributes="Bold" TextColor="White"
+                                       BackgroundColor="#9CA3AF" Padding="10,3" VerticalOptions="Center"/>
+                            </Grid>
+                            <FlexLayout x:Name="ballsF5" Wrap="Wrap" Direction="Row"
+                                        AlignItems="Center" Margin="0,4,0,0"/>
+                            <Label Text="Tap for payout details ▶" FontSize="11"
+                                   TextColor="#9CA3AF" HorizontalOptions="End"/>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Frame>
 
                 <!-- Super Lotto Plus -->
-                <Frame x:Name="cardSL" BackgroundColor="White" CornerRadius="12"
-                       BorderColor="#E5E7EB" Padding="14,12" HasShadow="False">
+                <Frame x:Name="cardSL" BackgroundColor="White" CornerRadius="16"
+                       BorderColor="#E5E7EB" Padding="0" HasShadow="False"
+                       IsClippedToBounds="True">
                     <Frame.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnCardTapped" CommandParameter="SL"/>
                     </Frame.GestureRecognizers>
-                    <VerticalStackLayout Spacing="5">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <Label Grid.Column="0" Text="Super Lotto Plus" FontSize="14"
-                                   FontAttributes="Bold" TextColor="#7B1FA2"/>
-                            <Label Grid.Column="1" x:Name="lblSLBadge" Text=""
-                                   FontSize="11" FontAttributes="Bold"
-                                   TextColor="White" BackgroundColor="#9CA3AF"
-                                   Padding="8,3" VerticalOptions="Center"/>
-                        </Grid>
-                        <Label x:Name="lblSLDate" Text="" FontSize="11" TextColor="#6B7280"/>
-                        <Label x:Name="lblSLNumbers" Text="" FontFamily="Monospace"
-                               FontSize="20" FontAttributes="Bold" TextColor="#1E2733"/>
-                        <Label x:Name="lblSLResult" Text="" FontSize="12" TextColor="#6B7280"/>
-                        <Label x:Name="lblSLJackpot" Text="" FontSize="13" FontAttributes="Bold" TextColor="#7B1FA2"/>
-                        <Label Text="Tap to see payout details ▶" FontSize="10" TextColor="#9CA3AF" HorizontalOptions="End"/>
+                    <VerticalStackLayout Spacing="0">
+                        <BoxView HeightRequest="10" Color="#7B1FA2"/>
+                        <Image Source="logo_superlotto.png" HeightRequest="80"
+                               HorizontalOptions="Center" Aspect="AspectFit" Margin="16,8,16,4"/>
+                        <VerticalStackLayout Padding="14,0,14,0" Spacing="2">
+                            <Label x:Name="lblSLJackpot" Text="" FontSize="26"
+                                   FontAttributes="Bold" TextColor="#1E2733"/>
+                            <Label x:Name="lblSLResult" Text="" FontSize="13" TextColor="#6B7280"/>
+                        </VerticalStackLayout>
+                        <BoxView HeightRequest="1" Color="#E5E7EB" Margin="14,8,14,8"/>
+                        <VerticalStackLayout Padding="14,0,14,10" Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Grid.Column="0" x:Name="lblSLDate" Text=""
+                                       FontSize="13" TextColor="#6B7280"/>
+                                <Label Grid.Column="1" x:Name="lblSLBadge" Text=""
+                                       FontSize="11" FontAttributes="Bold" TextColor="White"
+                                       BackgroundColor="#9CA3AF" Padding="10,3" VerticalOptions="Center"/>
+                            </Grid>
+                            <FlexLayout x:Name="ballsSL" Wrap="Wrap" Direction="Row"
+                                        AlignItems="Center" Margin="0,4,0,0"/>
+                            <Label Text="Tap for payout details ▶" FontSize="11"
+                                   TextColor="#9CA3AF" HorizontalOptions="End"/>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Frame>
 
                 <!-- Powerball -->
-                <Frame x:Name="cardPB" BackgroundColor="White" CornerRadius="12"
-                       BorderColor="#E5E7EB" Padding="14,12" HasShadow="False">
+                <Frame x:Name="cardPB" BackgroundColor="White" CornerRadius="16"
+                       BorderColor="#E5E7EB" Padding="0" HasShadow="False"
+                       IsClippedToBounds="True">
                     <Frame.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnCardTapped" CommandParameter="PB"/>
                     </Frame.GestureRecognizers>
-                    <VerticalStackLayout Spacing="5">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <Label Grid.Column="0" Text="Powerball" FontSize="14"
-                                   FontAttributes="Bold" TextColor="#C62828"/>
-                            <Label Grid.Column="1" x:Name="lblPBBadge" Text=""
-                                   FontSize="11" FontAttributes="Bold"
-                                   TextColor="White" BackgroundColor="#9CA3AF"
-                                   Padding="8,3" VerticalOptions="Center"/>
-                        </Grid>
-                        <Label x:Name="lblPBDate" Text="" FontSize="11" TextColor="#6B7280"/>
-                        <Label x:Name="lblPBNumbers" Text="" FontFamily="Monospace"
-                               FontSize="20" FontAttributes="Bold" TextColor="#1E2733"/>
-                        <Label x:Name="lblPBResult" Text="" FontSize="12" TextColor="#6B7280"/>
-                        <Label x:Name="lblPBJackpot" Text="" FontSize="13" FontAttributes="Bold" TextColor="#C62828"/>
-                        <Label Text="Tap to see payout details ▶" FontSize="10" TextColor="#9CA3AF" HorizontalOptions="End"/>
+                    <VerticalStackLayout Spacing="0">
+                        <BoxView HeightRequest="10" Color="#C62828"/>
+                        <Image Source="logo_powerball.png" HeightRequest="80"
+                               HorizontalOptions="Center" Aspect="AspectFit" Margin="16,8,16,4"/>
+                        <VerticalStackLayout Padding="14,0,14,0" Spacing="2">
+                            <Label x:Name="lblPBJackpot" Text="" FontSize="26"
+                                   FontAttributes="Bold" TextColor="#1E2733"/>
+                            <Label x:Name="lblPBResult" Text="" FontSize="13" TextColor="#6B7280"/>
+                        </VerticalStackLayout>
+                        <BoxView HeightRequest="1" Color="#E5E7EB" Margin="14,8,14,8"/>
+                        <VerticalStackLayout Padding="14,0,14,10" Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Grid.Column="0" x:Name="lblPBDate" Text=""
+                                       FontSize="13" TextColor="#6B7280"/>
+                                <Label Grid.Column="1" x:Name="lblPBBadge" Text=""
+                                       FontSize="11" FontAttributes="Bold" TextColor="White"
+                                       BackgroundColor="#9CA3AF" Padding="10,3" VerticalOptions="Center"/>
+                            </Grid>
+                            <FlexLayout x:Name="ballsPB" Wrap="Wrap" Direction="Row"
+                                        AlignItems="Center" Margin="0,4,0,0"/>
+                            <Label Text="Tap for payout details ▶" FontSize="11"
+                                   TextColor="#9CA3AF" HorizontalOptions="End"/>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Frame>
 
                 <!-- Mega Millions -->
-                <Frame x:Name="cardMM" BackgroundColor="White" CornerRadius="12"
-                       BorderColor="#E5E7EB" Padding="14,12" HasShadow="False">
+                <Frame x:Name="cardMM" BackgroundColor="White" CornerRadius="16"
+                       BorderColor="#E5E7EB" Padding="0" HasShadow="False"
+                       IsClippedToBounds="True">
                     <Frame.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnCardTapped" CommandParameter="MM"/>
                     </Frame.GestureRecognizers>
-                    <VerticalStackLayout Spacing="5">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <Label Grid.Column="0" Text="Mega Millions" FontSize="14"
-                                   FontAttributes="Bold" TextColor="#1565C0"/>
-                            <Label Grid.Column="1" x:Name="lblMMBadge" Text=""
-                                   FontSize="11" FontAttributes="Bold"
-                                   TextColor="White" BackgroundColor="#9CA3AF"
-                                   Padding="8,3" VerticalOptions="Center"/>
-                        </Grid>
-                        <Label x:Name="lblMMDate" Text="" FontSize="11" TextColor="#6B7280"/>
-                        <Label x:Name="lblMMNumbers" Text="" FontFamily="Monospace"
-                               FontSize="20" FontAttributes="Bold" TextColor="#1E2733"/>
-                        <Label x:Name="lblMMResult" Text="" FontSize="12" TextColor="#6B7280"/>
-                        <Label x:Name="lblMMJackpot" Text="" FontSize="13" FontAttributes="Bold" TextColor="#1565C0"/>
-                        <Label Text="Tap to see payout details ▶" FontSize="10" TextColor="#9CA3AF" HorizontalOptions="End"/>
+                    <VerticalStackLayout Spacing="0">
+                        <BoxView HeightRequest="10" Color="#F9A825"/>
+                        <Image Source="logo_megamillions.png" HeightRequest="80"
+                               HorizontalOptions="Center" Aspect="AspectFit" Margin="16,8,16,4"/>
+                        <VerticalStackLayout Padding="14,0,14,0" Spacing="2">
+                            <Label x:Name="lblMMJackpot" Text="" FontSize="26"
+                                   FontAttributes="Bold" TextColor="#1E2733"/>
+                            <Label x:Name="lblMMResult" Text="" FontSize="13" TextColor="#6B7280"/>
+                        </VerticalStackLayout>
+                        <BoxView HeightRequest="1" Color="#E5E7EB" Margin="14,8,14,8"/>
+                        <VerticalStackLayout Padding="14,0,14,10" Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Grid.Column="0" x:Name="lblMMDate" Text=""
+                                       FontSize="13" TextColor="#6B7280"/>
+                                <Label Grid.Column="1" x:Name="lblMMBadge" Text=""
+                                       FontSize="11" FontAttributes="Bold" TextColor="White"
+                                       BackgroundColor="#9CA3AF" Padding="10,3" VerticalOptions="Center"/>
+                            </Grid>
+                            <FlexLayout x:Name="ballsMM" Wrap="Wrap" Direction="Row"
+                                        AlignItems="Center" Margin="0,4,0,0"/>
+                            <Label Text="Tap for payout details ▶" FontSize="11"
+                                   TextColor="#9CA3AF" HorizontalOptions="End"/>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Frame>
 
                 <!-- Daily Derby -->
-                <Frame x:Name="cardDD" BackgroundColor="White" CornerRadius="12"
-                       BorderColor="#E5E7EB" Padding="14,12" HasShadow="False">
+                <Frame x:Name="cardDD" BackgroundColor="White" CornerRadius="16"
+                       BorderColor="#E5E7EB" Padding="0" HasShadow="False"
+                       IsClippedToBounds="True">
                     <Frame.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnCardTapped" CommandParameter="DD"/>
                     </Frame.GestureRecognizers>
-                    <VerticalStackLayout Spacing="5">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <Label Grid.Column="0" Text="Daily Derby" FontSize="14"
-                                   FontAttributes="Bold" TextColor="#5D4037"/>
-                            <Label Grid.Column="1" x:Name="lblDDBadge" Text=""
-                                   FontSize="11" FontAttributes="Bold"
-                                   TextColor="White" BackgroundColor="#9CA3AF"
-                                   Padding="8,3" VerticalOptions="Center"/>
-                        </Grid>
-                        <Label x:Name="lblDDDate" Text="" FontSize="11" TextColor="#6B7280"/>
-                        <Label x:Name="lblDDNumbers" Text="" FontFamily="Monospace"
-                               FontSize="16" FontAttributes="Bold" TextColor="#1E2733"/>
-                        <Label x:Name="lblDDResult" Text="" FontSize="12" TextColor="#6B7280"/>
-                        <Label x:Name="lblDDJackpot" Text="" FontSize="13" FontAttributes="Bold" TextColor="#5D4037"/>
-                        <Label Text="Tap to see payout details ▶" FontSize="10" TextColor="#9CA3AF" HorizontalOptions="End"/>
+                    <VerticalStackLayout Spacing="0">
+                        <BoxView HeightRequest="10" Color="#5D4037"/>
+                        <Image Source="logo_dailyderby.png" HeightRequest="80"
+                               HorizontalOptions="Center" Aspect="AspectFit" Margin="16,8,16,4"/>
+                        <VerticalStackLayout Padding="14,0,14,0" Spacing="2">
+                            <Label x:Name="lblDDJackpot" Text="" FontSize="26"
+                                   FontAttributes="Bold" TextColor="#1E2733"/>
+                            <Label x:Name="lblDDResult" Text="" FontSize="13" TextColor="#6B7280"/>
+                        </VerticalStackLayout>
+                        <BoxView HeightRequest="1" Color="#E5E7EB" Margin="14,8,14,8"/>
+                        <VerticalStackLayout Padding="14,0,14,10" Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Grid.Column="0" x:Name="lblDDDate" Text=""
+                                       FontSize="13" TextColor="#6B7280"/>
+                                <Label Grid.Column="1" x:Name="lblDDBadge" Text=""
+                                       FontSize="11" FontAttributes="Bold" TextColor="White"
+                                       BackgroundColor="#9CA3AF" Padding="10,3" VerticalOptions="Center"/>
+                            </Grid>
+                            <FlexLayout x:Name="ballsDD" Wrap="Wrap" Direction="Row"
+                                        AlignItems="Center" Margin="0,4,0,0"/>
+                            <Label Text="Tap for payout details ▶" FontSize="11"
+                                   TextColor="#9CA3AF" HorizontalOptions="End"/>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Frame>
 
                 <!-- Daily 4 -->
-                <Frame x:Name="cardD4" BackgroundColor="White" CornerRadius="12"
-                       BorderColor="#E5E7EB" Padding="14,12" HasShadow="False">
+                <Frame x:Name="cardD4" BackgroundColor="White" CornerRadius="16"
+                       BorderColor="#E5E7EB" Padding="0" HasShadow="False"
+                       IsClippedToBounds="True">
                     <Frame.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnCardTapped" CommandParameter="D4"/>
                     </Frame.GestureRecognizers>
-                    <VerticalStackLayout Spacing="5">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <Label Grid.Column="0" Text="Daily 4" FontSize="14"
-                                   FontAttributes="Bold" TextColor="#00695C"/>
-                            <Label Grid.Column="1" x:Name="lblD4Badge" Text=""
-                                   FontSize="11" FontAttributes="Bold"
-                                   TextColor="White" BackgroundColor="#9CA3AF"
-                                   Padding="8,3" VerticalOptions="Center"/>
-                        </Grid>
-                        <Label x:Name="lblD4Date" Text="" FontSize="11" TextColor="#6B7280"/>
-                        <Label x:Name="lblD4Numbers" Text="" FontFamily="Monospace"
-                               FontSize="20" FontAttributes="Bold" TextColor="#1E2733"/>
-                        <Label x:Name="lblD4Result" Text="" FontSize="12" TextColor="#6B7280"/>
-                        <Label Text="Tap to see payout details ▶" FontSize="10" TextColor="#9CA3AF" HorizontalOptions="End"/>
+                    <VerticalStackLayout Spacing="0">
+                        <BoxView HeightRequest="10" Color="#00695C"/>
+                        <Image Source="logo_daily4.png" HeightRequest="80"
+                               HorizontalOptions="Center" Aspect="AspectFit" Margin="16,8,16,4"/>
+                        <BoxView HeightRequest="1" Color="#E5E7EB" Margin="14,6,14,8"/>
+                        <VerticalStackLayout Padding="14,0,14,10" Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Grid.Column="0" x:Name="lblD4Date" Text=""
+                                       FontSize="13" TextColor="#6B7280"/>
+                                <Label Grid.Column="1" x:Name="lblD4Badge" Text=""
+                                       FontSize="11" FontAttributes="Bold" TextColor="White"
+                                       BackgroundColor="#9CA3AF" Padding="10,3" VerticalOptions="Center"/>
+                            </Grid>
+                            <FlexLayout x:Name="ballsD4" Wrap="Wrap" Direction="Row"
+                                        AlignItems="Center" Margin="0,4,0,0"/>
+                            <Label x:Name="lblD4Result" Text="" FontSize="13" TextColor="#6B7280"/>
+                            <Label Text="Tap for payout details ▶" FontSize="11"
+                                   TextColor="#9CA3AF" HorizontalOptions="End"/>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Frame>
 
                 <!-- Daily 3 Evening -->
-                <Frame x:Name="cardD3Eve" BackgroundColor="White" CornerRadius="12"
-                       BorderColor="#E5E7EB" Padding="14,12" HasShadow="False">
+                <Frame x:Name="cardD3Eve" BackgroundColor="White" CornerRadius="16"
+                       BorderColor="#E5E7EB" Padding="0" HasShadow="False"
+                       IsClippedToBounds="True">
                     <Frame.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnCardTapped" CommandParameter="D3E"/>
                     </Frame.GestureRecognizers>
-                    <VerticalStackLayout Spacing="5">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <Label Grid.Column="0" Text="Daily 3  –  Evening" FontSize="14"
-                                   FontAttributes="Bold" TextColor="#1976D2"/>
-                            <Label Grid.Column="1" x:Name="lblD3EveBadge" Text=""
-                                   FontSize="11" FontAttributes="Bold"
-                                   TextColor="White" BackgroundColor="#9CA3AF"
-                                   Padding="8,3" VerticalOptions="Center"/>
-                        </Grid>
-                        <Label x:Name="lblD3EveDate" Text="" FontSize="11" TextColor="#6B7280"/>
-                        <Label x:Name="lblD3EveNumbers" Text="" FontFamily="Monospace"
-                               FontSize="20" FontAttributes="Bold" TextColor="#1E2733"/>
-                        <Label x:Name="lblD3EveResult" Text="" FontSize="12" TextColor="#6B7280"/>
-                        <Label Text="Tap to see payout details ▶" FontSize="10" TextColor="#9CA3AF" HorizontalOptions="End"/>
+                    <VerticalStackLayout Spacing="0">
+                        <BoxView HeightRequest="10" Color="#1976D2"/>
+                        <Image Source="logo_daily3.png" HeightRequest="80"
+                               HorizontalOptions="Center" Aspect="AspectFit" Margin="16,8,16,4"/>
+                        <BoxView HeightRequest="1" Color="#E5E7EB" Margin="14,6,14,8"/>
+                        <VerticalStackLayout Padding="14,0,14,10" Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Grid.Column="0" x:Name="lblD3EveDate" Text=""
+                                       FontSize="13" TextColor="#6B7280"/>
+                                <Label Grid.Column="1" x:Name="lblD3EveBadge" Text=""
+                                       FontSize="11" FontAttributes="Bold" TextColor="White"
+                                       BackgroundColor="#9CA3AF" Padding="10,3" VerticalOptions="Center"/>
+                            </Grid>
+                            <FlexLayout x:Name="ballsD3Eve" Wrap="Wrap" Direction="Row"
+                                        AlignItems="Center" Margin="0,4,0,0"/>
+                            <Label x:Name="lblD3EveResult" Text="" FontSize="13" TextColor="#6B7280"/>
+                            <Label Text="Tap for payout details ▶" FontSize="11"
+                                   TextColor="#9CA3AF" HorizontalOptions="End"/>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Frame>
 
                 <!-- Daily 3 Midday -->
-                <Frame x:Name="cardD3Mid" BackgroundColor="White" CornerRadius="12"
-                       BorderColor="#E5E7EB" Padding="14,12" HasShadow="False">
+                <Frame x:Name="cardD3Mid" BackgroundColor="White" CornerRadius="16"
+                       BorderColor="#E5E7EB" Padding="0" HasShadow="False"
+                       IsClippedToBounds="True">
                     <Frame.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnCardTapped" CommandParameter="D3M"/>
                     </Frame.GestureRecognizers>
-                    <VerticalStackLayout Spacing="5">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <Label Grid.Column="0" Text="Daily 3  –  Midday" FontSize="14"
-                                   FontAttributes="Bold" TextColor="#1976D2"/>
-                            <Label Grid.Column="1" x:Name="lblD3MidBadge" Text=""
-                                   FontSize="11" FontAttributes="Bold"
-                                   TextColor="White" BackgroundColor="#9CA3AF"
-                                   Padding="8,3" VerticalOptions="Center"/>
-                        </Grid>
-                        <Label x:Name="lblD3MidDate" Text="" FontSize="11" TextColor="#6B7280"/>
-                        <Label x:Name="lblD3MidNumbers" Text="" FontFamily="Monospace"
-                               FontSize="20" FontAttributes="Bold" TextColor="#1E2733"/>
-                        <Label x:Name="lblD3MidResult" Text="" FontSize="12" TextColor="#6B7280"/>
-                        <Label Text="Tap to see payout details ▶" FontSize="10" TextColor="#9CA3AF" HorizontalOptions="End"/>
+                    <VerticalStackLayout Spacing="0">
+                        <BoxView HeightRequest="10" Color="#1976D2"/>
+                        <Image Source="logo_daily3.png" HeightRequest="80"
+                               HorizontalOptions="Center" Aspect="AspectFit" Margin="16,8,16,4"/>
+                        <BoxView HeightRequest="1" Color="#E5E7EB" Margin="14,6,14,8"/>
+                        <VerticalStackLayout Padding="14,0,14,10" Spacing="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Grid.Column="0" x:Name="lblD3MidDate" Text=""
+                                       FontSize="13" TextColor="#6B7280"/>
+                                <Label Grid.Column="1" x:Name="lblD3MidBadge" Text=""
+                                       FontSize="11" FontAttributes="Bold" TextColor="White"
+                                       BackgroundColor="#9CA3AF" Padding="10,3" VerticalOptions="Center"/>
+                            </Grid>
+                            <FlexLayout x:Name="ballsD3Mid" Wrap="Wrap" Direction="Row"
+                                        AlignItems="Center" Margin="0,4,0,0"/>
+                            <Label x:Name="lblD3MidResult" Text="" FontSize="13" TextColor="#6B7280"/>
+                            <Label Text="Tap for payout details ▶" FontSize="11"
+                                   TextColor="#9CA3AF" HorizontalOptions="End"/>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Frame>
 
@@ -278,9 +348,14 @@
                                Padding="16,16" HasShadow="False">
                             <VerticalStackLayout Spacing="0">
 
+                                <!-- Game logo -->
+                                <Image x:Name="overlayGameLogo"
+                                       HeightRequest="80" HorizontalOptions="Center"
+                                       Aspect="AspectFit" Margin="0,0,0,6"/>
+
                                 <!-- Game name -->
                                 <Label x:Name="overlayGameName" Text=""
-                                       FontSize="22" FontAttributes="Bold"
+                                       FontSize="18" FontAttributes="Bold"
                                        HorizontalOptions="Center"
                                        Margin="0,0,0,16"/>
 

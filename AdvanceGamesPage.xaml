@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
              x:Class="DailyFantasyMAUI.AdvanceGamesPage"
              Shell.NavBarIsVisible="False"
              BackgroundColor="#F0F4F8">
@@ -12,13 +13,26 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
+            <GraphicsView Grid.ColumnSpan="3"
+                          Opacity="0.70" HeightRequest="54" WidthRequest="54"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
             <Button Grid.Column="0" Text="◀" FontSize="16" BackgroundColor="Transparent"
                     TextColor="White" Padding="4,0" HeightRequest="34" WidthRequest="40"
                     Clicked="BtnBack_Clicked"/>
             <Label Grid.Column="1" Text="Games Expiration" TextColor="White"
                    FontSize="15" FontAttributes="Bold"
                    VerticalOptions="Center" HorizontalOptions="Center"/>
+            <Button Grid.Column="2" x:Name="btnEnhanceMode"
+                    Text="✨ Mode" FontSize="10"
+                    BackgroundColor="#444C58" TextColor="White"
+                    CornerRadius="8" HeightRequest="30" MinimumHeightRequest="0"
+                    Padding="8,0" Margin="0,0,4,0"
+                    Clicked="BtnEnhanceMode_Clicked"/>
         </Grid>
 
         <!-- Content -->

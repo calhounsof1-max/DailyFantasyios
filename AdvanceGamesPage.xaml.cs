@@ -1,4 +1,5 @@
 using System.Globalization;
+using DailyFantasyMAUI.Services;
 using Microsoft.Maui.Controls.Shapes;
 
 namespace DailyFantasyMAUI;
@@ -27,7 +28,23 @@ public partial class AdvanceGamesPage : ContentPage
     {
         base.OnAppearing();
         TranslationX = 0;
+        UpdateEnhanceModeButton();
         BuildCards();
+    }
+
+    void UpdateEnhanceModeButton()
+    {
+        bool on = Services.EnhanceModeService.IsEnhanced(Services.EnhanceModeService.ResultsPageKey);
+        btnEnhanceMode.BackgroundColor = on ? Color.FromArgb("#FFB300") : Color.FromArgb("#444C58");
+        btnEnhanceMode.TextColor       = on ? Color.FromArgb("#1A1A2E") : Colors.White;
+        btnEnhanceMode.Text            = on ? "✨ Mode ON" : "✨ Mode";
+    }
+
+    async void BtnEnhanceMode_Clicked(object sender, EventArgs e)
+    {
+        await Services.EnhanceModeService.ShowDialogAsync(this);
+        UpdateEnhanceModeButton();
+        // "Back" from this page just closes the dialog (no parent menu to return to)
     }
 
     void BuildCards()
@@ -89,6 +106,9 @@ public partial class AdvanceGamesPage : ContentPage
                     string drawNumStart = pair.Length > 2 ? pair[2] : "";
                     string drawNumEnd   = pair.Length > 3 ? pair[3] : "";
 
+                    // Skip rows with no numbers entered
+                    if (!nums.Any(n => !string.IsNullOrWhiteSpace(n))) continue;
+
                     entries.Add((slot, r, start, end, nums, drawFilter, drawNumStart, drawNumEnd));
                 }
             }
@@ -147,16 +167,34 @@ public partial class AdvanceGamesPage : ContentPage
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Star });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
+        int currentDraw = DrawNumberService.GetNextDraw(game.Name);
+
         header.Add(chevronLabel, 0, 0);
-        header.Add(new Label
+
+        var nameStack = new VerticalStackLayout
+        {
+            Spacing = 1,
+            VerticalOptions = LayoutOptions.Center,
+            Margin = new Thickness(6, 0, 0, 0),
+        };
+        nameStack.Children.Add(new Label
         {
             Text = game.Name,
             FontSize = 15,
             FontAttributes = FontAttributes.Bold,
             TextColor = Colors.White,
-            VerticalOptions = LayoutOptions.Center,
-            Margin = new Thickness(6, 0, 0, 0),
-        }, 1, 0);
+        });
+        if (currentDraw > 0)
+        {
+            nameStack.Children.Add(new Label
+            {
+                Text = $"Next Draw #{currentDraw}",
+                FontSize = 10,
+                FontAttributes = FontAttributes.Bold,
+                TextColor = Color.FromArgb("#FFFFFFCC"),
+            });
+        }
+        header.Add(nameStack, 1, 0);
 
         string summary = active > 0 && expired > 0 ? $"{active} active · {expired} expired"
                        : active  > 0 ? $"{active} active"

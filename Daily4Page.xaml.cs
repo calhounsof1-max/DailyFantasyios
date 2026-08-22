@@ -14,13 +14,15 @@ public partial class Daily4Page : ContentPage
     readonly Button[] _betTypeBtns = new Button[Rows];
     readonly CheckBox[] _permChks = new CheckBox[Rows];
     readonly Label[]    _permLabels = new Label[Rows];
-    DateTime?[] _playStart = new DateTime?[Rows];
-    DateTime?[] _playEnd   = new DateTime?[Rows];
-    string[]    _drawStart = new string[Rows];
-    string[]    _drawEnd   = new string[Rows];
+    DateTime?[] _playStart   = new DateTime?[Rows];
+    DateTime?[] _playEnd     = new DateTime?[Rows];
+    string[]    _logSnapshot = new string[Rows];
+    string[]    _drawStart   = new string[Rows];
+    string[]    _drawEnd     = new string[Rows];
     Grid?       _advOverlay;
     DatePicker? _advStartPicker;
     DatePicker? _advEndPicker;
+    Label?      _advWarnLabel;
     Entry?      _advDrawStartEntry;
     Entry?      _advDrawEndEntry;
     int         _advRow = -1;
@@ -29,9 +31,11 @@ public partial class Daily4Page : ContentPage
     static readonly string[] BetCycle = ["S", "B", "S&B"];
     int  _activeSlot = -1;
     bool _suppressPickerEvent = false;
+    int  _pickerSuppressEpoch = 0;
     bool _suppressExcl = false;
     bool _loading = false;
     bool _retreating = false;
+    CancellationTokenSource? _autoSaveCts;
     readonly Dictionary<int, (string entries, string betTypes)> _slotCache = new();
     View? _highlightedView;
 
@@ -43,6 +47,8 @@ public partial class Daily4Page : ContentPage
     bool _voiceOn = false;
     bool _voiceSettingText = false;
     bool _overrideMode = false;
+    bool _suppressAdvApply = false;  // blocks ApplyAdvanceToRowIfActive during slot loads
+    bool _advDatesLoaded   = false;  // prevents SaveAdvanceDates from overwriting before LoadAdvanceDates runs
     int  _voiceRow = 0, _voiceCol = 0;
     Entry? _voiceTarget = null;
     Color _voiceTargetOldColor = Colors.White;
@@ -56,7 +62,9 @@ public partial class Daily4Page : ContentPage
         BuildRows();
         BuildSlotPicker();
         BuildAdvancePlayOverlay();
-        foreach (var bt in BetCycle) allBetPicker.Items.Add(bt);
+        allBetPicker.Items.Add("Straight");
+        allBetPicker.Items.Add("Box");
+        allBetPicker.Items.Add("Str+Box");
         _suppressPickerEvent = true;
         allBetPicker.SelectedIndex = 0;
         _suppressPickerEvent = false;
@@ -121,30 +129,25 @@ public partial class Daily4Page : ContentPage
     private async void BtnGameMenu_Clicked(object sender, EventArgs e)
     {
         string? choice = await DisplayActionSheet("Go to Game", "Cancel", null,
-            "Fantasy 5", "Super Lotto", "Powerball", "Mega Millions", "Daily 3", "Daily 4", "Daily Derby", "Notifications", "Summary of Winnings", "Check Wins for Draw#");
+            "Fantasy 5", "Super Lotto", "Powerball", "Mega Millions", "Daily 3", "Daily 4", "Daily Derby", "Hot Spot", "Notifications", "Summary of Winnings", "Check Wins for Draw#");
         if (choice == null || choice == "Cancel") return;
         if (choice == "Notifications") { await Shell.Current.GoToAsync(nameof(NotificationsPage), false); return; }
         if (choice == "Summary of Winnings") { await Shell.Current.GoToAsync(nameof(SummaryPage), false); return; }
         if (choice == "Check Wins for Draw#") { DrawSearchPage.PresetGame = "Daily 4"; await Shell.Current.GoToAsync(nameof(DrawSearchPage), false); return; }
+        MainPage.Instance?.ShowNavOverlay($"Loading {choice}...");
         await Shell.Current.Navigation.PopToRootAsync(false);
+        await Task.Delay(100);
         switch (choice)
         {
-            case "Fantasy 5":    WinnerPage.ComingFrom    = "main"; await Shell.Current.GoToAsync(nameof(WinnerPage),     false); break;
-            case "Super Lotto":  SuperLottoPage.ComingFrom = "main"; await Shell.Current.GoToAsync(nameof(SuperLottoPage), false); break;
-            case "Powerball":    PowerballPage.ComingFrom  = "main"; await Shell.Current.GoToAsync(nameof(PowerballPage),  false); break;
-            case "Mega Millions":MegaMillionsPage.ComingFrom="main"; await Shell.Current.GoToAsync(nameof(MegaMillionsPage),false); break;
-            case "Daily 3":      Daily3Page.ComingFrom     = "main"; await Shell.Current.GoToAsync(nameof(Daily3Page),     false); break;
-            case "Daily 4":      Daily4Page.ComingFrom     = "main"; await Shell.Current.GoToAsync(nameof(Daily4Page),     false); break;
-            case "Daily Derby":  DailyDerbyPage.ComingFrom = "main"; await Shell.Current.GoToAsync(nameof(DailyDerbyPage), false); break;
+            case "Fantasy 5":    WinnerPage.ComingFrom    = "main"; AppShell.WinnerPageInstance.PrePosition(true);     await Shell.Current.GoToAsync(nameof(WinnerPage),      false); break;
+            case "Super Lotto":  SuperLottoPage.ComingFrom = "main"; AppShell.SuperLottoPageInstance.PrePosition(true); await Shell.Current.GoToAsync(nameof(SuperLottoPage),  false); break;
+            case "Powerball":    PowerballPage.ComingFrom  = "main"; AppShell.PowerballPageInstance.PrePosition(true);  await Shell.Current.GoToAsync(nameof(PowerballPage),   false); break;
+            case "Mega Millions":MegaMillionsPage.ComingFrom="main"; AppShell.MegaMillionsPageInstance.PrePosition(true);await Shell.Current.GoToAsync(nameof(MegaMillionsPage),false); break;
+            case "Daily 3":      Daily3Page.ComingFrom     = "main"; AppShell.Daily3PageInstance.PrePosition(true);     await Shell.Current.GoToAsync(nameof(Daily3Page),      false); break;
+            case "Daily 4":      Daily4Page.ComingFrom     = "main"; AppShell.Daily4PageInstance.PrePosition(true);     await Shell.Current.GoToAsync(nameof(Daily4Page),      false); break;
+            case "Daily Derby":  DailyDerbyPage.ComingFrom = "main"; AppShell.DailyDerbyPageInstance.PrePosition(true); await Shell.Current.GoToAsync(nameof(DailyDerbyPage),  false); break;
+            case "Hot Spot":      await Shell.Current.GoToAsync(nameof(HotSpotPage), false); break;
         }
-    }
-
-    private async void BtnGoDD_Clicked(object sender, EventArgs e)
-    {
-        if (_isPanning) return;
-        DailyDerbyPage.ComingFrom = "d4";
-        AppShell.DailyDerbyPageInstance.PrePosition(true);
-        await Shell.Current.GoToAsync(nameof(DailyDerbyPage), false);
     }
 
     private async void BtnNumIntel_Clicked(object sender, EventArgs e)
@@ -166,17 +169,28 @@ public partial class Daily4Page : ContentPage
         if (choice == "Rundown Calculator")   { RundownPage.PresetGame       = "Daily 4"; await Shell.Current.GoToAsync(nameof(RundownPage),       false); return; }
     }
 
+    private async void BtnGoDD_Clicked(object sender, EventArgs e)
+    {
+        if (_isPanning) return;
+        DailyDerbyPage.ComingFrom = "d4";
+        AppShell.DailyDerbyPageInstance.PrePosition(true);
+        await Shell.Current.GoToAsync(nameof(DailyDerbyPage), false);
+    }
+
     internal void PrePosition(bool fromRight)
     {
         double w = DeviceDisplay.MainDisplayInfo.Width / DeviceDisplay.MainDisplayInfo.Density;
         TranslationX = fromRight ? w : -w;
+        spinner.IsVisible = true;
+        spinner.IsRunning = true;
+        loadingOverlay.IsVisible = true;
     }
 
     protected override void OnAppearing()
     {
         this.TranslateTo(0, 0, 220, Easing.CubicOut);
         base.OnAppearing();
-
+        UpdateTicketCount();
         _ = LoadAllDraws();
         Dispatcher.Dispatch(() =>
         {
@@ -211,25 +225,111 @@ public partial class Daily4Page : ContentPage
                 if (SlotHasData(_activeSlot))
                     FillFromSlot(_activeSlot);
                 else
+                {
                     LoadEntries();
+                    LoadAdvanceDates(_activeSlot);
+                    RefreshAdvAllPanel();
+                }
             }
             UpdateSlotPicker();
             if (pendingRow >= 0)
                 _ = HighlightRow(pendingRow);
-            int nd = DrawNumberService.GetNextDraw("Daily 4");
-            if (nd > 0) { entAdvAllStart.Text = nd.ToString(); entAdvAllEnd.Text = nd.ToString(); }
+            TakeLogSnapshot();
         });
+    }
+
+    void TakeLogSnapshot()
+    {
+        for (int r = 0; r < Rows; r++)
+        {
+            var nums = new List<string>();
+            bool full = true;
+            for (int c = 0; c < Cols; c++)
+            {
+                string v = _entries[r, c].Text ?? "";
+                if (string.IsNullOrWhiteSpace(v)) { full = false; break; }
+                nums.Add(v);
+            }
+            _logSnapshot[r] = full ? string.Join(" ", nums) : "";
+        }
+    }
+
+    async Task LogCurrentTicketsAsync()
+    {
+        var rows = new List<(int, int, string, string, string, string)>();
+        for (int s = 0; s < 10; s++)
+        {
+            string set = Preferences.Get($"d4_set_{s}", "");
+            string adv = Preferences.Get($"d4_adv_{s}", "");
+            if (string.IsNullOrEmpty(set)) continue;
+            var vals     = set.Split('|');
+            var advParts = string.IsNullOrEmpty(adv) ? new string[Rows] : adv.Split('|');
+            if (advParts.Length < Rows) Array.Resize(ref advParts, Rows);
+            for (int r = 0; r < Rows; r++)
+            {
+                var nums = new List<string>(); bool full = true;
+                for (int c = 0; c < Cols; c++)
+                {
+                    string v = r * Cols + c < vals.Length ? vals[r * Cols + c] : "";
+                    if (string.IsNullOrWhiteSpace(v)) { full = false; break; }
+                    nums.Add(v);
+                }
+                if (!full) continue;
+                string pf = "", pt = "";
+                if (!string.IsNullOrEmpty(advParts[r]))
+                {
+                    var pair = advParts[r].Split('~');
+                    if (pair.Length >= 2)
+                    {
+                        if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var fd)) pf = fd.ToString("M/d");
+                        string eff = string.IsNullOrEmpty(pair[1]) ? pair[0] : pair[1];
+                        if (DateTime.TryParseExact(eff, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var td)) pt = td.ToString("M/d");
+                    }
+                }
+                rows.Add((s, r, string.Join(" ", nums), "", pf, pt));
+            }
+        }
+        for (int s = 0; s < 10; s++)
+            await Services.TicketLogService.ClearTodayGameSlotAsync("D4", s);
+        await Services.TicketLogService.LogRowsAsync("D4", rows);
     }
 
     protected override void OnDisappearing()
     {
         SaveAdvanceDates(_activeSlot);
+        SaveEntries();
+        if (_activeSlot >= 0)
+        {
+            SaveSet(_activeSlot);
+            Preferences.Set("d4_active_slot", _activeSlot);
+        }
+        Services.TicketLogService.PendingWriteTask = LogCurrentTicketsAsync();
         base.OnDisappearing();
         if (_voiceOn) StopVoice();
         if (_highlightedView != null) { _highlightedView.BackgroundColor = Colors.White; _highlightedView = null; }
-        SaveEntries();
-        if (_activeSlot >= 0)
-            Preferences.Set("d4_active_slot", _activeSlot);
+    }
+
+    private void TriggerAutoSaveIndicator()
+    {
+        _autoSaveCts?.Cancel();
+        _autoSaveCts = new CancellationTokenSource();
+        var token = _autoSaveCts.Token;
+        Task.Delay(600, token).ContinueWith(t =>
+        {
+            if (t.IsCanceled) return;
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                if (_activeSlot >= 0) SaveSet(_activeSlot);
+                lblStatus.Text = "Auto-saved \u2713";
+                var cts2 = new CancellationTokenSource();
+                Task.Delay(1500, cts2.Token).ContinueWith(_ =>
+                    MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        if (lblStatus.Text == "Auto-saved \u2713")
+                            lblStatus.Text = "Ready";
+                    }));
+            });
+        });
     }
 
     private void SaveEntries()
@@ -284,6 +384,25 @@ public partial class Daily4Page : ContentPage
     // ── Saved Number slots ───────────────────────────────────────────────────
 
     private string SetKey(int slot) => $"d4_set_{slot}";
+    private void UpdateTicketCount()
+    {
+        int total = 0;
+        for (int s = 0; s < 10; s++)
+        {
+            if (s == _activeSlot && _entries != null)
+            {
+                for (int r = 0; r < Rows; r++)
+                    if (!string.IsNullOrWhiteSpace(_entries[r, 0]?.Text)) total++;
+            }
+            else
+            {
+                var vals = Preferences.Get($"d4_set_{s}", "").Split('|');
+                for (int r = 0; r < 10; r++)
+                    if (r * 4 < vals.Length && !string.IsNullOrWhiteSpace(vals[r * 4])) total++;
+            }
+        }
+        lblTicketCount.Text = total > 0 ? $"🎟 {total}" : "";
+    }
     private string BetKey(int slot) => $"d4_btypes_{slot}";
 
     private string GetCurrentEntryString()
@@ -309,6 +428,7 @@ public partial class Daily4Page : ContentPage
         Array.Clear(_playEnd,   0, Rows);
         Array.Clear(_drawStart, 0, Rows);
         Array.Clear(_drawEnd,   0, Rows);
+        _advDatesLoaded = true; // user-triggered clear — allow subsequent saves
         UpdateAllResultBackgrounds();
         if (int.TryParse(fromEntry.Text, out int n)) HighlightRows(n);
     }
@@ -330,7 +450,7 @@ public partial class Daily4Page : ContentPage
         SaveEntries();
     }
 
-    private void SaveSet(int slot)
+    private void SaveSet(int slot, bool refreshPicker = true)
     {
         string data = GetCurrentEntryString();
         bool isEmpty = data.Replace("|", "").Trim().Length == 0;
@@ -344,26 +464,37 @@ public partial class Daily4Page : ContentPage
             Preferences.Set(SetKey(slot), data);
             Preferences.Set(BetKey(slot), string.Join("|", _betTypes));
         }
-        UpdateSlotPicker();
+        ResultsPage.NeedsRefresh = true;
+        // SlotPicker_Changed calls this mid-flight (refreshPicker:false) then refreshes the
+        // picker itself right after — calling UpdateSlotPicker() here too would reassign the
+        // native Picker's SelectedIndex/Unfocus from inside its own change callback, which
+        // wedges the UI thread against Android's input dispatcher (ANR: "waited for FocusEvent").
+        if (refreshPicker) UpdateSlotPicker();
     }
 
     private void FillFromSlot(int slot)
     {
         var saved = Preferences.Get(SetKey(slot), "");
         if (string.IsNullOrEmpty(saved)) return;
-        _loading = true;
-        var vals = saved.Split('|');
-        for (int r = 0; r < Rows; r++)
-            for (int c = 0; c < Cols; c++)
-            {
-                int idx = r * Cols + c;
-                _entries[r, c].Text = idx < vals.Length ? vals[idx] : "";
-            }
-        LoadBetTypes(BetKey(slot));
-        _loading = false;
-        LoadAdvanceDates(slot);
-        CheckAll();
-        UpdateAllResultBackgrounds();
+        _suppressAdvApply = true;
+        try
+        {
+            _loading = true;
+            var vals = saved.Split('|');
+            for (int r = 0; r < Rows; r++)
+                for (int c = 0; c < Cols; c++)
+                {
+                    int idx = r * Cols + c;
+                    _entries[r, c].Text = idx < vals.Length ? vals[idx] : "";
+                }
+            LoadBetTypes(BetKey(slot));
+            _loading = false;
+            LoadAdvanceDates(slot);
+            RefreshAdvAllPanel();
+            CheckAll();
+            UpdateAllResultBackgrounds();
+        }
+        finally { _suppressAdvApply = false; }
     }
 
     private bool SlotHasData(int slot) =>
@@ -394,25 +525,9 @@ public partial class Daily4Page : ContentPage
 
     private bool _advAllDateMode = false;
 
-    private void BtnAdvAllToggle_Clicked(object sender, EventArgs e)
+    private async void BtnAdvAllCombinedSet_Clicked(object sender, EventArgs e)
     {
-        _advAllDateMode = !_advAllDateMode;
-        advAllDrawMode.IsVisible = !_advAllDateMode;
-        advAllDateMode.IsVisible = _advAllDateMode;
-        btnAdvAllToggle.Text = _advAllDateMode ? "#" : "📅";
-        btnAdvAllToggle.BackgroundColor = _advAllDateMode
-            ? Color.FromArgb("#2E7D32")
-            : Color.FromArgb("#546E7A");
-        if (_advAllDateMode)
-        {
-            advAllFromPicker.Date = DateTime.Today;
-            advAllToPicker.Date = DateTime.Today;
-        }
-    }
-
-    private void BtnAdvAllCombinedSet_Clicked(object sender, EventArgs e)
-    {
-        bool hasDate = _advAllDateMode;
+        bool hasDate = advAllFromPicker.Date.HasValue;
         DateTime from = advAllFromPicker.Date ?? DateTime.Today;
         DateTime toRaw = advAllToPicker.Date ?? DateTime.Today;
         var to = toRaw >= from ? toRaw : from;
@@ -420,23 +535,75 @@ public partial class Daily4Page : ContentPage
         string de = (entAdvAllEnd.Text ?? "").Trim();
         bool hasDraw = !string.IsNullOrEmpty(ds) && int.TryParse(ds, out _);
         if (!hasDate && !hasDraw) return;
-        int cols = _entries.GetLength(1);
+
+        if (hasDraw)
+        {
+            string? warn = SpendingTracker.CheckDrawRangeWarning("D4", from, to, ds, de,
+                currentDrawNumber: DrawNumberService.GetNextDraw("Daily 4"));
+            if (warn != null)
+            {
+                bool proceed = await DisplayAlert("Check Draw # Range", warn, "Save Anyway", "Fix It");
+                if (!proceed)
+                {
+                    int current = DrawNumberService.GetNextDraw("Daily 4");
+                    if (current <= 0) current = await DrawNumberService.EnsureNextDrawAsync("Daily 4");
+                    if (current > 0)
+                    {
+                        entAdvAllStart.Text = current.ToString();
+                        entAdvAllEnd.Text   = current.ToString();
+                    }
+                    return;
+                }
+            }
+        }
+
+        var sb = new System.Text.StringBuilder();
+        if (hasDraw) sb.Append($"Draw #{ds}" + (string.IsNullOrEmpty(de) || de == ds ? "" : $"–{de}"));
+        if (hasDate && hasDraw) sb.Append("  ");
+        if (hasDate) sb.Append($"{from:M/d/yy}" + (to.Date == from.Date ? "" : $"–{to:M/d/yy}"));
+
+        int applyCount = Rows;
+        if (Preferences.Get("set_row_picker", true))
+        {
+            var options = Enumerable.Range(1, Rows).Select(i => $"{i} row{(i == 1 ? "" : "s")}").Append("Clear All Advances").ToArray();
+            string? choice = await DisplayActionSheet($"Apply {sb} to:", "Cancel", null, options);
+            if (string.IsNullOrEmpty(choice) || choice == "Cancel") return;
+            if (choice == "Clear All Advances")
+            {
+                for (int r = 0; r < Rows; r++)
+                { _playStart[r] = null; _playEnd[r] = null; _drawStart[r] = ""; _drawEnd[r] = ""; }
+                if (_activeSlot >= 0) SaveAdvanceDates(_activeSlot);
+                UpdateAllResultBackgrounds();
+                for (int r = 0; r < Rows; r++)
+                    for (int c = 0; c < Cols; c++)
+                        if (string.IsNullOrWhiteSpace(_entries[r, c].Text))
+                            _entries[r, c].BackgroundColor = Color.FromArgb("#F5F5F5");
+                return;
+            }
+            applyCount = int.Parse(choice.Split(' ')[0]);
+        }
+
         for (int r = 0; r < Rows; r++)
         {
-            bool hasNums = false;
-            for (int c = 0; c < cols; c++)
-                if (!string.IsNullOrEmpty(_entries[r, c].Text)) { hasNums = true; break; }
-            if (!hasNums) continue;
-            if (!_overrideMode)
-            {
-                bool alreadySet = _playStart[r].HasValue || _playEnd[r].HasValue || !string.IsNullOrEmpty(_drawStart[r]);
-                if (alreadySet) continue;
-            }
+            _playStart[r] = null; _playEnd[r] = null;
+            _drawStart[r] = ""; _drawEnd[r] = "";
+        }
+        for (int r = 0; r < applyCount && r < Rows; r++)
+        {
             if (hasDate) { _playStart[r] = from; _playEnd[r] = to; }
             if (hasDraw) { _drawStart[r] = ds; _drawEnd[r] = string.IsNullOrEmpty(de) ? ds : de; }
         }
         if (_activeSlot >= 0) SaveAdvanceDates(_activeSlot);
         UpdateAllResultBackgrounds();
+        // Tint empty rows that have advance dates
+        for (int r = 0; r < Rows; r++)
+        {
+            bool hasAdv = _playStart[r].HasValue || _playEnd[r].HasValue || !string.IsNullOrEmpty(_drawStart[r]);
+            var bg = hasAdv ? Color.FromArgb("#E3F2FD") : Color.FromArgb("#F5F5F5");
+            for (int c = 0; c < Cols; c++)
+                if (string.IsNullOrWhiteSpace(_entries[r, c].Text))
+                    _entries[r, c].BackgroundColor = bg;
+        }
     }
 
     private static bool TryParseAdvDate(string? text, out DateTime result)
@@ -450,8 +617,11 @@ public partial class Daily4Page : ContentPage
 
     private void ApplyAdvanceToRowIfActive(int row)
     {
+        if (_suppressAdvApply) return;
+        bool alreadySet = _playStart[row].HasValue || _playEnd[row].HasValue || !string.IsNullOrEmpty(_drawStart[row]);
+        if (alreadySet && !_overrideMode) return;
         bool applied = false;
-        if (_advAllDateMode)
+        if (advAllFromPicker.Date.HasValue)
         {
             DateTime from = advAllFromPicker.Date ?? DateTime.Today;
             DateTime to = advAllToPicker.Date ?? DateTime.Today;
@@ -486,8 +656,23 @@ public partial class Daily4Page : ContentPage
         for (int i = 0; i < 10; i++)
             slotPicker.Items[i] = SlotLabel(i);
         slotPicker.SelectedIndex = _activeSlot;
-        _suppressPickerEvent = false;
+        slotPicker.Unfocus();
         UpdateExclCheckbox();
+        UpdateTicketCount();
+        // See Daily3Page.SlotPicker_Focused for why the reset happens there, not here.
+        int epoch = ++_pickerSuppressEpoch;
+        Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(400), () =>
+        {
+            if (_pickerSuppressEpoch == epoch) _suppressPickerEvent = false;
+        });
+    }
+
+    private void SlotPicker_Focused(object sender, FocusEventArgs e)
+    {
+        if (_suppressPickerEvent)
+            slotPicker.Unfocus();
+        _suppressPickerEvent = false;
+        _pickerSuppressEpoch++;
     }
 
     private void SlotPicker_Changed(object sender, EventArgs e)
@@ -495,31 +680,47 @@ public partial class Daily4Page : ContentPage
         if (_suppressPickerEvent) return;
         int slot = slotPicker.SelectedIndex;
         if (slot < 0) return;
-        // Cache current slot before switching
+        // Turn off OVR when switching sets so it doesn't affect the new set
+        _overrideMode = false;
+        btnOverride.BackgroundColor = Color.FromArgb("#546E7A");
+        advAllPanel.BackgroundColor = Colors.Transparent;
+        // Cache current slot before switching. _slotCache is in-memory only — must not be the
+        // only copy, or the outgoing slot's tickets are lost for good if the app process dies
+        // before this page is exited normally while that slot is active again. SaveSet persists
+        // them to disk now too (see Daily3Page's same fix, 2026-08-03).
         if (_activeSlot >= 0)
+        {
             _slotCache[_activeSlot] = (GetCurrentEntryString(), string.Join("|", _betTypes));
+            SaveSet(_activeSlot, refreshPicker: false);
+        }
         SaveAdvanceDates(_activeSlot);
         _activeSlot = slot;
         Preferences.Set("d4_active_slot", slot);
         ClearAllEntries();
-        if (_slotCache.TryGetValue(slot, out var cached))
+        _suppressAdvApply = true;
+        try
         {
-            _loading = true;
-            var vals = cached.entries.Split('|');
-            for (int r = 0; r < Rows; r++)
-                for (int c = 0; c < Cols; c++)
-                {
-                    int idx = r * Cols + c;
-                    _entries[r, c].Text = idx < vals.Length ? vals[idx] : "";
-                }
-            LoadBetTypes_FromString(cached.betTypes);
-            _loading = false;
-            CheckAll();
-            LoadAdvanceDates(slot);
-            UpdateAllResultBackgrounds();
+            if (_slotCache.TryGetValue(slot, out var cached))
+            {
+                _loading = true;
+                var vals = cached.entries.Split('|');
+                for (int r = 0; r < Rows; r++)
+                    for (int c = 0; c < Cols; c++)
+                    {
+                        int idx = r * Cols + c;
+                        _entries[r, c].Text = idx < vals.Length ? vals[idx] : "";
+                    }
+                LoadBetTypes_FromString(cached.betTypes);
+                _loading = false;
+                CheckAll();
+                LoadAdvanceDates(slot);
+                RefreshAdvAllPanel();
+                UpdateAllResultBackgrounds();
+            }
+            else if (SlotHasData(slot))
+                FillFromSlot(slot);
         }
-        else if (SlotHasData(slot))
-            FillFromSlot(slot);
+        finally { _suppressAdvApply = false; }
         UpdateSlotPicker();
     }
 
@@ -535,16 +736,22 @@ public partial class Daily4Page : ContentPage
     private async Task HighlightRow(int rowIndex)
     {
         if (rowIndex < 0 || rowIndex >= rowsContainer.Children.Count) return;
-        var wrapper = rowsContainer.Children[rowIndex] as Layout;
-        if (wrapper == null || wrapper.Children.Count < 1) return;
-        var rowView = wrapper.Children[0] as View;
-        if (rowView == null) return;
-        _highlightedView = rowView;
-        rowView.BackgroundColor = Color.FromArgb("#FFF176");
+        if (rowsContainer.Children[rowIndex] is not View rowView) return;
+        // rowsContainer holds Border cards whose Content is a wrapper stack (row Grid +
+        // permsLabel) — the row Grid has its own opaque white background, so the highlight
+        // must land on that Grid directly, not the wrapper, or the white paints over it.
+        View target = rowView;
+        if (rowView is Border b && b.Content is Layout wrapper && wrapper.Children.Count > 0
+            && wrapper.Children[0] is View innerRow)
+            target = innerRow;
+        else if (rowView is Border b2 && b2.Content is View inner)
+            target = inner;
+        _highlightedView = target;
+        target.BackgroundColor = Color.FromArgb("#FFF176");
         if (rowsContainer.Parent is ScrollView sv)
-            await sv.ScrollToAsync(wrapper, ScrollToPosition.MakeVisible, true);
+            await sv.ScrollToAsync(rowView, ScrollToPosition.MakeVisible, true);
         await Task.Delay(2000);
-        rowView.BackgroundColor = Colors.White;
+        target.BackgroundColor = Colors.White;
         _highlightedView = null;
     }
 
@@ -585,10 +792,10 @@ public partial class Daily4Page : ContentPage
                     new ColumnDefinition(new GridLength(40)),    // 6: bet type
                     new ColumnDefinition(GridLength.Auto),       // 7: result
                 },
-                ColumnSpacing = 4,
+                ColumnSpacing = 6,
                 BackgroundColor = Colors.White,
-                Margin = new Thickness(0, 1),
-                Padding = new Thickness(4, 2),
+                Margin = new Thickness(0),
+                Padding = new Thickness(10, 8),
             };
 
             int rowIdx = r;
@@ -635,8 +842,10 @@ public partial class Daily4Page : ContentPage
                     if (!_voiceSettingText && _entries[row_, col_].Text?.Length == 1)
                         AdvanceFocus(row_, col_);
                     SaveEntries();
+                    TriggerAutoSaveIndicator();
                     CheckAll();
                     UpdatePermsIfChecked(row_);
+                    UpdateTicketCount();
                 };
 
                 _entries[r, c] = entry;
@@ -658,12 +867,12 @@ public partial class Daily4Page : ContentPage
 
             var betBtn = new Button
             {
-                Text = "S",
+                Text = "Str",
                 FontSize = 9,
                 FontAttributes = FontAttributes.Bold,
                 TextColor = Colors.White,
                 BackgroundColor = Color.FromArgb("#1565C0"),
-                WidthRequest = 38,
+                WidthRequest = 42,
                 HeightRequest = 30,
                 CornerRadius = 6,
                 Padding = new Thickness(0),
@@ -722,7 +931,17 @@ public partial class Daily4Page : ContentPage
             var wrapper = new VerticalStackLayout { Spacing = 0 };
             wrapper.Children.Add(row);
             wrapper.Children.Add(permsLabel);
-            rowsContainer.Children.Add(wrapper);
+            var card = new Border
+            {
+                Content = wrapper,
+                BackgroundColor = Colors.White,
+                Stroke = new SolidColorBrush(Color.FromArgb("#E5E7EB")),
+                StrokeThickness = 1,
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(12) },
+                Padding = new Thickness(0),
+                Margin = new Thickness(0, 4),
+            };
+            rowsContainer.Children.Add(card);
         }
     }
 
@@ -776,7 +995,7 @@ public partial class Daily4Page : ContentPage
     private void UpdateBetBtn(int row)
     {
         var btn = _betTypeBtns[row];
-        btn.Text = _betTypes[row];
+        btn.Text = _betTypes[row] switch { "B" => "Box", "S&B" => "S+B", _ => "Str" };
         btn.BackgroundColor = _betTypes[row] switch
         {
             "B"   => Color.FromArgb("#00695C"),
@@ -791,18 +1010,17 @@ public partial class Daily4Page : ContentPage
         int idx = allBetPicker.SelectedIndex;
         if (idx < 0) return;
         string bt = BetCycle[idx];
-        string allBets = string.Join("|", Enumerable.Repeat(bt, Rows));
         // Apply to current rows
         for (int r = 0; r < Rows; r++)
         {
             _betTypes[r] = bt;
             UpdateBetBtn(r);
         }
-        // Apply to all saved slots that have data
-        for (int s = 0; s < 10; s++)
+        // Apply only to the active set — not every saved set
+        if (_activeSlot >= 0)
         {
-            if (SlotHasData(s))
-                Preferences.Set(BetKey(s), allBets);
+            SaveSet(_activeSlot);
+            _slotCache[_activeSlot] = (GetCurrentEntryString(), string.Join("|", _betTypes));
         }
         SaveEntries();
         CheckAll();
@@ -814,10 +1032,7 @@ public partial class Daily4Page : ContentPage
         int nextRow = row;
         if (nextCol >= Cols) { nextCol = 0; nextRow = row + 1; }
         if (nextRow < Rows)
-        {
-            _entries[nextRow, nextCol].Text = "";
             Dispatcher.Dispatch(() => _entries[nextRow, nextCol].Focus());
-        }
     }
 
     private void RetreatFocus(int row, int col)
@@ -847,7 +1062,14 @@ public partial class Daily4Page : ContentPage
         {
             bool hasTodayDraw = _draws.Any(d =>
                 DateTime.TryParse(d.DateLabel, out var dt) && dt.Date == DateTime.Today);
-            if (hasTodayDraw) return;
+            if (hasTodayDraw)
+            {
+                await Task.Delay(400);
+                spinner.IsVisible = false;
+                spinner.IsRunning = false;
+                loadingOverlay.IsVisible = false;
+                return;
+            }
             _drawsLoaded = false;
             _draws.Clear();
         }
@@ -855,9 +1077,9 @@ public partial class Daily4Page : ContentPage
         spinner.IsVisible = true;
         spinner.IsRunning = true;
         loadingOverlay.IsVisible = true;
-        lblDrawDate.Text = "Fetching Daily 4 draws from calottery.com...";
+        lblDrawDate.Text = "Loading Daily 4 history...";
 
-        var raw = await GetDataEntry.GetDaily4Draws(50);
+        var raw = await GetDataEntry.LoadD4CsvDraws();
 
         spinner.IsVisible = false;
         spinner.IsRunning = false;
@@ -892,8 +1114,8 @@ public partial class Daily4Page : ContentPage
                 .Where(d => d != DateTime.MinValue)
                 .ToList();
             drawDatePicker.MinimumDate = dates.Last();
-            drawDatePicker.MaximumDate = dates.First();
-            var targetDate = dates.First();
+            drawDatePicker.MaximumDate = DateTime.Today;
+            var targetDate = DateTime.Today;
             if (drawDatePicker.Date == targetDate)
                 ShowDrawForDate(targetDate);
             else
@@ -938,7 +1160,7 @@ public partial class Daily4Page : ContentPage
             {
                 for (int c = 0; c < Cols; c++)
                     _entries[r, c].BackgroundColor = Color.FromArgb("#F5F5F5");
-                _results[r].Text = "";
+                UpdateResultBackground(r);
                 continue;
             }
 
@@ -988,6 +1210,8 @@ public partial class Daily4Page : ContentPage
     }
 
 
+    internal void InvalidateAfterPurge() { _slotCache.Clear(); _advDatesLoaded = false; }
+
     internal void ClearForArchive()
     {
         _slotCache.Clear();
@@ -1010,6 +1234,7 @@ public partial class Daily4Page : ContentPage
     {
         _drawsLoaded = false;
         _draws.Clear();
+        await GetDataEntry.UpdateD4CsvAsync();
         await LoadAllDraws();
     }
 
@@ -1306,6 +1531,27 @@ public partial class Daily4Page : ContentPage
         drawGrid.Add(new Label { Text = "—", TextColor = Color.FromArgb("#8B9DC3"), VerticalOptions = LayoutOptions.Center, HorizontalOptions = LayoutOptions.Center, FontSize = 16 }, 1, 0);
         drawGrid.Add(_advDrawEndEntry, 2, 0);
 
+        _advWarnLabel = new Label
+        {
+            FontSize = 11,
+            TextColor = Color.FromArgb("#F59E0B"),
+            IsVisible = false,
+        };
+
+        void UpdateAdvWarning()
+        {
+            string w = SpendingTracker.CheckDrawRangeWarning(
+                "D4", _advStartPicker!.Date ?? DateTime.Today, _advEndPicker!.Date ?? DateTime.Today,
+                _advDrawStartEntry!.Text ?? "", _advDrawEndEntry!.Text ?? "",
+                currentDrawNumber: DrawNumberService.GetNextDraw("Daily 4")) ?? "";
+            _advWarnLabel!.Text = w;
+            _advWarnLabel.IsVisible = !string.IsNullOrEmpty(w);
+        }
+        _advDrawStartEntry.TextChanged += (_, _) => UpdateAdvWarning();
+        _advDrawEndEntry.TextChanged   += (_, _) => UpdateAdvWarning();
+        _advStartPicker.DateSelected   += (_, _) => UpdateAdvWarning();
+        _advEndPicker.DateSelected     += (_, _) => UpdateAdvWarning();
+
         var btnClear  = new Button { Text = "Clear",  BackgroundColor = Color.FromArgb("#4B5563"), TextColor = Colors.White, CornerRadius = 10, HeightRequest = 42, FontSize = 13 };
         var btnCancel = new Button { Text = "Cancel", BackgroundColor = Color.FromArgb("#1E293B"), TextColor = Colors.White, CornerRadius = 10, HeightRequest = 42, FontSize = 13 };
         var btnOk     = new Button { Text = "OK",     BackgroundColor = Color.FromArgb("#2563EB"), TextColor = Colors.White, CornerRadius = 10, HeightRequest = 42, FontSize = 13, FontAttributes = FontAttributes.Bold };
@@ -1322,17 +1568,38 @@ public partial class Daily4Page : ContentPage
             _advOverlay!.IsVisible = false;
         };
         btnCancel.Clicked += (_, _) => _advOverlay!.IsVisible = false;
-        btnOk.Clicked += (_, _) =>
+        btnOk.Clicked += async (_, _) =>
         {
             if (_advRow < 0) return;
-            _playStart[_advRow] = _advStartPicker!.Date;
-            _playEnd[_advRow]   = _advEndPicker!.Date >= _advStartPicker!.Date ? _advEndPicker!.Date : _advStartPicker!.Date;
             string ds = (_advDrawStartEntry!.Text ?? "").Trim();
             string de = (_advDrawEndEntry!.Text ?? "").Trim();
+            string? warn = SpendingTracker.CheckDrawRangeWarning("D4", _advStartPicker!.Date ?? DateTime.Today, _advEndPicker!.Date ?? DateTime.Today, ds, de,
+                currentDrawNumber: DrawNumberService.GetNextDraw("Daily 4"));
+            if (warn != null)
+            {
+                bool proceed = await DisplayAlert("Check Draw # Range", warn, "Save Anyway", "Fix It");
+                if (!proceed)
+                {
+                    int current = DrawNumberService.GetNextDraw("Daily 4");
+                    if (current <= 0) current = await DrawNumberService.EnsureNextDrawAsync("Daily 4");
+                    if (current > 0)
+                    {
+                        ds = current.ToString();
+                        de = current.ToString();
+                        _advDrawStartEntry.Text = ds;
+                        _advDrawEndEntry.Text   = de;
+                    }
+                    UpdateAdvWarning();
+                    return;
+                }
+            }
+            _playStart[_advRow] = _advStartPicker!.Date;
+            _playEnd[_advRow]   = _advEndPicker!.Date >= _advStartPicker!.Date ? _advEndPicker!.Date : _advStartPicker!.Date;
             _drawStart[_advRow] = ds;
             _drawEnd[_advRow]   = de;
             UpdateResultBackground(_advRow);
             SaveAdvanceDates(_activeSlot);
+            _ = TicketLogService.RecordAdvanceEnteredAsync("D4", _activeSlot, _advRow, _playStart[_advRow]!.Value, _playEnd[_advRow]!.Value);
             ResultsPageCls.ClearCache(); ResultsPage.NeedsRefresh = true;
             _advOverlay!.IsVisible = false;
         };
@@ -1371,6 +1638,7 @@ public partial class Daily4Page : ContentPage
                         _advEndPicker,
                         new Label { Text = "Draw # (optional)", FontSize = 11, TextColor = Color.FromArgb("#8B9DC3") },
                         drawGrid,
+                        _advWarnLabel,
                         btnRow,
                     }
                 }
@@ -1388,29 +1656,43 @@ public partial class Daily4Page : ContentPage
 
 
 
-    private void ShowAdvancePlayOverlay(int row)
+    private async void ShowAdvancePlayOverlay(int row)
     {
         _advRow = row;
         _advStartPicker!.Date = _playStart[row] ?? DateTime.Today;
         var defEnd = _playEnd[row];
         if (!defEnd.HasValue || defEnd.Value.Date < (_playStart[row]?.Date ?? DateTime.Today))
-            defEnd = (_playStart[row] ?? DateTime.Today).AddDays(20);
+            defEnd = (_playStart[row] ?? DateTime.Today);
         _advEndPicker!.Date = defEnd.Value;
         _advDrawStartEntry!.Text = _drawStart[row] ?? "";
         _advDrawEndEntry!.Text   = _drawEnd[row] ?? "";
         _advOverlay!.IsVisible = true;
+        if (string.IsNullOrEmpty(_advDrawStartEntry.Text) && string.IsNullOrEmpty(_advDrawEndEntry.Text))
+        {
+            int current = DrawNumberService.GetNextDraw("Daily 4");
+            if (current <= 0) current = await DrawNumberService.EnsureNextDrawAsync("Daily 4");
+            if (current > 0 && _advRow == row
+                && string.IsNullOrEmpty(_advDrawStartEntry.Text) && string.IsNullOrEmpty(_advDrawEndEntry.Text))
+            {
+                _advDrawStartEntry.Text = current.ToString();
+                _advDrawEndEntry.Text   = current.ToString();
+            }
+        }
     }
 
     private void UpdateResultBackground(int r)
     {
         bool hasAdv = _playStart[r].HasValue || _playEnd[r].HasValue
                    || !string.IsNullOrEmpty(_drawStart[r]);
-        _results[r].BackgroundColor = hasAdv ? Color.FromArgb("#1A3A8A") : Colors.Transparent;
+        bool hasNums = false;
+        for (int c = 0; c < Cols; c++)
+            if (!string.IsNullOrEmpty(_entries[r, c].Text)) { hasNums = true; break; }
+        _results[r].BackgroundColor = (hasAdv && hasNums) ? Color.FromArgb("#1A3A8A") : Colors.Transparent;
         bool showingResult = !string.IsNullOrEmpty(_results[r].Text) && _results[r].Text != "+";
         if (!showingResult)
         {
             _results[r].Text = "+";
-            _results[r].TextColor = hasAdv ? Colors.White : Color.FromArgb("#4B6A8A");
+            _results[r].TextColor = (hasAdv && hasNums) ? Colors.White : Color.FromArgb("#4B6A8A");
         }
     }
 
@@ -1490,6 +1772,7 @@ public partial class Daily4Page : ContentPage
     private void SaveAdvanceDates(int slot)
     {
         if (slot < 0) return;
+        if (!_advDatesLoaded) return; // never write before we've loaded — would blank out stored dates
         var parts = new string[Rows];
         for (int r = 0; r < Rows; r++)
         {
@@ -1500,31 +1783,45 @@ public partial class Daily4Page : ContentPage
         Preferences.Set(AdvDatesKey(slot), string.Join("|", parts));
     }
 
+    private async void RefreshAdvAllPanel()
+    {
+        advAllFromPicker.Date = DateTime.Today;
+        advAllToPicker.Date   = DateTime.Today;
+        int next = await DrawNumberService.EnsureNextDrawAsync("Daily 4");
+        if (next > 0) { entAdvAllStart.Text = next.ToString(); entAdvAllEnd.Text = next.ToString(); }
+    }
+
     private void LoadAdvanceDates(int slot)
     {
+        _advDatesLoaded = false;
         Array.Clear(_playStart, 0, Rows);
         Array.Clear(_playEnd,   0, Rows);
         Array.Clear(_drawStart, 0, Rows);
         Array.Clear(_drawEnd,   0, Rows);
-        if (slot < 0) return;
-        string raw = Preferences.Get(AdvDatesKey(slot), "");
-        if (string.IsNullOrEmpty(raw)) return;
-        var parts = raw.Split('|');
-        for (int r = 0; r < Rows && r < parts.Length; r++)
+        if (slot >= 0)
         {
-            var pair = parts[r].Split('~');
-            if (pair.Length >= 2)
+            string raw = Preferences.Get(AdvDatesKey(slot), "");
+            if (!string.IsNullOrEmpty(raw))
             {
-                if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null,
-                    System.Globalization.DateTimeStyles.None, out var sd))
-                    _playStart[r] = sd;
-                if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null,
-                    System.Globalization.DateTimeStyles.None, out var ed))
-                    _playEnd[r] = ed;
+                var parts = raw.Split('|');
+                for (int r = 0; r < Rows && r < parts.Length; r++)
+                {
+                    var pair = parts[r].Split('~');
+                    if (pair.Length >= 2)
+                    {
+                        if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null,
+                            System.Globalization.DateTimeStyles.None, out var sd))
+                            _playStart[r] = sd;
+                        if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null,
+                            System.Globalization.DateTimeStyles.None, out var ed))
+                            _playEnd[r] = ed;
+                    }
+                    _drawStart[r] = pair.Length > 2 ? pair[2] : "";
+                    _drawEnd[r]   = pair.Length > 3 ? pair[3] : "";
+                }
             }
-            _drawStart[r] = pair.Length > 2 ? pair[2] : "";
-            _drawEnd[r]   = pair.Length > 3 ? pair[3] : "";
         }
+        _advDatesLoaded = true; // safe to save from this point forward
     }
 
 }

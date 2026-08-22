@@ -42,6 +42,7 @@ public partial class DrawSearchPage : ContentPage
         foreach (var g in _games)
             gamePicker.Items.Add(g.Name);
         gamePicker.SelectedIndex = 0;
+        UpdateGameLogo();
         AddNumberRow(scroll: false);
         AddNumberRow(scroll: false);
         AddNumberRow(scroll: false);
@@ -60,7 +61,16 @@ public partial class DrawSearchPage : ContentPage
             gamePicker.SelectedIndex = idx;
         }
         UpdateGameUI();
+        UpdateGameLogo();
         ApplyNextDraw();
+
+        // Restore numbers section collapse state
+        _numbersVisible = Preferences.Get("ds_numbers_visible", true);
+        numbersScrollView.IsVisible = _numbersVisible;
+        lblChevron.Text = _numbersVisible ? "▼" : "▶";
+        lblNumsHeader.Text = _numbersVisible
+            ? "Numbers to Check (tap to hide)"
+            : "Numbers to Check (tap to show)";
     }
 
     // ── Collapse / expand numbers ─────────────────────────────────
@@ -68,6 +78,7 @@ public partial class DrawSearchPage : ContentPage
     private void NumbersHeader_Tapped(object? sender, TappedEventArgs e)
     {
         _numbersVisible = !_numbersVisible;
+        Preferences.Set("ds_numbers_visible", _numbersVisible);
         numbersScrollView.IsVisible = _numbersVisible;
         lblChevron.Text = _numbersVisible ? "▼" : "▶";
         lblNumsHeader.Text = _numbersVisible
@@ -279,6 +290,7 @@ public partial class DrawSearchPage : ContentPage
         ApplyNextDraw();
         resultsContainer.Children.Clear();
         lblSummary.Text = "";
+        UpdateGameLogo();
     }
 
     void ApplyNextDraw()
@@ -1011,4 +1023,21 @@ public partial class DrawSearchPage : ContentPage
             VerticalOptions   = LayoutOptions.Center
         }
     };
+
+    void UpdateGameLogo()
+    {
+        if (gamePicker.SelectedIndex < 0) return;
+        string game = gamePicker.Items[gamePicker.SelectedIndex];
+        imgGameLogo.Source = game switch
+        {
+            "Fantasy 5"    => "logo_fantasy5.png",
+            "Super Lotto"  => "logo_superlotto.png",
+            "Powerball"    => "logo_powerball.png",
+            "Mega Millions"=> "logo_megamillions.png",
+            "Daily 3"      => "logo_daily3.png",
+            "Daily 4"      => "logo_daily4.png",
+            "Daily Derby"  => "logo_dailyderby.png",
+            _              => "logo_fantasy5.png"
+        };
+    }
 }

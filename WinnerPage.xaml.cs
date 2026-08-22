@@ -7,65 +7,32 @@ public partial class WinnerPage : ContentPage
     const int Rows = 10;
     const int Cols = 5;
 
-    // Count FP-flagged rows active for TODAY only (advance-play rows only count if start date =
-    // today) — ported from the Android app's WinnerPage.xaml.cs, needed by SpendingTracker.
-    internal static int CountFreePlayRowsToday(string entries, string fpRaw, string adv)
-    {
-        if (string.IsNullOrEmpty(entries) || string.IsNullOrEmpty(fpRaw)) return 0;
-        var vals    = entries.Split('|');
-        var flags   = fpRaw.Split('|');
-        var advRows = string.IsNullOrEmpty(adv) ? Array.Empty<string>() : adv.Split('|');
-        int count   = 0;
-        for (int r = 0; r < 10; r++)
-        {
-            int idx = r * 5;
-            if (idx >= vals.Length || string.IsNullOrWhiteSpace(vals[idx])) continue;
-            if (r >= flags.Length || flags[r] != "1") continue;
-            // If row has advance dates, only count when start date is today
-            // and the end date has not already passed
-            if (r < advRows.Length && !string.IsNullOrEmpty(advRows[r])
-                && advRows[r] != "~~~" && advRows[r] != "~")
-            {
-                var pair = advRows[r].Split('~');
-
-                // If end date is set and already past, ticket is expired — skip
-                if (pair.Length >= 2 && !string.IsNullOrEmpty(pair[1])
-                    && DateTime.TryParseExact(pair[1], "yyyyMMdd", null,
-                        System.Globalization.DateTimeStyles.None, out var ed)
-                    && ed.Date < DateTime.Today)
-                    continue;
-
-                bool startIsToday = pair.Length >= 1
-                    && !string.IsNullOrEmpty(pair[0])
-                    && DateTime.TryParseExact(pair[0], "yyyyMMdd", null,
-                        System.Globalization.DateTimeStyles.None, out var sd)
-                    && sd.Date == DateTime.Today;
-                if (!startIsToday) continue;
-            }
-            count++;
-        }
-        return count;
-    }
-
     readonly Border[] _wBorders;
     readonly Label[]  _wLabels;
 
     // [row, col] entries and per-row result label
-    readonly Entry[,] _entries  = new Entry[Rows, Cols];
-    readonly Label[]  _results  = new Label[Rows];
+    readonly Entry[,]  _entries     = new Entry[Rows, Cols];
+    readonly Label[]   _results     = new Label[Rows];
+    readonly Button[]  _fpBtns      = new Button[Rows];   // unused placeholders
+    readonly Border[]  _fpBorders   = new Border[Rows];  // Free Play toggle borders
+    readonly bool[]    _freePlay    = new bool[Rows];    // per-row free play flag
     int _activeSlot = -1;
     bool _suppressPickerEvent = false;
+    int  _pickerSuppressEpoch = 0;
     bool _suppressExcl = false;
     readonly Dictionary<int, string> _slotCache = new();
     View? _highlightedView;
+    CancellationTokenSource? _autoSaveCts;
 
     DateTime?[] _playStart = new DateTime?[Rows];
     DateTime?[] _playEnd   = new DateTime?[Rows];
+    string[]    _logSnapshot = new string[Rows]; // numbers per row at OnAppearing, for change detection
     string[]    _drawStart = new string[Rows];
     string[]    _drawEnd   = new string[Rows];
     Grid?       _advOverlay;
     DatePicker? _advStartPicker;
     DatePicker? _advEndPicker;
+    Label?      _advWarnLabel;
     Entry?      _advDrawStartEntry;
     Entry?      _advDrawEndEntry;
     int         _advRow = -1;
@@ -77,6 +44,8 @@ public partial class WinnerPage : ContentPage
     bool _voiceOn = false;
     bool _voiceSettingText = false;
     bool _overrideMode = false;
+    bool _suppressAdvApply = false;  // blocks ApplyAdvanceToRowIfActive during slot loads
+    bool _advDatesLoaded   = false;  // prevents SaveAdvanceDates from overwriting before LoadAdvanceDates runs
     int  _voiceRow = 0, _voiceCol = 0;
     Entry? _voiceTarget = null;
     Color _voiceTargetOldColor = Colors.White;
@@ -152,21 +121,24 @@ public partial class WinnerPage : ContentPage
     private async void BtnGameMenu_Clicked(object sender, EventArgs e)
     {
         string? choice = await DisplayActionSheet("Go to Game", "Cancel", null,
-            "Fantasy 5", "Super Lotto", "Powerball", "Mega Millions", "Daily 3", "Daily 4", "Daily Derby", "Notifications", "Summary of Winnings", "Check Wins for Draw#");
+            "Fantasy 5", "Super Lotto", "Powerball", "Mega Millions", "Daily 3", "Daily 4", "Daily Derby", "Hot Spot", "Notifications", "Summary of Winnings", "Check Wins for Draw#");
         if (choice == null || choice == "Cancel") return;
         if (choice == "Notifications") { await Shell.Current.GoToAsync(nameof(NotificationsPage), false); return; }
         if (choice == "Summary of Winnings") { await Shell.Current.GoToAsync(nameof(SummaryPage), false); return; }
         if (choice == "Check Wins for Draw#") { DrawSearchPage.PresetGame = "Fantasy 5"; await Shell.Current.GoToAsync(nameof(DrawSearchPage), false); return; }
+        MainPage.Instance?.ShowNavOverlay($"Loading {choice}...");
         await Shell.Current.Navigation.PopToRootAsync(false);
+        await Task.Delay(100);
         switch (choice)
         {
-            case "Fantasy 5":    WinnerPage.ComingFrom    = "main"; await Shell.Current.GoToAsync(nameof(WinnerPage),     false); break;
-            case "Super Lotto":  SuperLottoPage.ComingFrom = "main"; await Shell.Current.GoToAsync(nameof(SuperLottoPage), false); break;
-            case "Powerball":    PowerballPage.ComingFrom  = "main"; await Shell.Current.GoToAsync(nameof(PowerballPage),  false); break;
-            case "Mega Millions":MegaMillionsPage.ComingFrom="main"; await Shell.Current.GoToAsync(nameof(MegaMillionsPage),false); break;
-            case "Daily 3":      Daily3Page.ComingFrom     = "main"; await Shell.Current.GoToAsync(nameof(Daily3Page),     false); break;
-            case "Daily 4":      Daily4Page.ComingFrom     = "main"; await Shell.Current.GoToAsync(nameof(Daily4Page),     false); break;
-            case "Daily Derby":  DailyDerbyPage.ComingFrom = "main"; await Shell.Current.GoToAsync(nameof(DailyDerbyPage), false); break;
+            case "Fantasy 5":    WinnerPage.ComingFrom    = "main"; AppShell.WinnerPageInstance.PrePosition(true);     await Shell.Current.GoToAsync(nameof(WinnerPage),      false); break;
+            case "Super Lotto":  SuperLottoPage.ComingFrom = "main"; AppShell.SuperLottoPageInstance.PrePosition(true); await Shell.Current.GoToAsync(nameof(SuperLottoPage),  false); break;
+            case "Powerball":    PowerballPage.ComingFrom  = "main"; AppShell.PowerballPageInstance.PrePosition(true);  await Shell.Current.GoToAsync(nameof(PowerballPage),   false); break;
+            case "Mega Millions":MegaMillionsPage.ComingFrom="main"; AppShell.MegaMillionsPageInstance.PrePosition(true);await Shell.Current.GoToAsync(nameof(MegaMillionsPage),false); break;
+            case "Daily 3":      Daily3Page.ComingFrom     = "main"; AppShell.Daily3PageInstance.PrePosition(true);     await Shell.Current.GoToAsync(nameof(Daily3Page),      false); break;
+            case "Daily 4":      Daily4Page.ComingFrom     = "main"; AppShell.Daily4PageInstance.PrePosition(true);     await Shell.Current.GoToAsync(nameof(Daily4Page),      false); break;
+            case "Daily Derby":  DailyDerbyPage.ComingFrom = "main"; AppShell.DailyDerbyPageInstance.PrePosition(true); await Shell.Current.GoToAsync(nameof(DailyDerbyPage),  false); break;
+            case "Hot Spot":      await Shell.Current.GoToAsync(nameof(HotSpotPage), false); break;
         }
     }
 
@@ -201,14 +173,17 @@ public partial class WinnerPage : ContentPage
     {
         double w = DeviceDisplay.MainDisplayInfo.Width / DeviceDisplay.MainDisplayInfo.Density;
         TranslationX = fromRight ? w : -w;
+        spinner.IsVisible = true;
+        spinner.IsRunning = true;
+        loadingOverlay.IsVisible = true;
     }
 
     protected override void OnAppearing()
     {
         // TranslationX was pre-set by PrePosition before navigation — just animate in
         this.TranslateTo(0, 0, 220, Easing.CubicOut);
-
         base.OnAppearing();
+        UpdateTicketCount();
         _ = LoadAllDraws();
         Dispatcher.Dispatch(() =>
         {
@@ -243,27 +218,102 @@ public partial class WinnerPage : ContentPage
                 if (SlotHasData(_activeSlot))
                     FillFromSlot(_activeSlot);
                 else
+                {
                     LoadEntries();
+                    LoadAdvanceDates(_activeSlot);
+                    RefreshAdvAllPanel();
+                }
             }
             UpdateSlotPicker();
             if (pendingRow >= 0)
                 _ = HighlightRow(pendingRow);
-            int nd = DrawNumberService.GetNextDraw("Fantasy 5");
-            if (nd > 0) { entAdvAllStart.Text = nd.ToString(); entAdvAllEnd.Text = nd.ToString(); }
+            TakeLogSnapshot();
         });
+    }
+
+    void TakeLogSnapshot()
+    {
+        for (int r = 0; r < Rows; r++)
+        {
+            var nums = new List<string>();
+            bool full = true;
+            for (int c = 0; c < Cols; c++)
+            {
+                string v = _entries[r, c].Text ?? "";
+                if (string.IsNullOrWhiteSpace(v)) { full = false; break; }
+                nums.Add(v.PadLeft(2, '0'));
+            }
+            _logSnapshot[r] = full ? string.Join(" ", nums) : "";
+        }
+    }
+
+    async Task LogCurrentTicketsAsync()
+    {
+        // Log ALL slots from Preferences (already flushed in OnDisappearing before this call).
+        // Active slot UI entries are already saved to Preferences by SaveEntries()/SaveSet() above.
+        var allRows = new List<(int, int, string, string, string, string)>();
+        var fpDict  = new Dictionary<(int, int), bool>();
+
+        for (int s = 0; s < 10; s++)
+        {
+            string set   = Preferences.Get($"f5_set_{s}", "");
+            string adv   = Preferences.Get($"f5_adv_{s}", "");
+            string fpRaw = Preferences.Get($"f5_freeplay_{s}", "");
+            var fpParts  = string.IsNullOrEmpty(fpRaw) ? Array.Empty<string>() : fpRaw.Split('|');
+            if (string.IsNullOrEmpty(set)) continue;
+
+            var vals     = set.Split('|');
+            var advParts = string.IsNullOrEmpty(adv) ? new string[Rows] : adv.Split('|');
+            if (advParts.Length < Rows) Array.Resize(ref advParts, Rows);
+
+            for (int r = 0; r < Rows; r++)
+            {
+                var nums = new List<string>(); bool full = true;
+                for (int c = 0; c < Cols; c++)
+                {
+                    string v = r * Cols + c < vals.Length ? vals[r * Cols + c] : "";
+                    if (string.IsNullOrWhiteSpace(v)) { full = false; break; }
+                    nums.Add(v.PadLeft(2, '0'));
+                }
+                if (!full) continue;
+
+                string pf = "", pt = "";
+                if (!string.IsNullOrEmpty(advParts[r]))
+                {
+                    var pair = advParts[r].Split('~');
+                    if (pair.Length >= 2)
+                    {
+                        if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var fd))
+                            pf = fd.ToString("M/d");
+                        string eff = string.IsNullOrEmpty(pair[1]) ? pair[0] : pair[1];
+                        if (DateTime.TryParseExact(eff, "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out var td))
+                            pt = td.ToString("M/d");
+                    }
+                }
+                bool isFp = r < fpParts.Length && fpParts[r] == "1";
+                allRows.Add((s, r, string.Join(" ", nums), "", pf, pt));
+                fpDict[(s, r)] = isFp;
+            }
+        }
+
+        // Clear ALL today's F5 log entries, then re-log every slot.
+        for (int s = 0; s < 10; s++)
+            await Services.TicketLogService.ClearTodayGameSlotAsync("F5", s);
+        if (allRows.Count > 0)
+            await Services.TicketLogService.LogRowsAsync("F5", allRows, fpDict);
     }
 
     protected override void OnDisappearing()
     {
+        // Save all data BEFORE base.OnDisappearing() — on Android, Entry controls can be
+        // detached after base call and return empty text, which would erase saved data.
         SaveAdvanceDates(_activeSlot);
-        base.OnDisappearing();
-        if (_voiceOn) StopVoice();
-        if (_highlightedView != null) { _highlightedView.BackgroundColor = Colors.White; _highlightedView = null; }
         SaveEntries();
         if (_activeSlot >= 0)
         {
             _slotCache[_activeSlot] = GetCurrentEntryString();
             Preferences.Set("f5_active_slot", _activeSlot);
+            SaveFreePlay(_activeSlot);
         }
         // Flush all cached slot changes to Preferences
         foreach (var (slot, entries) in _slotCache)
@@ -274,6 +324,10 @@ public partial class WinnerPage : ContentPage
             else
                 Preferences.Set(SetKey(slot), entries);
         }
+        Services.TicketLogService.PendingWriteTask = LogCurrentTicketsAsync();
+        base.OnDisappearing();
+        if (_voiceOn) StopVoice();
+        if (_highlightedView != null) { _highlightedView.BackgroundColor = Colors.White; _highlightedView = null; }
     }
 
     private void SaveEntries()
@@ -283,6 +337,29 @@ public partial class WinnerPage : ContentPage
             for (int c = 0; c < Cols; c++)
                 vals[r * Cols + c] = _entries[r, c].Text ?? "";
         Preferences.Set("f5_entries", string.Join("|", vals));
+    }
+
+    private void TriggerAutoSaveIndicator()
+    {
+        _autoSaveCts?.Cancel();
+        _autoSaveCts = new CancellationTokenSource();
+        var token = _autoSaveCts.Token;
+        Task.Delay(600, token).ContinueWith(t =>
+        {
+            if (t.IsCanceled) return;
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                if (_activeSlot >= 0) SaveSet(_activeSlot);
+                lblStatus.Text = "Auto-saved \u2713";
+                var cts2 = new CancellationTokenSource();
+                Task.Delay(1500, cts2.Token).ContinueWith(_ =>
+                    MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        if (lblStatus.Text == "Auto-saved \u2713")
+                            lblStatus.Text = "Ready";
+                    }));
+            });
+        });
     }
 
     private void LoadEntries()
@@ -297,11 +374,31 @@ public partial class WinnerPage : ContentPage
                 if (idx < vals.Length)
                     _entries[r, c].Text = vals[idx];
             }
+        LoadFreePlay(_activeSlot);
     }
 
     // ── Set slots (save/load 10 named sets) ─────────────────────────────────
 
     private string SetKey(int slot) => $"f5_set_{slot}";
+    private void UpdateTicketCount()
+    {
+        int total = 0;
+        for (int s = 0; s < 10; s++)
+        {
+            if (s == _activeSlot && _entries != null)
+            {
+                for (int r = 0; r < Rows; r++)
+                    if (!string.IsNullOrWhiteSpace(_entries[r, 0]?.Text)) total++;
+            }
+            else
+            {
+                var vals = Preferences.Get($"f5_set_{s}", "").Split('|');
+                for (int r = 0; r < 10; r++)
+                    if (r * 5 < vals.Length && !string.IsNullOrWhiteSpace(vals[r * 5])) total++;
+            }
+        }
+        lblTicketCount.Text = total > 0 ? $"🎟 {total}" : "";
+    }
 
     private string GetCurrentEntryString()
     {
@@ -325,6 +422,8 @@ public partial class WinnerPage : ContentPage
         Array.Clear(_playEnd,   0, Rows);
         Array.Clear(_drawStart, 0, Rows);
         Array.Clear(_drawEnd,   0, Rows);
+        _advDatesLoaded = true; // user-triggered clear — allow subsequent saves
+        ClearFreePlay();
         UpdateAllResultBackgrounds();
     }
 
@@ -340,20 +439,135 @@ public partial class WinnerPage : ContentPage
         _playEnd[r]   = null;
         _drawStart[r] = "";
         _drawEnd[r]   = "";
+        _freePlay[r]  = false;
+        RefreshFpBtn(r);
         UpdateResultBackground(r);
         SaveEntries();
         if (_activeSlot >= 0) SaveSet(_activeSlot);
     }
 
-    private void SaveSet(int slot)
+    // ── Free Play helpers ─────────────────────────────────────────────────────
+
+    private string FpKey(int slot) => slot >= 0 ? $"f5_freeplay_{slot}" : "f5_freeplay_live";
+
+    private void SaveFreePlay(int slot)
+    {
+        var vals = _freePlay.Select(f => f ? "1" : "0");
+        Preferences.Set(FpKey(slot), string.Join("|", vals));
+    }
+
+    private void LoadFreePlay(int slot)
+    {
+        var raw = Preferences.Get(FpKey(slot), "");
+        var parts = string.IsNullOrEmpty(raw) ? Array.Empty<string>() : raw.Split('|');
+        for (int r = 0; r < Rows; r++)
+        {
+            _freePlay[r] = r < parts.Length && parts[r] == "1";
+            RefreshFpBtn(r);
+        }
+    }
+
+    private void ClearFreePlay()
+    {
+        for (int r = 0; r < Rows; r++)
+        {
+            _freePlay[r] = false;
+            RefreshFpBtn(r);
+        }
+    }
+
+    private void RefreshFpBtn(int r)
+    {
+        if (_fpBorders[r] == null) return;
+        var lbl = _fpBorders[r].Content as Label;
+        if (_freePlay[r])
+        {
+            _fpBorders[r].BackgroundColor = Color.FromArgb("#E65100");
+            if (lbl != null) lbl.TextColor = Colors.White;
+        }
+        else
+        {
+            _fpBorders[r].BackgroundColor = Color.FromArgb("#37474F");
+            if (lbl != null) lbl.TextColor = Color.FromArgb("#78909C");
+        }
+    }
+
+    // Count FP-flagged rows that have data in the given entries string
+    internal static int CountFreePlayRows(string entries, string fpRaw)
+    {
+        if (string.IsNullOrEmpty(entries) || string.IsNullOrEmpty(fpRaw)) return 0;
+        var vals  = entries.Split('|');
+        var flags = fpRaw.Split('|');
+        int count = 0;
+        for (int r = 0; r < 10; r++)
+        {
+            int idx = r * 5;
+            if (idx < vals.Length && !string.IsNullOrWhiteSpace(vals[idx])
+                && r < flags.Length && flags[r] == "1")
+                count++;
+        }
+        return count;
+    }
+
+    // Count FP-flagged rows active for TODAY only (advance-play rows only count if start date = today)
+    internal static int CountFreePlayRowsToday(string entries, string fpRaw, string adv)
+    {
+        if (string.IsNullOrEmpty(entries) || string.IsNullOrEmpty(fpRaw)) return 0;
+        var vals    = entries.Split('|');
+        var flags   = fpRaw.Split('|');
+        var advRows = string.IsNullOrEmpty(adv) ? Array.Empty<string>() : adv.Split('|');
+        int count   = 0;
+        for (int r = 0; r < 10; r++)
+        {
+            int idx = r * 5;
+            if (idx >= vals.Length || string.IsNullOrWhiteSpace(vals[idx])) continue;
+            if (r >= flags.Length || flags[r] != "1") continue;
+            // If row has advance dates, only count when start date is today
+            // and the end date has not already passed
+            if (r < advRows.Length && !string.IsNullOrEmpty(advRows[r])
+                && advRows[r] != "~~~" && advRows[r] != "~")
+            {
+                var pair = advRows[r].Split('~');
+
+                // If end date is set and already past, ticket is expired — skip
+                if (pair.Length >= 2 && !string.IsNullOrEmpty(pair[1])
+                    && DateTime.TryParseExact(pair[1], "yyyyMMdd", null,
+                        System.Globalization.DateTimeStyles.None, out var ed)
+                    && ed.Date < DateTime.Today)
+                    continue;
+
+                bool startIsToday = pair.Length >= 1
+                    && !string.IsNullOrEmpty(pair[0])
+                    && DateTime.TryParseExact(pair[0], "yyyyMMdd", null,
+                        System.Globalization.DateTimeStyles.None, out var sd)
+                    && sd.Date == DateTime.Today;
+                if (!startIsToday) continue;
+            }
+            count++;
+        }
+        return count;
+    }
+
+    private void SaveSet(int slot, bool refreshPicker = true)
     {
         string data = GetCurrentEntryString();
         bool isEmpty = data.Replace("|", "").Trim().Length == 0;
         if (isEmpty)
+        {
             Preferences.Remove(SetKey(slot));   // saving empty clears the slot
+            Preferences.Remove(FpKey(slot));
+        }
         else
+        {
             Preferences.Set(SetKey(slot), data);
-        UpdateSlotPicker();
+            SaveFreePlay(slot);
+        }
+        ResultsPage.NeedsRefresh = true;
+        // SlotPicker_Changed calls this mid-flight (refreshPicker:false) then refreshes the
+        // picker itself right after — calling UpdateSlotPicker() here too would reassign the
+        // native Picker's SelectedIndex/Unfocus from inside its own change callback, which
+        // wedges the UI thread against Android's input dispatcher (ANR: "waited for FocusEvent").
+        if (refreshPicker) UpdateSlotPicker();
     }
 
     private void FillFromSlot(int slot)
@@ -361,15 +575,22 @@ public partial class WinnerPage : ContentPage
         var saved = Preferences.Get(SetKey(slot), "");
         if (string.IsNullOrEmpty(saved)) return;
         var vals = saved.Split('|');
-        for (int r = 0; r < Rows; r++)
-            for (int c = 0; c < Cols; c++)
-            {
-                int idx = r * Cols + c;
-                _entries[r, c].Text = idx < vals.Length ? vals[idx] : "";
-            }
-        LoadAdvanceDates(slot);
-        CheckAll();
-        UpdateAllResultBackgrounds();
+        _suppressAdvApply = true;
+        try
+        {
+            for (int r = 0; r < Rows; r++)
+                for (int c = 0; c < Cols; c++)
+                {
+                    int idx = r * Cols + c;
+                    _entries[r, c].Text = idx < vals.Length ? vals[idx] : "";
+                }
+            LoadAdvanceDates(slot);
+            RefreshAdvAllPanel();
+            LoadFreePlay(slot);
+            CheckAll();
+            UpdateAllResultBackgrounds();
+        }
+        finally { _suppressAdvApply = false; }
     }
 
     private bool SlotHasData(int slot) =>
@@ -387,25 +608,23 @@ public partial class WinnerPage : ContentPage
 
     private bool _advAllDateMode = false;
 
-    private void BtnAdvAllToggle_Clicked(object sender, EventArgs e)
+    private void BtnClearAdvSlot_Clicked(object sender, EventArgs e)
     {
-        _advAllDateMode = !_advAllDateMode;
-        advAllDrawMode.IsVisible = !_advAllDateMode;
-        advAllDateMode.IsVisible = _advAllDateMode;
-        btnAdvAllToggle.Text = _advAllDateMode ? "#" : "📅";
-        btnAdvAllToggle.BackgroundColor = _advAllDateMode
-            ? Color.FromArgb("#2E7D32")
-            : Color.FromArgb("#546E7A");
-        if (_advAllDateMode)
+        if (_activeSlot < 0) return;
+        for (int r = 0; r < Rows; r++)
         {
-            advAllFromPicker.Date = DateTime.Today;
-            advAllToPicker.Date = DateTime.Today;
+            _playStart[r] = null;
+            _playEnd[r]   = null;
+            _drawStart[r] = "";
+            _drawEnd[r]   = "";
         }
+        SaveAdvanceDates(_activeSlot);
+        UpdateAllResultBackgrounds();
     }
 
-    private void BtnAdvAllCombinedSet_Clicked(object sender, EventArgs e)
+    private async void BtnAdvAllCombinedSet_Clicked(object sender, EventArgs e)
     {
-        bool hasDate = _advAllDateMode;
+        bool hasDate = advAllFromPicker.Date.HasValue;
         DateTime from = advAllFromPicker.Date ?? DateTime.Today;
         DateTime toRaw = advAllToPicker.Date ?? DateTime.Today;
         var to = toRaw >= from ? toRaw : from;
@@ -413,23 +632,75 @@ public partial class WinnerPage : ContentPage
         string de = (entAdvAllEnd.Text ?? "").Trim();
         bool hasDraw = !string.IsNullOrEmpty(ds) && int.TryParse(ds, out _);
         if (!hasDate && !hasDraw) return;
-        int cols = _entries.GetLength(1);
+
+        if (hasDraw)
+        {
+            string? warn = SpendingTracker.CheckDrawRangeWarning("F5", from, to, ds, de,
+                currentDrawNumber: DrawNumberService.GetNextDraw("Fantasy 5"));
+            if (warn != null)
+            {
+                bool proceed = await DisplayAlert("Check Draw # Range", warn, "Save Anyway", "Fix It");
+                if (!proceed)
+                {
+                    int current = DrawNumberService.GetNextDraw("Fantasy 5");
+                    if (current <= 0) current = await DrawNumberService.EnsureNextDrawAsync("Fantasy 5");
+                    if (current > 0)
+                    {
+                        entAdvAllStart.Text = current.ToString();
+                        entAdvAllEnd.Text   = current.ToString();
+                    }
+                    return;
+                }
+            }
+        }
+
+        var sb = new System.Text.StringBuilder();
+        if (hasDraw) sb.Append($"Draw #{ds}" + (string.IsNullOrEmpty(de) || de == ds ? "" : $"–{de}"));
+        if (hasDate && hasDraw) sb.Append("  ");
+        if (hasDate) sb.Append($"{from:M/d/yy}" + (to.Date == from.Date ? "" : $"–{to:M/d/yy}"));
+
+        int applyCount = Rows;
+        if (Preferences.Get("set_row_picker", true))
+        {
+            var options = Enumerable.Range(1, Rows).Select(i => $"{i} row{(i == 1 ? "" : "s")}").Append("Clear All Advances").ToArray();
+            string? choice = await DisplayActionSheet($"Apply {sb} to:", "Cancel", null, options);
+            if (string.IsNullOrEmpty(choice) || choice == "Cancel") return;
+            if (choice == "Clear All Advances")
+            {
+                for (int r = 0; r < Rows; r++)
+                { _playStart[r] = null; _playEnd[r] = null; _drawStart[r] = ""; _drawEnd[r] = ""; }
+                if (_activeSlot >= 0) SaveAdvanceDates(_activeSlot);
+                UpdateAllResultBackgrounds();
+                for (int r = 0; r < Rows; r++)
+                    for (int c = 0; c < Cols; c++)
+                        if (string.IsNullOrWhiteSpace(_entries[r, c].Text))
+                            _entries[r, c].BackgroundColor = Color.FromArgb("#F5F5F5");
+                return;
+            }
+            applyCount = int.Parse(choice.Split(' ')[0]);
+        }
+
         for (int r = 0; r < Rows; r++)
         {
-            bool hasNums = false;
-            for (int c = 0; c < cols; c++)
-                if (!string.IsNullOrEmpty(_entries[r, c].Text)) { hasNums = true; break; }
-            if (!hasNums) continue;
-            if (!_overrideMode)
-            {
-                bool alreadySet = _playStart[r].HasValue || _playEnd[r].HasValue || !string.IsNullOrEmpty(_drawStart[r]);
-                if (alreadySet) continue;
-            }
+            _playStart[r] = null; _playEnd[r] = null;
+            _drawStart[r] = ""; _drawEnd[r] = "";
+        }
+        for (int r = 0; r < applyCount && r < Rows; r++)
+        {
             if (hasDate) { _playStart[r] = from; _playEnd[r] = to; }
             if (hasDraw) { _drawStart[r] = ds; _drawEnd[r] = string.IsNullOrEmpty(de) ? ds : de; }
         }
         if (_activeSlot >= 0) SaveAdvanceDates(_activeSlot);
         UpdateAllResultBackgrounds();
+        // Tint empty rows that have advance dates
+        for (int r = 0; r < Rows; r++)
+        {
+            bool hasAdv = _playStart[r].HasValue || _playEnd[r].HasValue || !string.IsNullOrEmpty(_drawStart[r]);
+            var bg = hasAdv ? Color.FromArgb("#E3F2FD") : Color.FromArgb("#F5F5F5");
+            for (int c = 0; c < Cols; c++)
+                if (string.IsNullOrWhiteSpace(_entries[r, c].Text))
+                    _entries[r, c].BackgroundColor = bg;
+        }
     }
 
     private static bool TryParseAdvDate(string? text, out DateTime result)
@@ -443,8 +714,11 @@ public partial class WinnerPage : ContentPage
 
     private void ApplyAdvanceToRowIfActive(int row)
     {
+        if (_suppressAdvApply) return;
+        bool alreadySet = _playStart[row].HasValue || _playEnd[row].HasValue || !string.IsNullOrEmpty(_drawStart[row]);
+        if (alreadySet && !_overrideMode) return;
         bool applied = false;
-        if (_advAllDateMode)
+        if (advAllFromPicker.Date.HasValue)
         {
             DateTime from = advAllFromPicker.Date ?? DateTime.Today;
             DateTime to = advAllToPicker.Date ?? DateTime.Today;
@@ -502,8 +776,23 @@ public partial class WinnerPage : ContentPage
         for (int i = 0; i < 10; i++)
             slotPicker.Items[i] = SlotLabel(i);
         slotPicker.SelectedIndex = _activeSlot;
-        _suppressPickerEvent = false;
+        slotPicker.Unfocus();
         UpdateExclCheckbox();
+        UpdateTicketCount();
+        // See Daily3Page.SlotPicker_Focused for why the reset happens there, not here.
+        int epoch = ++_pickerSuppressEpoch;
+        Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(400), () =>
+        {
+            if (_pickerSuppressEpoch == epoch) _suppressPickerEvent = false;
+        });
+    }
+
+    private void SlotPicker_Focused(object sender, FocusEventArgs e)
+    {
+        if (_suppressPickerEvent)
+            slotPicker.Unfocus();
+        _suppressPickerEvent = false;
+        _pickerSuppressEpoch++;
     }
 
     private void SlotPicker_Changed(object sender, EventArgs e)
@@ -511,28 +800,46 @@ public partial class WinnerPage : ContentPage
         if (_suppressPickerEvent) return;
         int slot = slotPicker.SelectedIndex;
         if (slot < 0) return;
-        // Cache current slot before switching
+        // Turn off OVR when switching sets so it doesn't affect the new set
+        _overrideMode = false;
+        btnOverride.BackgroundColor = Color.FromArgb("#546E7A");
+        advAllPanel.BackgroundColor = Colors.Transparent;
+        // Cache current slot before switching. _slotCache is in-memory only — must not be the
+        // only copy, or the outgoing slot's tickets are lost for good if the app process dies
+        // before this page is exited normally while that slot is active again. SaveSet persists
+        // them to disk now too (see Daily3Page's same fix, 2026-08-03).
         if (_activeSlot >= 0)
+        {
             _slotCache[_activeSlot] = GetCurrentEntryString();
+            SaveSet(_activeSlot, refreshPicker: false);
+        }
         SaveAdvanceDates(_activeSlot);
+        SaveFreePlay(_activeSlot);
         _activeSlot = slot;
         Preferences.Set("f5_active_slot", slot);
         ClearAllEntries();
-        if (_slotCache.TryGetValue(slot, out var cached))
+        _suppressAdvApply = true;
+        try
         {
-            var vals = cached.Split('|');
-            for (int r = 0; r < Rows; r++)
-                for (int c = 0; c < Cols; c++)
-                {
-                    int idx = r * Cols + c;
-                    _entries[r, c].Text = idx < vals.Length ? vals[idx] : "";
-                }
-            CheckAll();
-            LoadAdvanceDates(slot);
-            UpdateAllResultBackgrounds();
+            if (_slotCache.TryGetValue(slot, out var cached))
+            {
+                var vals = cached.Split('|');
+                for (int r = 0; r < Rows; r++)
+                    for (int c = 0; c < Cols; c++)
+                    {
+                        int idx = r * Cols + c;
+                        _entries[r, c].Text = idx < vals.Length ? vals[idx] : "";
+                    }
+                CheckAll();
+                LoadAdvanceDates(slot);
+                RefreshAdvAllPanel();
+                LoadFreePlay(slot);
+                UpdateAllResultBackgrounds();
+            }
+            else if (SlotHasData(slot))
+                FillFromSlot(slot);
         }
-        else if (SlotHasData(slot))
-            FillFromSlot(slot);
+        finally { _suppressAdvApply = false; }
         UpdateSlotPicker();
     }
 
@@ -553,11 +860,12 @@ public partial class WinnerPage : ContentPage
                     new ColumnDefinition(GridLength.Star),
                     new ColumnDefinition(GridLength.Star),
                     new ColumnDefinition(GridLength.Auto),   // result label
+                    new ColumnDefinition(GridLength.Auto),   // FP button
                 },
-                ColumnSpacing = 4,
+                ColumnSpacing = 6,
                 BackgroundColor = Colors.White,
-                Margin = new Thickness(0, 1),
-                Padding = new Thickness(4, 2),
+                Margin = new Thickness(0),
+                Padding = new Thickness(10, 8),
             };
 
             // Row number — tap to clear this row
@@ -618,13 +926,20 @@ public partial class WinnerPage : ContentPage
                             }
                         }
                     }
-                    if (!_voiceSettingText && _entries[row_, col_].Text?.Length == 2)
-                        AdvanceFocus(row_, col_);
+                    if (!_voiceSettingText && nv.Length == 2)
+                    {
+                        if (int.TryParse(nv, out int cv) && cv >= 1)
+                            AdvanceFocus(row_, col_);
+                        else
+                            ((Entry)s!).Text = ""; // reject "00", stay on this box
+                    }
                     SaveEntries();
+                    TriggerAutoSaveIndicator();
                     bool rowFull = true;
                     for (int ci = 0; ci < Cols; ci++)
                         if (string.IsNullOrEmpty(_entries[row_, ci].Text)) { rowFull = false; break; }
                     if (rowFull) CheckAll();
+                    UpdateTicketCount();
                 };
 
                 _entries[r, c] = entry;
@@ -664,7 +979,56 @@ public partial class WinnerPage : ContentPage
                 Command = new Command(() => ShowAdvancePlayOverlay(ri))
             });
 
-            rowsContainer.Children.Add(row);
+            // FP (Free Play) toggle — use Border+Label to avoid Android minimum button size
+            var fpLabel = new Label
+            {
+                Text = "FP",
+                FontSize = 11,
+                FontAttributes = FontAttributes.Bold,
+                TextColor = Color.FromArgb("#78909C"),
+                HorizontalOptions = LayoutOptions.Center,
+                VerticalOptions = LayoutOptions.Center,
+            };
+            var fpBorder = new Border
+            {
+                Content = fpLabel,
+                BackgroundColor = Color.FromArgb("#37474F"),
+                StrokeThickness = 0,
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 3 },
+                Padding = new Thickness(5, 3),
+                WidthRequest = 32,
+                HeightRequest = 28,
+                VerticalOptions = LayoutOptions.Center,
+                HorizontalOptions = LayoutOptions.Center,
+            };
+            // Store border as the "button" for color updates
+            _fpBtns[r] = new Button { IsVisible = false }; // placeholder — not used for display
+            int fpRow = r;
+            fpBorder.GestureRecognizers.Add(new TapGestureRecognizer
+            {
+                Command = new Command(() =>
+                {
+                    _freePlay[fpRow] = !_freePlay[fpRow];
+                    RefreshFpBtn(fpRow);
+                    SaveFreePlay(_activeSlot);
+                })
+            });
+            // Store border reference for color refresh
+            _fpBorders[r] = fpBorder;
+            Grid.SetColumn(fpBorder, 7);
+            row.Children.Add(fpBorder);
+
+            var card = new Border
+            {
+                Content = row,
+                BackgroundColor = Colors.White,
+                Stroke = new SolidColorBrush(Color.FromArgb("#E5E7EB")),
+                StrokeThickness = 1,
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(12) },
+                Padding = new Thickness(0),
+                Margin = new Thickness(0, 4),
+            };
+            rowsContainer.Children.Add(card);
         }
     }
 
@@ -687,8 +1051,11 @@ public partial class WinnerPage : ContentPage
     {
         entry.TextChanged += (s, e) =>
         {
-            if (int.TryParse(e.NewTextValue, out int v) && v > max)
-                ((Entry)s!).Text = e.OldTextValue ?? "";
+            var ent = (Entry)s!;
+            string nv = e.NewTextValue ?? "";
+            if (int.TryParse(nv, out int v) &&
+                (v > max || (nv.Length == ent.MaxLength && v < 1)))
+                ent.Text = e.OldTextValue ?? "";
         };
     }
 
@@ -717,12 +1084,14 @@ public partial class WinnerPage : ContentPage
     {
         if (rowIndex < 0 || rowIndex >= rowsContainer.Children.Count) return;
         if (rowsContainer.Children[rowIndex] is not View rowView) return;
-        _highlightedView = rowView;
-        rowView.BackgroundColor = Color.FromArgb("#FFF176");
+        // rowsContainer holds Border cards — highlight the inner Grid so it's visible
+        var target = (rowView is Border b && b.Content is View inner) ? inner : rowView;
+        _highlightedView = target;
+        target.BackgroundColor = Color.FromArgb("#FFF176");
         if (rowsContainer.Parent is ScrollView sv)
             await sv.ScrollToAsync(rowView, ScrollToPosition.MakeVisible, true);
         await Task.Delay(2000);
-        rowView.BackgroundColor = Colors.White;
+        target.BackgroundColor = Colors.White;
         _highlightedView = null;
     }
 
@@ -763,7 +1132,14 @@ public partial class WinnerPage : ContentPage
         if (_drawsLoaded)
         {
             bool hasTodayDraw = _allDraws.Any(d => d.Date.Date == DateTime.Today);
-            if (hasTodayDraw) return;
+            if (hasTodayDraw)
+            {
+                await Task.Delay(400);
+                spinner.IsVisible = false;
+                spinner.IsRunning = false;
+                loadingOverlay.IsVisible = false;
+                return;
+            }
             _drawsLoaded = false;
             _allDraws.Clear();
         }
@@ -810,8 +1186,8 @@ public partial class WinnerPage : ContentPage
         MainThread.BeginInvokeOnMainThread(() =>
         {
             drawDatePicker.MinimumDate = _allDraws.Last().Date.Date;
-            drawDatePicker.MaximumDate = _allDraws.First().Date.Date;
-            var targetDate = defaultDraw.Date != default ? defaultDraw.Date.Date : _allDraws.First().Date.Date;
+            drawDatePicker.MaximumDate = DateTime.Today;
+            var targetDate = DateTime.Today;
             if (drawDatePicker.Date == targetDate)
                 ShowDrawForDate(targetDate); // DateSelected won't fire if date unchanged
             else
@@ -882,6 +1258,13 @@ public partial class WinnerPage : ContentPage
         _activeSlot = -1;
         ClearAllEntries();
         UpdateSlotPicker();
+    }
+
+    /// <summary>Called after a purge to drop the slot number cache so OnDisappearing can't write stale numbers back to prefs.</summary>
+    internal void InvalidateAfterPurge()
+    {
+        _slotCache.Clear();
+        _advDatesLoaded = false; // prevent SaveAdvanceDates from writing stale null values before next LoadAdvanceDates
     }
 
     // ── Button handlers ──────────────────────────────────────────────────────
@@ -1177,6 +1560,27 @@ public partial class WinnerPage : ContentPage
         drawGrid.Add(new Label { Text = "—", TextColor = Color.FromArgb("#8B9DC3"), VerticalOptions = LayoutOptions.Center, HorizontalOptions = LayoutOptions.Center, FontSize = 16 }, 1, 0);
         drawGrid.Add(_advDrawEndEntry, 2, 0);
 
+        _advWarnLabel = new Label
+        {
+            FontSize = 11,
+            TextColor = Color.FromArgb("#F59E0B"),
+            IsVisible = false,
+        };
+
+        void UpdateAdvWarning()
+        {
+            string w = SpendingTracker.CheckDrawRangeWarning(
+                "F5", _advStartPicker!.Date ?? DateTime.Today, _advEndPicker!.Date ?? DateTime.Today,
+                _advDrawStartEntry!.Text ?? "", _advDrawEndEntry!.Text ?? "",
+                currentDrawNumber: DrawNumberService.GetNextDraw("Fantasy 5")) ?? "";
+            _advWarnLabel!.Text = w;
+            _advWarnLabel.IsVisible = !string.IsNullOrEmpty(w);
+        }
+        _advDrawStartEntry.TextChanged += (_, _) => UpdateAdvWarning();
+        _advDrawEndEntry.TextChanged   += (_, _) => UpdateAdvWarning();
+        _advStartPicker.DateSelected   += (_, _) => UpdateAdvWarning();
+        _advEndPicker.DateSelected     += (_, _) => UpdateAdvWarning();
+
         var btnClear  = new Button { Text = "Clear",  BackgroundColor = Color.FromArgb("#4B5563"), TextColor = Colors.White, CornerRadius = 10, HeightRequest = 42, FontSize = 13 };
         var btnCancel = new Button { Text = "Cancel", BackgroundColor = Color.FromArgb("#1E293B"), TextColor = Colors.White, CornerRadius = 10, HeightRequest = 42, FontSize = 13 };
         var btnOk     = new Button { Text = "OK",     BackgroundColor = Color.FromArgb("#2563EB"), TextColor = Colors.White, CornerRadius = 10, HeightRequest = 42, FontSize = 13, FontAttributes = FontAttributes.Bold };
@@ -1193,17 +1597,38 @@ public partial class WinnerPage : ContentPage
             _advOverlay!.IsVisible = false;
         };
         btnCancel.Clicked += (_, _) => _advOverlay!.IsVisible = false;
-        btnOk.Clicked += (_, _) =>
+        btnOk.Clicked += async (_, _) =>
         {
             if (_advRow < 0) return;
-            _playStart[_advRow] = _advStartPicker!.Date;
-            _playEnd[_advRow]   = _advEndPicker!.Date >= _advStartPicker!.Date ? _advEndPicker!.Date : _advStartPicker!.Date;
             string ds = (_advDrawStartEntry!.Text ?? "").Trim();
             string de = (_advDrawEndEntry!.Text ?? "").Trim();
+            string? warn = SpendingTracker.CheckDrawRangeWarning("F5", _advStartPicker!.Date ?? DateTime.Today, _advEndPicker!.Date ?? DateTime.Today, ds, de,
+                currentDrawNumber: DrawNumberService.GetNextDraw("Fantasy 5"));
+            if (warn != null)
+            {
+                bool proceed = await DisplayAlert("Check Draw # Range", warn, "Save Anyway", "Fix It");
+                if (!proceed)
+                {
+                    int current = DrawNumberService.GetNextDraw("Fantasy 5");
+                    if (current <= 0) current = await DrawNumberService.EnsureNextDrawAsync("Fantasy 5");
+                    if (current > 0)
+                    {
+                        ds = current.ToString();
+                        de = current.ToString();
+                        _advDrawStartEntry.Text = ds;
+                        _advDrawEndEntry.Text   = de;
+                    }
+                    UpdateAdvWarning();
+                    return;
+                }
+            }
+            _playStart[_advRow] = _advStartPicker!.Date;
+            _playEnd[_advRow]   = _advEndPicker!.Date >= _advStartPicker!.Date ? _advEndPicker!.Date : _advStartPicker!.Date;
             _drawStart[_advRow] = ds;
             _drawEnd[_advRow]   = de;
             UpdateResultBackground(_advRow);
             SaveAdvanceDates(_activeSlot);
+            _ = TicketLogService.RecordAdvanceEnteredAsync("F5", _activeSlot, _advRow, _playStart[_advRow]!.Value, _playEnd[_advRow]!.Value);
             ResultsPageCls.ClearCache(); ResultsPage.NeedsRefresh = true;
             _advOverlay!.IsVisible = false;
         };
@@ -1242,6 +1667,7 @@ public partial class WinnerPage : ContentPage
                         _advEndPicker,
                         new Label { Text = "Draw # (optional)", FontSize = 11, TextColor = Color.FromArgb("#8B9DC3") },
                         drawGrid,
+                        _advWarnLabel,
                         btnRow,
                     }
                 }
@@ -1259,29 +1685,43 @@ public partial class WinnerPage : ContentPage
 
 
 
-    private void ShowAdvancePlayOverlay(int row)
+    private async void ShowAdvancePlayOverlay(int row)
     {
         _advRow = row;
         _advStartPicker!.Date = _playStart[row] ?? DateTime.Today;
         var defEnd = _playEnd[row];
         if (!defEnd.HasValue || defEnd.Value.Date < (_playStart[row]?.Date ?? DateTime.Today))
-            defEnd = (_playStart[row] ?? DateTime.Today).AddDays(20);
+            defEnd = (_playStart[row] ?? DateTime.Today);
         _advEndPicker!.Date = defEnd.Value;
         _advDrawStartEntry!.Text = _drawStart[row] ?? "";
         _advDrawEndEntry!.Text   = _drawEnd[row] ?? "";
         _advOverlay!.IsVisible = true;
+        if (string.IsNullOrEmpty(_advDrawStartEntry.Text) && string.IsNullOrEmpty(_advDrawEndEntry.Text))
+        {
+            int current = DrawNumberService.GetNextDraw("Fantasy 5");
+            if (current <= 0) current = await DrawNumberService.EnsureNextDrawAsync("Fantasy 5");
+            if (current > 0 && _advRow == row
+                && string.IsNullOrEmpty(_advDrawStartEntry.Text) && string.IsNullOrEmpty(_advDrawEndEntry.Text))
+            {
+                _advDrawStartEntry.Text = current.ToString();
+                _advDrawEndEntry.Text   = current.ToString();
+            }
+        }
     }
 
     private void UpdateResultBackground(int r)
     {
         bool hasAdv = _playStart[r].HasValue || _playEnd[r].HasValue
                    || !string.IsNullOrEmpty(_drawStart[r]);
-        _results[r].BackgroundColor = hasAdv ? Color.FromArgb("#1A3A8A") : Colors.Transparent;
+        bool hasNums = false;
+        for (int c = 0; c < Cols; c++)
+            if (!string.IsNullOrEmpty(_entries[r, c].Text)) { hasNums = true; break; }
+        _results[r].BackgroundColor = (hasAdv && hasNums) ? Color.FromArgb("#1A3A8A") : Colors.Transparent;
         bool showingResult = !string.IsNullOrEmpty(_results[r].Text) && _results[r].Text != "+";
         if (!showingResult)
         {
             _results[r].Text = "+";
-            _results[r].TextColor = hasAdv ? Colors.White : Color.FromArgb("#4B6A8A");
+            _results[r].TextColor = (hasAdv && hasNums) ? Colors.White : Color.FromArgb("#4B6A8A");
         }
     }
 
@@ -1362,6 +1802,7 @@ public partial class WinnerPage : ContentPage
     private void SaveAdvanceDates(int slot)
     {
         if (slot < 0) return;
+        if (!_advDatesLoaded) return; // never write before we've loaded — would blank out stored dates
         var parts = new string[Rows];
         for (int r = 0; r < Rows; r++)
         {
@@ -1370,6 +1811,7 @@ public partial class WinnerPage : ContentPage
             parts[r] = $"{s}~{e}~{_drawStart[r] ?? ""}~{_drawEnd[r] ?? ""}";
         }
         Preferences.Set(AdvDatesKey(slot), string.Join("|", parts));
+        ResultsPage.NeedsRefresh = true;
     }
 
     public void FlushAdvanceDates()
@@ -1377,31 +1819,45 @@ public partial class WinnerPage : ContentPage
         if (_activeSlot >= 0) SaveAdvanceDates(_activeSlot);
     }
 
+    private async void RefreshAdvAllPanel()
+    {
+        advAllFromPicker.Date = DateTime.Today;
+        advAllToPicker.Date   = DateTime.Today;
+        int next = await DrawNumberService.EnsureNextDrawAsync("Fantasy 5");
+        if (next > 0) { entAdvAllStart.Text = next.ToString(); entAdvAllEnd.Text = next.ToString(); }
+    }
+
     private void LoadAdvanceDates(int slot)
     {
+        _advDatesLoaded = false;
         Array.Clear(_playStart, 0, Rows);
         Array.Clear(_playEnd,   0, Rows);
         Array.Clear(_drawStart, 0, Rows);
         Array.Clear(_drawEnd,   0, Rows);
-        if (slot < 0) return;
-        string raw = Preferences.Get(AdvDatesKey(slot), "");
-        if (string.IsNullOrEmpty(raw)) return;
-        var parts = raw.Split('|');
-        for (int r = 0; r < Rows && r < parts.Length; r++)
+        if (slot >= 0)
         {
-            var pair = parts[r].Split('~');
-            if (pair.Length >= 2)
+            string raw = Preferences.Get(AdvDatesKey(slot), "");
+            if (!string.IsNullOrEmpty(raw))
             {
-                if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null,
-                    System.Globalization.DateTimeStyles.None, out var sd))
-                    _playStart[r] = sd;
-                if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null,
-                    System.Globalization.DateTimeStyles.None, out var ed))
-                    _playEnd[r] = ed;
+                var parts = raw.Split('|');
+                for (int r = 0; r < Rows && r < parts.Length; r++)
+                {
+                    var pair = parts[r].Split('~');
+                    if (pair.Length >= 2)
+                    {
+                        if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null,
+                            System.Globalization.DateTimeStyles.None, out var sd))
+                            _playStart[r] = sd;
+                        if (DateTime.TryParseExact(pair[1], "yyyyMMdd", null,
+                            System.Globalization.DateTimeStyles.None, out var ed))
+                            _playEnd[r] = ed;
+                    }
+                    _drawStart[r] = pair.Length > 2 ? pair[2] : "";
+                    _drawEnd[r]   = pair.Length > 3 ? pair[3] : "";
+                }
             }
-            _drawStart[r] = pair.Length > 2 ? pair[2] : "";
-            _drawEnd[r]   = pair.Length > 3 ? pair[3] : "";
         }
+        _advDatesLoaded = true; // safe to save from this point forward
     }
 
 }

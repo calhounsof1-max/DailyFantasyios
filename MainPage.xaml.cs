@@ -7,6 +7,15 @@ public partial class MainPage : ContentPage
 {
     internal const string HotSpotOnlyModeKey = "hotspot_only_mode";
 
+    // Referenced by other game pages' "Go to Game" menu (MainPage.Instance?.ShowNavOverlay(...))
+    // to show a loading indicator while Shell pops back to Home before navigating onward. Reuses
+    // the existing loadingOverlay/vm.IsLoading rather than Android's separate nav-specific
+    // overlay+label, since iOS's XAML doesn't have that second overlay — good enough to show
+    // loading feedback without adding new UI just for this.
+    internal static MainPage? Instance;
+    internal void ShowNavOverlay(string label) => vm.IsLoading = true;
+    internal void HideNavOverlay() => vm.IsLoading = false;
+
     readonly MainViewModel vm = new();
     int _mode = 0; // 0=F5, 1=SL, 2=D3
     bool _isRestoring = false;
@@ -21,6 +30,7 @@ public partial class MainPage : ContentPage
     {
         InitializeComponent();
         BindingContext = vm;
+        Instance = this;
         cmbRecurrence.SelectedIndex = 0;
 
         foreach (var entry in new[] { Box1, Box2, Box3, Box4, Box5, Box6, Box7,
