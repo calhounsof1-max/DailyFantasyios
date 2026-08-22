@@ -1,15 +1,23 @@
+using DailyFantasyMAUI.Services;
+
 namespace DailyFantasyMAUI;
 
 public partial class ResultsPage : ContentPage
 {
     private DateResultData? _lastData;
     private DateTime? _lastRunDate;
+    private DateTime _lastFetchTime = DateTime.MinValue;
+    private CancellationTokenSource? _autoRefreshCts;
+    private const int AutoRefreshIntervalSeconds = 60;
     internal static bool SkipNextRefresh;
     internal static bool NeedsRefresh;
     private Grid? _highlightedRow;
-    // key = (Game, SetNumber, RowNumber) → Preferences key for "collected" state
-    private readonly Dictionary<(string Game, int Set, int Row), string> _collKeyMap = new();
+    // key = the specific WinnerEntry row instance → Preferences key for "collected" state.
+    // Keyed by instance (not Game/Set/Row) because one ticket can have multiple win rows —
+    // one per draw date it won on — and each needs its own independent collected state.
+    private readonly Dictionary<WinnerEntry, string> _collKeyMap = new();
     private readonly Dictionary<string, bool> _sectionCollapsed = new();
+    private readonly Dictionary<string, Label> _gameTotalLabels = new();
 
     public ResultsPage()
     {
@@ -22,10 +30,90 @@ public partial class ResultsPage : ContentPage
         TranslationX = fromRight ? w : -w;
     }
 
+    private void UpdateTicketCount()
+    {
+        int CountRows(string prefix, int cols)
+        {
+            int CountFromData(string data) {
+                var vals = data.Split('|');
+                return Enumerable.Range(0, 10).Count(r =>
+                    Enumerable.Range(0, cols).Any(c => {
+                        int idx = r * cols + c;
+                        return idx < vals.Length && !string.IsNullOrWhiteSpace(vals[idx]);
+                    }));
+            }
+            int total = Enumerable.Range(0, 10)
+                .Where(s => !string.IsNullOrEmpty(Preferences.Get($"{prefix}_set_{s}", "")))
+                .Sum(s => CountFromData(Preferences.Get($"{prefix}_set_{s}", "")));
+            if (total == 0) {
+                var live = Preferences.Get($"{prefix}_entries", "");
+                if (!string.IsNullOrEmpty(live)) total = CountFromData(live);
+            }
+            return total;
+        }
+
+        int f5 = CountRows("f5", 5), sl = CountRows("sl", 6), pb = CountRows("pb", 6);
+        int mm = CountRows("mm", 6), d3 = CountRows("d3", 3), d4 = CountRows("d4", 4), dd = CountRows("dd", 4);
+        int total = f5 + sl + pb + mm + d3 + d4 + dd;
+
+        ticketBadgeRow.Children.Clear();
+
+        if (total == 0)
+        {
+            ticketBadgeRow.Children.Add(new Label
+            {
+                Text = "No tickets saved — add numbers in each game page",
+                FontSize = 11, TextColor = Color.FromArgb("#888"),
+                VerticalOptions = LayoutOptions.Center
+            });
+            return;
+        }
+
+        var pills = new (string Label, int Count, string Color)[]
+        {
+            ("F5", f5, "#FF8F00"),
+            ("SL", sl, "#7B1FA2"),
+            ("PB", pb, "#C62828"),
+            ("MM", mm, "#F57F17"),
+            ("D3", d3, "#1565C0"),
+            ("D4", d4, "#00695C"),
+            ("DD", dd, "#5D4037"),
+        };
+
+        foreach (var (label, count, hex) in pills)
+        {
+            if (count == 0) continue;
+            var pill = new Border
+            {
+                BackgroundColor = Color.FromArgb(hex),
+                StrokeThickness = 0,
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 11 },
+                Padding = new Thickness(9, 3),
+                Margin = new Thickness(0, 0, 4, 2),
+                Content = new Label
+                {
+                    Text = $"{label} ×{count}",
+                    FontSize = 11, FontAttributes = FontAttributes.Bold,
+                    TextColor = Colors.White
+                }
+            };
+            ticketBadgeRow.Children.Add(pill);
+        }
+
+        ticketBadgeRow.Children.Add(new Label
+        {
+            Text = $"= {total} Total",
+            FontSize = 12, FontAttributes = FontAttributes.Bold, TextColor = Color.FromArgb("#333"),
+            VerticalOptions = LayoutOptions.Center,
+            Margin = new Thickness(2, 0, 0, 0)
+        });
+    }
+
     protected override void OnAppearing()
     {
         this.TranslateTo(0, 0, 220, Easing.CubicOut);
         base.OnAppearing();
+        UpdateTicketCount();
         AppShell.WinnerPageInstance.ClearHighlight();
         AppShell.SuperLottoPageInstance.ClearHighlight();
         AppShell.PowerballPageInstance.ClearHighlight();
@@ -38,11 +126,137 @@ public partial class ResultsPage : ContentPage
             _highlightedRow.BackgroundColor = Colors.White;
             _highlightedRow = null;
         }
-        if (SkipNextRefresh) { SkipNextRefresh = false; return; }
-        if (_lastData != null && _lastRunDate == DateTime.Today && !NeedsRefresh) return;
+        if (SkipNextRefresh) { SkipNextRefresh = false; SetBusy(false, ""); StartAutoRefresh(); return; }
+
+        bool wasNeedsRefresh = NeedsRefresh;
+
+        // Already have fresh data for today — nothing to do (auto-refresh timer handles updates)
+        if (_lastData != null && _lastRunDate == DateTime.Today && !wasNeedsRefresh)
+        {
+            SetBusy(false, "");
+            StartAutoRefresh();
+            return;
+        }
+
         NeedsRefresh = false;
+        // AutoClearExpiredOldSets() removed — was silently deleting non-active slots without confirmation.
+        // Expired play cleanup is handled by CheckAutoPurgeOnStartupAsync (startup dialog with "No, Keep All").
         resultDatePicker.Date = DateTime.Today;
-        _ = RunCheck(DateTime.Today);
+
+        if (_lastData != null && !wasNeedsRefresh)
+        {
+            // Have stale/yesterday data — show it instantly, refresh quietly in background
+            SetBusy(false, "");
+            BuildResultsUI(_lastData);
+            _ = Task.Run(() => BackgroundRefreshAsync(DateTime.Today));
+            StartAutoRefresh();
+        }
+        else
+        {
+            // No UI data yet, OR tickets changed (wasNeedsRefresh) — do a fresh load.
+            // Do NOT clear the draw cache — reuse whatever LoadAllDrawsAsync already fetched (fast).
+            // This re-reads all ticket prefs so newly entered tickets show up immediately.
+            if (btnCheckTickets != null) btnCheckTickets.IsEnabled = false;
+            if (btnRefresh != null) btnRefresh.IsEnabled = false;
+            _ = Task.Delay(80).ContinueWith(_ => MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                SetBusy(true, $"Checking {DateTime.Today:ddd, MMM d, yyyy}...");
+                var data = await ResultsPageCls.ProcessDateAsync(DateTime.Today);
+                _lastData = data;
+                _lastRunDate = DateTime.Today;
+                _lastFetchTime = DateTime.Now;
+                SetBusy(false, "");
+                BuildResultsUI(data);
+                if (btnCheckTickets != null) btnCheckTickets.IsEnabled = true;
+                if (btnRefresh != null) btnRefresh.IsEnabled = true;
+                StartAutoRefresh();
+            }));
+        }
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        _autoRefreshCts?.Cancel();
+        _autoRefreshCts = null;
+        lblCountdown.Text = "";
+    }
+
+    private void StartAutoRefresh()
+    {
+        _autoRefreshCts?.Cancel();
+        _autoRefreshCts = new CancellationTokenSource();
+        var token = _autoRefreshCts.Token;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    for (int secs = AutoRefreshIntervalSeconds; secs > 0; secs--)
+                    {
+                        if (token.IsCancellationRequested) return;
+                        int display = secs;
+                        await MainThread.InvokeOnMainThreadAsync(() =>
+                            lblCountdown.Text = $"Next refresh in {display}s");
+                        await Task.Delay(1000, token);
+                    }
+                    if (token.IsCancellationRequested) break;
+
+                    await MainThread.InvokeOnMainThreadAsync(() => lblCountdown.Text = "Refreshing...");
+
+                    var selectedDate = await MainThread.InvokeOnMainThreadAsync(
+                        () => resultDatePicker?.Date ?? DateTime.Today);
+                    if (selectedDate.Date == DateTime.Today)
+                        await BackgroundRefreshAsync(DateTime.Today);
+                }
+            }
+            catch (TaskCanceledException) { }
+        }, token);
+    }
+
+    // ── Silent background refresh ────────────────────────────────────────────
+
+    private async Task BackgroundRefreshAsync(DateTime date)
+    {
+        try
+        {
+            ResultsPageCls.ClearCache();
+            var data = await ResultsPageCls.ProcessDateAsync(date);
+
+            // Only rebuild the UI if the winning numbers actually changed
+            // (draws are posted once per day — most background refreshes return identical data)
+            bool changed = _lastData == null
+                || !data.F5Numbers.SequenceEqual(_lastData.F5Numbers)
+                || !data.SLMain.SequenceEqual(_lastData.SLMain)
+                || !data.PBMain.SequenceEqual(_lastData.PBMain)
+                || !data.MMMain.SequenceEqual(_lastData.MMMain)
+                || data.D3MiddayDrawNum  != _lastData.D3MiddayDrawNum
+                || data.D3EveningDrawNum != _lastData.D3EveningDrawNum
+                || data.D4DrawNumber     != _lastData.D4DrawNumber
+                || data.DDDrawNumber     != _lastData.DDDrawNumber;
+
+            _lastData    = data;
+            _lastRunDate = date;
+            _lastFetchTime = DateTime.Now;
+
+            if (changed)
+            {
+                await MainThread.InvokeOnMainThreadAsync(() =>
+                {
+                    SetBusy(false, "");
+                    BuildResultsUI(data);
+                });
+            }
+            else
+            {
+                await MainThread.InvokeOnMainThreadAsync(() => SetBusy(false, ""));
+            }
+        }
+        catch
+        {
+            await MainThread.InvokeOnMainThreadAsync(() => SetBusy(false, ""));
+        }
     }
 
     // ── Date picker — auto-run check when date changes ───────────────────────
@@ -56,7 +270,23 @@ public partial class ResultsPage : ContentPage
 
     private async void BtnCheckTickets_Clicked(object sender, EventArgs e)
     {
-        await RunCheck(resultDatePicker?.Date ?? DateTime.Today);
+        if (btnCheckTickets != null) btnCheckTickets.IsEnabled = false;
+        if (btnRefresh != null) btnRefresh.IsEnabled = false;
+        SetBusy(true, "Checking tickets...");
+        try { await RunCheck(resultDatePicker?.Date ?? DateTime.Today); }
+        finally
+        {
+            if (btnCheckTickets != null) btnCheckTickets.IsEnabled = true;
+            if (btnRefresh != null) btnRefresh.IsEnabled = true;
+        }
+    }
+
+    /// <summary>Clears the in-memory cache so the next visit re-reads current prefs.</summary>
+    internal void InvalidateCache()
+    {
+        _lastData    = null;
+        _lastRunDate = null;
+        NeedsRefresh = true;
     }
 
     private async Task RunCheck(DateTime date)
@@ -70,6 +300,7 @@ public partial class ResultsPage : ContentPage
         var data = await ResultsPageCls.ProcessDateAsync(date);
         _lastData = data;
         _lastRunDate = date;
+        _lastFetchTime = DateTime.Now;
 
         SetBusy(false, "");
         BuildResultsUI(data);
@@ -82,6 +313,10 @@ public partial class ResultsPage : ContentPage
         resultsContainer.Children.Clear();
         totalWinBanner.IsVisible = false;
         _collKeyMap.Clear();
+        _gameTotalLabels.Clear();
+
+        // Read the current enhance-mode preference (false = classic plain text by default)
+        bool enhanced = EnhanceModeService.IsEnhanced(EnhanceModeService.ResultsPageKey);
 
         if (!string.IsNullOrEmpty(data.Error))
         {
@@ -98,7 +333,7 @@ public partial class ResultsPage : ContentPage
         }
 
         // ── F5 section ───────────────────────────────────────────────────────
-        if (ResultsPageCls.HasSets("f5"))
+        if (!ResultsPageCls.IsGameExcluded("f5"))
         {
             string f5DrawLabel = data.F5DrawNumber > 0 ? $"Draw #{data.F5DrawNumber}  " : "";
             string f5Win = data.F5Numbers.Length > 0
@@ -106,11 +341,13 @@ public partial class ResultsPage : ContentPage
                 : "No draw found for this date";
             var f5Winners = data.Winners.Where(w => w.Game == "F5").ToList();
             BuildSection("FANTASY 5", "#FF8F00", f5Win, f5Winners, "F5",
-                f5Winners.Sum(w => ParsePrize(w.Prize).amount), data.F5DrawDate);
+                CheckedGameTotal(f5Winners), data.F5DrawDate, data.F5DrawNumber, 0,
+                data.F5Numbers.Length > 0 ? data.F5Numbers : null,
+                enhanced: enhanced);
         }
 
         // ── SL section ───────────────────────────────────────────────────────
-        if (ResultsPageCls.HasSets("sl"))
+        if (!ResultsPageCls.IsGameExcluded("sl"))
         {
             string slDrawLabel = data.SLDrawNumber > 0 ? $"Draw #{data.SLDrawNumber}  " : "";
             string slWin = data.SLMain.Length > 0
@@ -119,11 +356,13 @@ public partial class ResultsPage : ContentPage
                 : "No draw found for this date";
             var slWinners = data.Winners.Where(w => w.Game == "SL").ToList();
             BuildSection("SUPER LOTTO PLUS", "#7B1FA2", slWin, slWinners, "SL",
-                slWinners.Sum(w => ParsePrize(w.Prize).amount), data.SLDrawDate);
+                CheckedGameTotal(slWinners), data.SLDrawDate, data.SLDrawNumber, 0,
+                data.SLMain.Length > 0 ? [..data.SLMain, data.SLMega] : null,
+                enhanced: enhanced);
         }
 
         // ── PB section ───────────────────────────────────────────────────────
-        if (ResultsPageCls.HasSets("pb"))
+        if (!ResultsPageCls.IsGameExcluded("pb"))
         {
             string pbDrawLabel = data.PBDrawNumber > 0 ? $"Draw #{data.PBDrawNumber}  " : "";
             string pbWin = data.PBMain.Length > 0
@@ -132,11 +371,13 @@ public partial class ResultsPage : ContentPage
                 : "No draw found for this date";
             var pbWinners = data.Winners.Where(w => w.Game == "PB").ToList();
             BuildSection("POWERBALL", "#C62828", pbWin, pbWinners, "PB",
-                pbWinners.Sum(w => ParsePrize(w.Prize).amount), data.PBDrawDate);
+                CheckedGameTotal(pbWinners), data.PBDrawDate, data.PBDrawNumber, 0,
+                data.PBMain.Length > 0 ? [..data.PBMain, data.PBBall] : null,
+                enhanced: enhanced);
         }
 
         // ── MM section ───────────────────────────────────────────────────────
-        if (ResultsPageCls.HasSets("mm"))
+        if (!ResultsPageCls.IsGameExcluded("mm"))
         {
             string mmDrawLabel = data.MMDrawNumber > 0 ? $"Draw #{data.MMDrawNumber}  " : "";
             string mmWin = data.MMMain.Length > 0
@@ -145,11 +386,13 @@ public partial class ResultsPage : ContentPage
                 : "No draw found for this date";
             var mmWinners = data.Winners.Where(w => w.Game == "MM").ToList();
             BuildSection("MEGA MILLIONS", "#F57F17", mmWin, mmWinners, "MM",
-                mmWinners.Sum(w => ParsePrize(w.Prize).amount), data.MMDrawDate);
+                CheckedGameTotal(mmWinners), data.MMDrawDate, data.MMDrawNumber, 0,
+                data.MMMain.Length > 0 ? [..data.MMMain, data.MMBall] : null,
+                enhanced: enhanced);
         }
 
         // ── D3 section ───────────────────────────────────────────────────────
-        if (ResultsPageCls.HasSets("d3"))
+        if (!ResultsPageCls.IsGameExcluded("d3"))
         {
             string d3Win;
             if (data.D3Midday != null || data.D3Evening != null)
@@ -161,7 +404,6 @@ public partial class ResultsPage : ContentPage
                 if (data.D3Evening != null)
                 {
                     eve = eveLabel + string.Join("-", data.D3Evening);
-                    // If evening is from a different date (yesterday's fallback), note it
                     if (!string.IsNullOrEmpty(data.D3EveningDateLabel) &&
                         !string.IsNullOrEmpty(data.D3MiddayDateLabel) &&
                         data.D3EveningDateLabel != data.D3MiddayDateLabel)
@@ -178,12 +420,20 @@ public partial class ResultsPage : ContentPage
                 d3Win = "No draw found for this date";
             }
             var d3Winners = data.Winners.Where(w => w.Game == "D3").ToList();
+            bool d3EveFromPrev = !string.IsNullOrEmpty(data.D3EveningDateLabel) &&
+                                 !string.IsNullOrEmpty(data.D3MiddayDateLabel) &&
+                                 data.D3EveningDateLabel != data.D3MiddayDateLabel;
             BuildSection("DAILY 3", "#1565C0", d3Win, d3Winners, "D3",
-                d3Winners.Sum(w => ParsePrize(w.Prize).amount), data.D3MiddayDateLabel);
+                CheckedGameTotal(d3Winners), data.D3MiddayDateLabel,
+                data.D3MiddayDrawNum, data.D3EveningDrawNum,
+                winningNums:  data.D3Midday,
+                winningNums2: data.D3Evening ?? Array.Empty<int>(),
+                winNums2Suffix: d3EveFromPrev ? "(prev)" : "",
+                enhanced: enhanced);
         }
 
         // ── D4 section ───────────────────────────────────────────────────────
-        if (ResultsPageCls.HasSets("d4"))
+        if (!ResultsPageCls.IsGameExcluded("d4"))
         {
             string d4DrawLabel = data.D4DrawNumber > 0 ? $"Draw #{data.D4DrawNumber}  " : "";
             string d4Win = data.D4Numbers != null
@@ -191,23 +441,28 @@ public partial class ResultsPage : ContentPage
                 : "No draw found for this date";
             var d4Winners = data.Winners.Where(w => w.Game == "D4").ToList();
             BuildSection("DAILY 4", "#00695C", d4Win, d4Winners, "D4",
-                d4Winners.Sum(w => ParsePrize(w.Prize).amount), data.D4DrawDate);
+                CheckedGameTotal(d4Winners), data.D4DrawDate, data.D4DrawNumber,
+                enhanced: enhanced);
         }
 
         // ── DD section ───────────────────────────────────────────────────────
-        if (ResultsPageCls.HasDDSets())
+        if (!ResultsPageCls.IsGameExcluded("dd"))
         {
             string ddWin;
+            int[]? ddWinNums = null;
             string ddDrawLabel = data.DDDrawNumber > 0 ? $"Draw #{data.DDDrawNumber}  " : "";
             if (data.DDHorses != null && data.DDHorses.Length == 3)
             {
-                ddWin = ddDrawLabel + $"1st:{data.DDHorses[0]}  2nd:{data.DDHorses[1]}  3rd:{data.DDHorses[2]}";
+                ddWinNums = data.DDHorses;
+                string raceInfo = "";
                 if (!string.IsNullOrEmpty(data.DDRaceTime))
                 {
                     string norm = new string(data.DDRaceTime.Where(char.IsDigit).ToArray());
                     string last3 = norm.Length >= 3 ? norm[^3..] : norm;
-                    ddWin += $"   ⏱{data.DDRaceTime}  [{last3}]";
+                    raceInfo = $"  ⏱{data.DDRaceTime}  [{last3}]";
                 }
+                // "Winning:" marker lets BuildSection extract the draw info label from the rest
+                ddWin = ddDrawLabel + $"1st:{data.DDHorses[0]}  2nd:{data.DDHorses[1]}  3rd:{data.DDHorses[2]}{raceInfo}  Winning: {data.DDHorses[0]}  {data.DDHorses[1]}  {data.DDHorses[2]}";
             }
             else
             {
@@ -215,29 +470,11 @@ public partial class ResultsPage : ContentPage
             }
             var ddWinners = data.Winners.Where(w => w.Game == "DD").ToList();
             BuildSection("DAILY DERBY", "#5D4037", ddWin, ddWinners, "DD",
-                ddWinners.Sum(w => ParsePrize(w.Prize).amount), data.DDDrawDate);
+                CheckedGameTotal(ddWinners), data.DDDrawDate, data.DDDrawNumber,
+                winningNums: ddWinNums, enhanced: enhanced);
         }
 
         // ── Summary ──────────────────────────────────────────────────────────
-        bool anySets = ResultsPageCls.HasSets("f5") || ResultsPageCls.HasSets("sl") ||
-                       ResultsPageCls.HasSets("pb") || ResultsPageCls.HasSets("mm") ||
-                       ResultsPageCls.HasSets("d3") || ResultsPageCls.HasSets("d4") ||
-                       ResultsPageCls.HasDDSets();
-
-        if (!anySets)
-        {
-            lblBottom.Text = "No sets saved — go add your numbers first";
-            resultsContainer.Children.Add(new Label
-            {
-                Text = "No sets saved. Add your numbers in the game pages first.",
-                TextColor = Color.FromArgb("#888"),
-                FontSize = 14,
-                HorizontalOptions = LayoutOptions.Center,
-                Margin = new Thickness(0, 28)
-            });
-            return;
-        }
-
         UpdateSummaryLabel();
         RefreshTotalWinnings();
 
@@ -271,22 +508,73 @@ public partial class ResultsPage : ContentPage
 
     // gameKey = "F5","SL","PB","MM","D3","D4","DD" — matches WinnerEntry.Game
     private void BuildSection(string title, string colorHex, string winNumbers,
-        List<WinnerEntry> winners, string gameKey, decimal gameTotal = 0, string drawDateStr = "")
+        List<WinnerEntry> winners, string gameKey, decimal gameTotal = 0, string drawDateStr = "",
+        int drawNumber = 0, int drawNumber2 = 0, int[]? winningNums = null,
+        int[]? winningNums2 = null, string winNums2Suffix = "", bool enhanced = false)
     {
         bool sectionIsPast = DateTime.TryParse(drawDateStr, out var drawDateParsed) && drawDateParsed.Date < DateTime.Today;
 
         // Separate past/current draw results from "still active, no win" rows
         var actualWinners = winners.Where(w => !w.IsActiveNoWin).ToList();
         var activeNoWin   = winners.Where(w =>  w.IsActiveNoWin).ToList();
+
+        // After midnight: hide expired entries from the Results page display (display-only, no data deleted).
+        // D3 actual wins: route through IsRowStillVisible so the same 6am cutoff used by TOTAL
+        // WINNINGS applies here too (a win's own DrawDate is meaningful — it's the day it won).
+        // D3 activeNoWin: DrawDate on these rows is NOT the ticket's date — it's stamped with
+        // result.D3MiddayDateLabel (the currently-loaded draw's date, which lags at yesterday
+        // until today's draws post), so running it through the date-aware check misread every
+        // still-active ticket as "a stale win from yesterday" and hid them all (found 2026-08-02
+        // right after install). Keep the original pure draw-number comparison for these instead.
+        if (gameKey == "D3")
+        {
+            actualWinners = actualWinners.Where(IsRowStillVisible).ToList();
+            int minD3Draw = (drawNumber > 0 && drawNumber2 > 0)
+                ? Math.Min(drawNumber, drawNumber2)
+                : Math.Max(drawNumber, drawNumber2);
+            if (minD3Draw > 0)
+                activeNoWin = activeNoWin.Where(w => w.DrawEnd <= 0 || w.DrawEnd >= minD3Draw).ToList();
+        }
+        else
+        {
+            // Non-D3: hide rows whose date has passed, win or not — D3 is the only exception
+            // (uses draw# instead, handled above). "Passed" means different things depending
+            // on the row: a regular single-day ticket goes by its own DrawDate, but an advance
+            // (multi-draw) ticket that won on an early draw is still CURRENT until its play
+            // range's own end date — the win's DrawDate can be "past" while the ticket itself
+            // isn't (e.g. a 7/25-9/16 SL ticket that won $1 on its first draw is still active).
+            actualWinners = actualWinners.Where(IsRowStillVisible).ToList();
+            // activeNoWin: only filter ADVANCE tickets (have PlayFromDate or DrawEnd set).
+            // Regular tickets (PlayFromDate="" and DrawEnd=0) always keep — their PlayToDate
+            // is stamped at processing time and may be stale from yesterday's cache.
+            activeNoWin = activeNoWin.Where(w => {
+                bool hasAdvanceDates = !string.IsNullOrEmpty(w.PlayFromDate) || w.DrawEnd > 0;
+                if (!hasAdvanceDates) return true;
+                if (string.IsNullOrEmpty(w.PlayToDate)) return true;
+                if (DateTime.TryParseExact(w.PlayToDate, "MM/dd", null,
+                    System.Globalization.DateTimeStyles.None, out var endDate))
+                {
+                    endDate = new DateTime(DateTime.Today.Year, endDate.Month, endDate.Day);
+                    return endDate.Date >= DateTime.Today;
+                }
+                return true;
+            }).ToList();
+        }
+        // Recompute the header total from the post-filter list so it never shows a $ amount
+        // for a row that was just removed from view (was the "$1 — No wins" bug, 2026-07-28).
+        gameTotal = CheckedGameTotal(actualWinners);
+
         // Only entries with an actual prize count as "wins"
         int winCount = actualWinners.Count(w => !string.IsNullOrEmpty(w.Prize));
 
-        // Auto-add actual wins (with prize) to Summary of Winnings
-        foreach (var aw in actualWinners.Where(w => !string.IsNullOrEmpty(w.Prize)))
+        // Auto-add actual wins (with a resolved amount) to Summary of Winnings —
+        // skip "n/a" so a pending win isn't recorded as a $0 win before the real
+        // payout posts on calottery.com.
+        foreach (var aw in actualWinners.Where(w => !string.IsNullOrEmpty(w.Prize) && !w.Prize.Equals("n/a", StringComparison.OrdinalIgnoreCase)))
         {
             string awDateStr = !string.IsNullOrEmpty(aw.DrawDate) ? aw.DrawDate : drawDateStr;
             if (!DateTime.TryParse(awDateStr, out var awDate) || awDate == default) continue;
-            string sk = $"auto_{aw.Game}_{aw.SetNumber}_{aw.RowNumber}_{awDate:yyyyMMdd}";
+            string sk = $"auto_{aw.Game}_{awDate:yyyyMMdd}_{aw.Numbers.Replace(" ", "")}";
             var (awAmt, _, _, awFree) = ParsePrize(aw.Prize);
             _ = SummaryPage.AddWinAsync(new WinningRecord
             {
@@ -332,7 +620,7 @@ public partial class ResultsPage : ContentPage
         string headerDateStr = "";
         if (!string.IsNullOrEmpty(drawDateStr) &&
             DateTime.TryParse(drawDateStr, out var headerDate) && headerDate != default)
-            headerDateStr = "  " + headerDate.ToString("M/d/yy");
+            headerDateStr = "  " + headerDate.ToString("MM/dd/yy");
 
         var titleLbl = new Label
         {
@@ -345,20 +633,19 @@ public partial class ResultsPage : ContentPage
         Grid.SetColumn(titleLbl, 1);
         headerGrid.Children.Add(titleLbl);
 
-        if (gameTotal > 0)
+        var gameTotalLbl = new Label
         {
-            var totalLbl = new Label
-            {
-                Text = $"${gameTotal:N0}",
-                FontSize = 13,
-                FontAttributes = FontAttributes.Bold,
-                TextColor = Color.FromArgb("#FFFF66"),
-                VerticalOptions = LayoutOptions.Center,
-                Margin = new Thickness(0, 0, 10, 0)
-            };
-            Grid.SetColumn(totalLbl, 2);
-            headerGrid.Children.Add(totalLbl);
-        }
+            Text = gameTotal > 0 ? $"${gameTotal:N0}" : "",
+            FontSize = 13,
+            FontAttributes = FontAttributes.Bold,
+            TextColor = Color.FromArgb("#FFFF66"),
+            VerticalOptions = LayoutOptions.Center,
+            Margin = new Thickness(0, 0, 10, 0),
+            IsVisible = gameTotal > 0,
+        };
+        Grid.SetColumn(gameTotalLbl, 2);
+        headerGrid.Children.Add(gameTotalLbl);
+        _gameTotalLabels[gameKey] = gameTotalLbl;
 
         var countLbl = new Label
         {
@@ -379,23 +666,82 @@ public partial class ResultsPage : ContentPage
         // ── Section body (winning numbers + rows) ──────────────────────────
         var sectionBody = new VerticalStackLayout { IsVisible = !isCollapsed };
 
-        var winLbl = new Label
+        // Active (no-win) rows: if ticket has a draw# range, show the End draw# so user knows when it expires.
+        // Winning rows: show the draw# that actually produced the win, not the range's end.
+        // Otherwise fall back to the section's current draw number.
+        int GetRowDrawNum(WinnerEntry entry, bool preferDrawEnd = true)
         {
-            Text = winNumbers,
-            FontSize = 12,
-            FontAttributes = FontAttributes.Bold,
-            TextColor = Color.FromArgb("#222"),
-            BackgroundColor = Color.FromArgb("#EEF2FF"),
-            Padding = new Thickness(12, 5)
+            if (preferDrawEnd && entry.DrawEnd > 0) return entry.DrawEnd;
+            if (!preferDrawEnd && entry.MatchDrawNum > 0) return entry.MatchDrawNum;
+            // Regular ticket (no advance draw# set): show the upcoming draw (next after last fetched)
+            if (string.IsNullOrEmpty(entry.DrawDate))
+                return entry.Game == "D3" ? Math.Max(drawNumber, drawNumber2) + 1 : drawNumber + 1;
+            return entry.Game == "D3" ? Math.Max(drawNumber, drawNumber2) : drawNumber;
+        }
+
+        // Winning numbers header — balls if we have raw numbers, plain text fallback
+        var winHeaderBox = new VerticalStackLayout
+        {
+            BackgroundColor = enhanced ? Colors.White : Color.FromArgb("#EEF2FF"),
+            Padding = new Thickness(12, enhanced ? 10 : 6),
+            Spacing = 4
         };
+
+        // In enhanced mode — show a small game logo above the numbers
+        if (enhanced)
+        {
+            string logoSrc = gameKey switch
+            {
+                "F5" => "logo_fantasy5.png",
+                "SL" => "logo_superlotto.png",
+                "PB" => "logo_powerball.png",
+                "MM" => "logo_megamillions.png",
+                "D3" => "logo_daily3.png",
+                "D4" => "logo_daily4.png",
+                "DD" => "logo_dailyderby.png",
+                _    => ""
+            };
+            if (!string.IsNullOrEmpty(logoSrc))
+                winHeaderBox.Children.Add(new Image
+                {
+                    Source            = logoSrc,
+                    HeightRequest     = 100,
+                    HorizontalOptions = LayoutOptions.Center,
+                    Aspect            = Aspect.AspectFit,
+                    Margin            = new Thickness(0, 4, 0, 8)
+                });
+        }
+
+        // Draw # / label line
         var firstActualWin = actualWinners.FirstOrDefault(w => !string.IsNullOrEmpty(w.Prize));
+        if (!string.IsNullOrEmpty(winNumbers))
+        {
+            // Extract just the draw label part (before "Winning:")
+            int winIdx = winNumbers.IndexOf("Winning:", StringComparison.OrdinalIgnoreCase);
+            string drawInfoText = winIdx > 0 ? winNumbers[..winIdx].Trim() : "";
+            if (!string.IsNullOrEmpty(drawInfoText))
+            {
+                winHeaderBox.Children.Add(new Label
+                {
+                    Text = drawInfoText,
+                    FontSize = 11,
+                    TextColor = Color.FromArgb("#555"),
+                });
+            }
+        }
+
+        // Winning numbers display — delegate to the active renderer
+        winHeaderBox.Children.Add(enhanced
+            ? ResultsRendererEnhanced.MakeWinningNumbersView(winningNums, winningNums2, winNumbers, accent, drawNumber, drawNumber2, winNums2Suffix)
+            : ResultsRendererClassic.MakeWinningNumbersView(winningNums, winningNums2, winNumbers, accent, drawNumber, drawNumber2, winNums2Suffix));
+
         if (firstActualWin != null)
         {
             var winTap = new TapGestureRecognizer();
             winTap.Tapped += (_, _) => _ = OnWinnerRowTappedAsync(firstActualWin);
-            winLbl.GestureRecognizers.Add(winTap);
+            winHeaderBox.GestureRecognizers.Add(winTap);
         }
-        sectionBody.Children.Add(winLbl);
+        sectionBody.Children.Add(winHeaderBox);
 
         if (actualWinners.Count == 0 && activeNoWin.Count == 0)
         {
@@ -413,89 +759,215 @@ public partial class ResultsPage : ContentPage
             // ── Actual winning rows ──────────────────────────────────────────
             foreach (var w in actualWinners)
             {
-                // Determine isPast per-row using the entry's own DrawDate
-                string rowDateStr = !string.IsNullOrEmpty(w.DrawDate) ? w.DrawDate : drawDateStr;
-                bool isRowPast = DateTime.TryParse(rowDateStr, out var rowDate) && rowDate.Date < DateTime.Today;
-                string rowDateFormatted = isRowPast ? rowDate.ToString("M/d/yy") : "";
+                // Determine isPast per-row using the entry's own DrawDate only (no section date fallback for regular tickets)
+                string rowDateStr = w.DrawDate ?? "";
+                DateTime rowDate = default;
+                bool isRowPast = !string.IsNullOrEmpty(rowDateStr) && DateTime.TryParse(rowDateStr, out rowDate) && rowDate.Date < DateTime.Today;
+                string rowDateFormatted = isRowPast ? rowDate.ToString("MM/dd") : "";
 
-                var row = isRowPast
-                    ? new Grid
-                    {
-                        BackgroundColor = Colors.White,
-                        Padding = new Thickness(6, 4),
-                        Margin = new Thickness(0, 1),
-                        ColumnDefinitions =
-                        {
-                            new ColumnDefinition(new GridLength(44)),   // S# R#
-                            new ColumnDefinition(GridLength.Star),      // numbers
-                            new ColumnDefinition(new GridLength(40)),   // match
-                            new ColumnDefinition(new GridLength(60)),   // prize
-                            new ColumnDefinition(new GridLength(28)),   // checkbox
-                            new ColumnDefinition(new GridLength(62)),   // date
-                        }
-                    }
-                    : new Grid
-                    {
-                        BackgroundColor = Colors.White,
-                        Padding = new Thickness(10, 5),
-                        Margin = new Thickness(0, 1),
-                        ColumnDefinitions =
-                        {
-                            new ColumnDefinition(new GridLength(55)),   // S# R#
-                            new ColumnDefinition(GridLength.Star),      // numbers
-                            new ColumnDefinition(GridLength.Auto),      // match
-                            new ColumnDefinition(new GridLength(86)),   // prize
-                        }
-                    };
-
-                row.Children.Add(MakeLabel($"S{w.SetNumber} R{w.RowNumber}",
-                    12, "#555", 0, FontAttributes.Bold));
-
-                var numsLbl = MakeLabel(w.Numbers, isRowPast ? 11 : 12, isRowPast ? "#999" : "#111", 1, FontAttributes.Bold);
-                numsLbl.LineBreakMode = LineBreakMode.NoWrap;
-                if (isRowPast) numsLbl.TextDecorations = TextDecorations.Strikethrough;
-                row.Children.Add(numsLbl);
-
-                var matchLbl = MakeLabel(w.MatchLabel, 12, isRowPast ? "#AAA" : "#E65100", 2,
-                    FontAttributes.Bold, TextAlignment.Center);
-                matchLbl.LineBreakMode = LineBreakMode.NoWrap;
-                row.Children.Add(matchLbl);
-
-                string prizeText = !string.IsNullOrEmpty(w.Prize) ? w.Prize : (isRowPast ? "No match" : "");
-                bool isJackpot = w.Prize.Contains("JACKPOT");
-                string prizeColor = isRowPast ? "#999" : (isJackpot ? "#B71C1C" : "#1B5E20");
-                var prizeLbl = MakeLabel(prizeText, isJackpot ? 12 : 13, prizeColor, 3,
-                    FontAttributes.Bold, TextAlignment.End);
-                if (isRowPast) prizeLbl.TextDecorations = TextDecorations.Strikethrough;
-                row.Children.Add(prizeLbl);
-
-                if (isRowPast && !string.IsNullOrEmpty(rowDateFormatted) && !string.IsNullOrEmpty(w.Prize))
+                var row = new Grid
                 {
-                    string collKey = $"coll_{w.Game}_{w.SetNumber}_{w.RowNumber}_{rowDateStr}";
-                    _collKeyMap[(w.Game, w.SetNumber, w.RowNumber)] = collKey;
-
-                    var cb = new CheckBox
+                    BackgroundColor = Colors.White,
+                    Padding = new Thickness(10, 7),
+                    Margin = new Thickness(0),
+                    ColumnSpacing = 4,
+                    ColumnDefinitions =
                     {
-                        IsChecked = Preferences.Get(collKey, false),
-                        Color = Color.FromArgb("#4CAF50"),
-                        VerticalOptions = LayoutOptions.Center,
-                        HorizontalOptions = LayoutOptions.Center,
-                        WidthRequest = 24,
-                        HeightRequest = 24,
-                    };
-                    Grid.SetColumn(cb, 4);
-                    cb.CheckedChanged += (_, e) =>
-                    {
-                        Preferences.Set(collKey, e.Value);
-                        RefreshTotalWinnings();
-                    };
-                    row.Children.Add(cb);
+                        new ColumnDefinition(GridLength.Auto),      // S# R#
+                        new ColumnDefinition(GridLength.Star),      // numbers — always gets whatever room is left
+                        new ColumnDefinition(GridLength.Auto),      // match
+                        new ColumnDefinition(GridLength.Auto),      // draw#
+                        new ColumnDefinition(GridLength.Auto),      // prize (tappable — doubles as collected toggle)
+                        new ColumnDefinition(GridLength.Auto),      // date
+                    }
+                };
 
-                    var dateLbl = MakeLabel(rowDateFormatted, 11, "#888", 5,
-                        FontAttributes.None, TextAlignment.End);
+                var setLbl = MakeLabel($"Set{w.SetNumber}·R{w.RowNumber}", 9, "#555", 0, FontAttributes.Bold);
+                setLbl.LineBreakMode = LineBreakMode.NoWrap;
+                if (isRowPast) setLbl.TextDecorations = TextDecorations.Strikethrough;
+                row.Children.Add(setLbl);
+
+                // Numbers — delegate to active renderer, then append bet type for D3/D4
+                {
+                    var winSet = winningNums != null ? new HashSet<int>(winningNums) : null;
+                    bool bonusMatch = w.MatchLabel.Contains('+');
+                    var numsView = enhanced
+                        ? ResultsRendererEnhanced.MakePlayerNumbersView(w.Numbers, accent, isRowPast, isRowPast ? null : winSet, gameKey, bonusMatch)
+                        : ResultsRendererClassic.MakePlayerNumbersView(w.Numbers, accent, isRowPast, isRowPast ? null : winSet, gameKey, bonusMatch);
+                    if (!string.IsNullOrEmpty(w.BetType) && (w.Game == "D3" || w.Game == "D4"))
+                    {
+                        var numsRow = new HorizontalStackLayout { Spacing = 6, VerticalOptions = LayoutOptions.Center };
+                        numsRow.Children.Add(numsView);
+                        numsRow.Children.Add(new Label
+                        {
+                            Text = w.BetType, FontSize = 9, FontAttributes = FontAttributes.Bold,
+                            TextColor = Color.FromArgb("#1565C0"),
+                            VerticalOptions = LayoutOptions.Center,
+                            LineBreakMode = LineBreakMode.NoWrap
+                        });
+                        if (w.Game == "D3" && !string.IsNullOrEmpty(w.DrawFilter))
+                        {
+                            numsRow.Children.Add(new Label
+                            {
+                                Text = D3DrawFilterLabel(w.DrawFilter), FontSize = 9, FontAttributes = FontAttributes.Bold,
+                                TextColor = Color.FromArgb("#6A1B9A"),
+                                VerticalOptions = LayoutOptions.Center,
+                                LineBreakMode = LineBreakMode.NoWrap
+                            });
+                        }
+                        Grid.SetColumn(numsRow, 1);
+                        row.Children.Add(numsRow);
+                    }
+                    else
+                    {
+                        Grid.SetColumn(numsView, 1);
+                        row.Children.Add(numsView);
+                    }
+                }
+
+                row.Children.Add(MakeMatchBadge(w.MatchLabel, w.Prize, isRowPast, 2));
+
+                int rowDrawNum = GetRowDrawNum(w, preferDrawEnd: false);
+                string drawNumText = rowDrawNum > 0 ? $"#{rowDrawNum}" : "";
+                var drawNumLbl = MakeLabel(drawNumText, 10, "#777", 3,
+                    FontAttributes.None, TextAlignment.Center);
+                drawNumLbl.Margin = new Thickness(6, 0, 0, 0);
+                drawNumLbl.LineBreakMode = LineBreakMode.NoWrap;
+                row.Children.Add(drawNumLbl);
+
+                bool isJackpot    = w.Prize.Contains("JACKPOT");
+                bool isFreeTicket = w.Prize.Contains("Free Ticket", StringComparison.OrdinalIgnoreCase);
+                string prizeText  = isFreeTicket ? "Free" : (!string.IsNullOrEmpty(w.Prize) ? w.Prize : (isRowPast ? "—" : ""));
+
+                // "n/a" = confirmed win, real payout not posted by calottery.com yet —
+                // no collected-toggle until there's an actual amount to collect against.
+                bool hasResolvedPrize = !string.IsNullOrEmpty(w.Prize) && !w.Prize.Equals("n/a", StringComparison.OrdinalIgnoreCase);
+                // Multi-draw ticket still has draws remaining beyond this win — shown as a second line below the row.
+                int winDrawNum = w.Game == "D3" ? Math.Max(drawNumber, drawNumber2) : drawNumber;
+                bool stillActiveMultiDraw = w.DrawEnd > 0 && w.DrawEnd > winDrawNum && !string.IsNullOrEmpty(w.PlayToDate);
+                // Show the full advance range whenever it's known, not just while draws remain —
+                // otherwise a completed advance ticket's win row only shows one date (the day it
+                // won), hiding which range it was actually part of.
+                bool hasPlayRange = !string.IsNullOrEmpty(w.PlayFromDate) && !string.IsNullOrEmpty(w.PlayToDate);
+
+                if (hasResolvedPrize)
+                {
+                    string displayDate = isRowPast ? rowDateFormatted : DateTime.Today.ToString("MM/dd");
+
+                    Border prizePill;
+                    Label prizeTxt;
+
+                    if (isRowPast)
+                    {
+                        // A win from an earlier draw within this ticket's still-active window.
+                        // Never green — shown as a checked/strikethrough item with its own
+                        // date + amount, independently toggleable per draw date.
+                        string effectiveDateStr = !string.IsNullOrEmpty(rowDateStr) ? rowDateStr : DateTime.Today.ToString("yyyy-MM-dd");
+                        string collKey = $"coll_{w.Game}_{w.SetNumber}_{w.RowNumber}_{effectiveDateStr}";
+                        _collKeyMap[w] = collKey;
+
+                        bool cbState = Preferences.Get(collKey, true);
+                        string PillText(bool @checked) => (@checked ? "✓ " : "") + $"{rowDateFormatted}  {prizeText}";
+
+                        prizeTxt = new Label
+                        {
+                            Text = PillText(cbState),
+                            FontSize = 8,
+                            FontAttributes = FontAttributes.Bold,
+                            TextDecorations = cbState ? TextDecorations.Strikethrough : TextDecorations.None,
+                            TextColor = cbState ? Color.FromArgb("#78909C") : (isJackpot ? Color.FromArgb("#B71C1C") : Color.FromArgb("#1B5E20")),
+                            HorizontalOptions = LayoutOptions.Center,
+                            VerticalOptions = LayoutOptions.Center,
+                            LineBreakMode = LineBreakMode.NoWrap,
+                        };
+                        prizePill = new Border
+                        {
+                            StrokeThickness = 1.5,
+                            Stroke = new SolidColorBrush(Color.FromArgb("#B0BEC5")),
+                            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 6 },
+                            BackgroundColor = cbState ? Color.FromArgb("#ECEFF1") : Colors.Transparent,
+                            Padding = new Thickness(4, 1),
+                            HorizontalOptions = LayoutOptions.End,
+                            VerticalOptions = LayoutOptions.Center,
+                            Content = prizeTxt,
+                        };
+                        prizePill.GestureRecognizers.Add(new TapGestureRecognizer
+                        {
+                            Command = new Command(() =>
+                            {
+                                cbState = !cbState;
+                                Preferences.Set(collKey, cbState);
+                                prizeTxt.Text = PillText(cbState);
+                                prizeTxt.TextDecorations = cbState ? TextDecorations.Strikethrough : TextDecorations.None;
+                                prizeTxt.TextColor = cbState ? Color.FromArgb("#78909C") : (isJackpot ? Color.FromArgb("#B71C1C") : Color.FromArgb("#1B5E20"));
+                                prizePill.BackgroundColor = cbState ? Color.FromArgb("#ECEFF1") : Colors.Transparent;
+                                RefreshTotalWinnings();
+                                RefreshGameHeader(gameKey);
+                            })
+                        });
+                    }
+                    else
+                    {
+                        // Today's win — the "current" result. Always green, always counted;
+                        // no collected-toggle (that's only meaningful for past wins).
+                        prizeTxt = new Label
+                        {
+                            Text = prizeText,
+                            FontSize = isJackpot ? 11 : 12,
+                            FontAttributes = FontAttributes.Bold,
+                            TextColor = Colors.White,
+                            HorizontalOptions = LayoutOptions.Center,
+                            VerticalOptions = LayoutOptions.Center,
+                            LineBreakMode = LineBreakMode.NoWrap,
+                        };
+                        prizePill = new Border
+                        {
+                            StrokeThickness = 1.5,
+                            Stroke = new SolidColorBrush(Color.FromArgb("#4CAF50")),
+                            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 6 },
+                            BackgroundColor = Color.FromArgb("#4CAF50"),
+                            Padding = new Thickness(6, 2),
+                            HorizontalOptions = LayoutOptions.End,
+                            VerticalOptions = LayoutOptions.Center,
+                            Content = prizeTxt,
+                        };
+                    }
+                    Grid.SetColumn(prizePill, 4);
+                    row.Children.Add(prizePill);
+
+                    string dateText = hasPlayRange ? $"{w.PlayFromDate} - {w.PlayToDate}" : displayDate;
+                    var dateLbl = MakeLabel(dateText, 9,
+                        stillActiveMultiDraw ? "#1565C0" : "#888", 5,
+                        stillActiveMultiDraw ? FontAttributes.Bold : FontAttributes.None, TextAlignment.End);
                     dateLbl.Margin = new Thickness(2, 0, 4, 0);
                     dateLbl.LineBreakMode = LineBreakMode.NoWrap;
                     row.Children.Add(dateLbl);
+                }
+                else
+                {
+                    var prizeLbl = MakeLabel(prizeText, isJackpot ? 11 : 12,
+                        isRowPast ? "#999" : (isJackpot ? "#B71C1C" : "#1B5E20"), 4,
+                        FontAttributes.Bold, TextAlignment.End);
+                    if (isRowPast) prizeLbl.TextDecorations = TextDecorations.Strikethrough;
+                    row.Children.Add(prizeLbl);
+                }
+
+                // Past win (any date before today) — strike a line across the set#/numbers/
+                // match/draw# columns so it visually reads as a completed past result. Stops
+                // before the prize pill column (4), which already carries its own strikethrough text.
+                if (isRowPast)
+                {
+                    var winStrikeLine = new BoxView
+                    {
+                        Color = Color.FromArgb("#78909C"),
+                        HeightRequest = 2,
+                        VerticalOptions = LayoutOptions.Center,
+                        HorizontalOptions = LayoutOptions.Fill,
+                        InputTransparent = true,
+                    };
+                    Grid.SetColumn(winStrikeLine, 0);
+                    Grid.SetColumnSpan(winStrikeLine, 4);
+                    row.Children.Add(winStrikeLine);
                 }
 
                 // Tap to navigate to that set with the row highlighted
@@ -505,7 +977,16 @@ public partial class ResultsPage : ContentPage
                 tap.Tapped += (_, _) => _ = OnWinnerRowTappedAsync(capturedW, capturedRow);
                 row.GestureRecognizers.Add(tap);
 
-                sectionBody.Children.Add(row);
+                var winCard = new Border
+                {
+                    Content = row,
+                    Stroke = new SolidColorBrush(Color.FromArgb("#E5E7EB")),
+                    StrokeThickness = 1,
+                    StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(10) },
+                    Padding = new Thickness(0),
+                    Margin = new Thickness(0, 3),
+                };
+                sectionBody.Children.Add(winCard);
             }
 
             // ── Active advance tickets with no win today ──────────────────────
@@ -513,27 +994,110 @@ public partial class ResultsPage : ContentPage
             {
                 foreach (var w in activeNoWin)
                 {
+                    // D3 midday-only or evening-only ticket, and its own draw has already posted
+                    // a result — there's no other draw to wait for on this ticket, so it's done.
+                    bool d3Done = w.Game == "D3" && _lastData != null && w.DrawFilter switch
+                    {
+                        "M" => D3TimingRules.IsMiddayDone(_lastData.D3MiddayDrawNum, w.DrawEnd),
+                        "E" => D3TimingRules.IsEveningDone(_lastData.D3EveningDrawNum, w.DrawEnd),
+                        _   => false,
+                    };
+
                     var row = new Grid
                     {
-                        BackgroundColor = Color.FromArgb("#E3F2FD"),
-                        Padding = new Thickness(10, 4),
-                        Margin = new Thickness(0, 1),
+                        BackgroundColor = d3Done ? Color.FromArgb("#ECEFF1") : Color.FromArgb("#E3F2FD"),
+                        Padding = new Thickness(10, 7),
+                        Margin = new Thickness(0),
+                        ColumnSpacing = 4,
                         ColumnDefinitions =
                         {
-                            new ColumnDefinition(new GridLength(55)),   // S# R#
-                            new ColumnDefinition(GridLength.Star),      // numbers
+                            new ColumnDefinition(GridLength.Auto),      // S# R#
+                            new ColumnDefinition(GridLength.Star),      // numbers — always gets whatever room is left
                             new ColumnDefinition(GridLength.Auto),      // match
-                            new ColumnDefinition(new GridLength(86)),   // status
+                            new ColumnDefinition(GridLength.Auto),      // draw#
+                            new ColumnDefinition(GridLength.Auto),      // status
                         }
                     };
-                    row.Children.Add(MakeLabel($"S{w.SetNumber} R{w.RowNumber}", 12, "#555", 0, FontAttributes.Bold));
-                    row.Children.Add(MakeLabel(w.Numbers, 12, "#888", 1));
-                    var activeMatchLbl = MakeLabel(w.MatchLabel, 11, "#999", 2, FontAttributes.None, TextAlignment.Center);
-                    activeMatchLbl.LineBreakMode = LineBreakMode.NoWrap;
-                    row.Children.Add(activeMatchLbl);
-                    string playToLabel = !string.IsNullOrEmpty(w.PlayToDate) ? w.PlayToDate : "In play";
-                    row.Children.Add(MakeLabel(playToLabel, 12, "#1565C0", 3, FontAttributes.Bold, TextAlignment.End));
-                    sectionBody.Children.Add(row);
+                    var activeSetLbl = MakeLabel($"Set{w.SetNumber}·R{w.RowNumber}", 9, "#555", 0, FontAttributes.Bold);
+                    activeSetLbl.LineBreakMode = LineBreakMode.NoWrap;
+                    row.Children.Add(activeSetLbl);
+                    {
+                        var numsView = enhanced
+                            ? ResultsRendererEnhanced.MakePlayerNumbersView(w.Numbers, accent, false, null, w.Game)
+                            : ResultsRendererClassic.MakePlayerNumbersView(w.Numbers, accent, false, null, w.Game);
+                        if (!string.IsNullOrEmpty(w.BetType) && (w.Game == "D3" || w.Game == "D4"))
+                        {
+                            var numsRow = new HorizontalStackLayout { Spacing = 6, VerticalOptions = LayoutOptions.Center };
+                            numsRow.Children.Add(numsView);
+                            numsRow.Children.Add(new Label
+                            {
+                                Text = w.BetType, FontSize = 9, FontAttributes = FontAttributes.Bold,
+                                TextColor = Color.FromArgb("#1565C0"),
+                                VerticalOptions = LayoutOptions.Center,
+                                LineBreakMode = LineBreakMode.NoWrap
+                            });
+                            if (w.Game == "D3" && !string.IsNullOrEmpty(w.DrawFilter))
+                            {
+                                numsRow.Children.Add(new Label
+                                {
+                                    Text = D3DrawFilterLabel(w.DrawFilter), FontSize = 9, FontAttributes = FontAttributes.Bold,
+                                    TextColor = Color.FromArgb("#6A1B9A"),
+                                    VerticalOptions = LayoutOptions.Center,
+                                    LineBreakMode = LineBreakMode.NoWrap
+                                });
+                            }
+                            Grid.SetColumn(numsRow, 1);
+                            row.Children.Add(numsRow);
+                        }
+                        else
+                        {
+                            Grid.SetColumn(numsView, 1);
+                            row.Children.Add(numsView);
+                        }
+                    }
+                    row.Children.Add(MakeMatchBadge(w.MatchLabel, "", false, 2));
+                    int activeDrawNum = GetRowDrawNum(w);
+                    string activeDrawText = activeDrawNum > 0 ? $"#{activeDrawNum}" : "";
+                    var activeDrawLbl = MakeLabel(activeDrawText, 10, "#777", 3, FontAttributes.None, TextAlignment.Center);
+                    activeDrawLbl.Margin = new Thickness(6, 0, 0, 0);
+                    activeDrawLbl.LineBreakMode = LineBreakMode.NoWrap;
+                    row.Children.Add(activeDrawLbl);
+                    string playRangeLabel = !string.IsNullOrEmpty(w.PlayFromDate) && !string.IsNullOrEmpty(w.PlayToDate)
+                        ? $"{w.PlayFromDate} - {w.PlayToDate}"
+                        : !string.IsNullOrEmpty(w.PlayToDate) ? w.PlayToDate : "—";
+                    var playRangeLbl = MakeLabel(playRangeLabel, 9, "#1565C0", 4, FontAttributes.Bold, TextAlignment.End);
+                    playRangeLbl.LineBreakMode = LineBreakMode.NoWrap;
+                    row.Children.Add(playRangeLbl);
+                    if (d3Done)
+                    {
+                        var strikeLine = new BoxView
+                        {
+                            Color = Color.FromArgb("#78909C"),
+                            HeightRequest = 2,
+                            VerticalOptions = LayoutOptions.Center,
+                            HorizontalOptions = LayoutOptions.Fill,
+                            InputTransparent = true,
+                        };
+                        Grid.SetColumn(strikeLine, 0);
+                        Grid.SetColumnSpan(strikeLine, row.ColumnDefinitions.Count);
+                        row.Children.Add(strikeLine);
+                    }
+                    // Tap to navigate to that set with the row highlighted
+                    var advTap = new TapGestureRecognizer();
+                    var capturedAdvW = w;
+                    var capturedAdvRow = row;
+                    advTap.Tapped += (_, _) => _ = OnWinnerRowTappedAsync(capturedAdvW, capturedAdvRow);
+                    row.GestureRecognizers.Add(advTap);
+                    var advCard = new Border
+                    {
+                        Content = row,
+                        Stroke = new SolidColorBrush(Color.FromArgb(d3Done ? "#CFD8DC" : "#90CAF9")),
+                        StrokeThickness = 1,
+                        StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(10) },
+                        Padding = new Thickness(0),
+                        Margin = new Thickness(0, 3),
+                    };
+                    sectionBody.Children.Add(advCard);
                 }
             }
         }
@@ -617,10 +1181,23 @@ public partial class ResultsPage : ContentPage
         if (_lastData == null) return;
         var active = _lastData.Winners
             .Where(w => !w.IsActiveNoWin)
-            .Where(w => !_collKeyMap.TryGetValue((w.Game, w.SetNumber, w.RowNumber), out var key)
-                        || Preferences.Get(key, false))
+            .Where(IsRowStillVisible)
+            .Where(w => !_collKeyMap.TryGetValue(w, out var key)
+                        || Preferences.Get(key, true))
             .ToList();
         UpdateTotalWinnings(active);
+    }
+
+    // Single source of truth for "is this row still current," shared by BuildSection's
+    // actualWinners filter and the TOTAL WINNINGS banner so they can't disagree again.
+    // - D3: draw# completion (it draws twice a day, so calendar-date alone is unreliable).
+    // - Advance ticket (PlayFromDate set or DrawEnd>0): current until its PlayToDate passes —
+    //   an early win inside a still-running range must NOT be treated as expired.
+    // - Regular single-day ticket: current until its own DrawDate passes.
+    private bool IsRowStillVisible(WinnerEntry w)
+    {
+        if (_lastData == null) return true;
+        return _lastData.IsWinnerCurrent(w);
     }
 
     private void UpdateTotalWinnings(List<WinnerEntry> winners)
@@ -663,6 +1240,42 @@ public partial class ResultsPage : ContentPage
 
         if (total >= 100)
             PlayBellSound();
+    }
+
+    private void RefreshGameHeader(string gameKey)
+    {
+        if (_lastData == null || !_gameTotalLabels.TryGetValue(gameKey, out var lbl)) return;
+        // Must apply the same "is this still current" filter RefreshTotalWinnings/BuildSection
+        // use — this header bar was reading _lastData.Winners directly with no date/draw
+        // currency check at all, so a stale win from a prior day kept showing here (with its
+        // own dollar total) even after the TOTAL WINNINGS banner had correctly stopped
+        // counting it. A 4th place needing the same rule, found 2026-08-02.
+        var winners = _lastData.Winners.Where(w => w.Game == gameKey && !w.IsActiveNoWin && IsRowStillVisible(w)).ToList();
+        decimal total = CheckedGameTotal(winners);
+        lbl.Text = total > 0 ? $"${total:N0}" : "";
+        lbl.IsVisible = total > 0;
+    }
+
+    // Only sum prizes whose collection checkbox is checked (past rows); non-past rows always counted
+    private decimal CheckedGameTotal(List<WinnerEntry> winners)
+    {
+        decimal total = 0;
+        foreach (var w in winners)
+        {
+            if (string.IsNullOrEmpty(w.Prize)) continue;
+            var (amt, _, _, _) = ParsePrize(w.Prize);
+            if (amt == 0) continue;
+            string rowDateStr = w.DrawDate ?? "";
+            if (!string.IsNullOrEmpty(rowDateStr) &&
+                DateTime.TryParse(rowDateStr, out var rowDate) &&
+                rowDate.Date < DateTime.Today)
+            {
+                string collKey = $"coll_{w.Game}_{w.SetNumber}_{w.RowNumber}_{rowDateStr}";
+                if (!Preferences.Get(collKey, true)) continue;
+            }
+            total += amt;
+        }
+        return total;
     }
 
     private static void PlayBellSound()
@@ -726,6 +1339,86 @@ public partial class ResultsPage : ContentPage
             : $"No winners found for {_lastData.DateLabel}";
     }
 
+    // Parse player number string into (displayText, isMatch) pairs for highlighting
+    static List<(string Text, bool IsMatch)> ParsePlayerNums(string nums, HashSet<int>? winSet)
+    {
+        var result = new List<(string, bool)>();
+        foreach (var part in nums.Split(' '))
+        {
+            if (string.IsNullOrEmpty(part)) continue;
+            if (part.StartsWith("|"))
+            {
+                result.Add((part, false));
+                continue;
+            }
+            if (int.TryParse(part, out int n))
+                result.Add((part, winSet?.Contains(n) ?? false));
+            else
+                result.Add((part, false));
+        }
+        return result;
+    }
+
+    // Build a colored badge Border for match count.
+    // Bonus-only matches ("+M"/"+MB"/"+PB", 0 main numbers) skip the badge entirely —
+    // that info is now conveyed by turning the bonus ball itself green (see MakePlayerNumbersView),
+    // and a "0/5" badge next to a win just reads as a loss.
+    // Converts the stored per-row D3 draw filter ("B"/"M"/"E") to the display tag the user reads on-screen.
+    static string D3DrawFilterLabel(string df) => df switch { "M" => "M", "E" => "E", _ => "M+E" };
+
+    static View MakeMatchBadge(string matchLabel, string prize, bool isRowPast, int col)
+    {
+        bool hasBonusSuffix = matchLabel.Contains('+');
+        int count;
+        string displayLabel;
+        if (hasBonusSuffix)
+        {
+            var lm = System.Text.RegularExpressions.Regex.Match(matchLabel, @"^(\d+)");
+            count = lm.Success ? int.Parse(lm.Groups[1].Value) : 0;
+            if (count == 0)
+            {
+                var empty = new BoxView { WidthRequest = 0, HeightRequest = 0, Color = Colors.Transparent };
+                Grid.SetColumn(empty, col);
+                return empty;
+            }
+            displayLabel = $"{count}/5";
+        }
+        else
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(matchLabel, @"(\d+)/\d+");
+            count = m.Success ? int.Parse(m.Groups[1].Value) : 0;
+            displayLabel = matchLabel;
+        }
+
+        string bgColor;
+        if (isRowPast)
+            bgColor = "#BDBDBD";
+        else if (!string.IsNullOrEmpty(prize))
+            bgColor = "#FFB300";  // gold = won something
+        else
+            bgColor = count >= 3 ? "#43A047" : count >= 1 ? "#FF8F00" : "#9E9E9E";
+
+        var badge = new Border
+        {
+            BackgroundColor = Color.FromArgb(bgColor),
+            StrokeThickness = 0,
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 8 },
+            Padding = new Thickness(0, 2),
+            VerticalOptions = LayoutOptions.Center,
+            HorizontalOptions = LayoutOptions.Center,
+            Content = new Label
+            {
+                Text = displayLabel,
+                FontSize = 10,
+                FontAttributes = FontAttributes.Bold,
+                TextColor = Colors.White,
+                HorizontalTextAlignment = TextAlignment.Center,
+            }
+        };
+        Grid.SetColumn(badge, col);
+        return badge;
+    }
+
     static Label MakeLabel(string text, double fontSize, string colorHex, int col,
         FontAttributes attrs = FontAttributes.None,
         TextAlignment hAlign = TextAlignment.Start)
@@ -764,20 +1457,22 @@ public partial class ResultsPage : ContentPage
     private async void BtnGameMenu_Clicked(object sender, EventArgs e)
     {
         string? choice = await DisplayActionSheet("Go to Game", "Cancel", null,
-            "Fantasy 5", "Super Lotto", "Powerball", "Mega Millions", "Daily 3", "Daily 4", "Daily Derby", "Notifications", "Summary of Winnings", "Check Wins for Draw#");
+            "Fantasy 5", "Super Lotto", "Powerball", "Mega Millions", "Daily 3", "Daily 4", "Daily Derby", "Hot Spot", "Notifications", "Summary of Winnings", "Check Wins for Draw#");
         if (choice == null || choice == "Cancel") return;
         if (choice == "Summary of Winnings") { await Shell.Current.GoToAsync(nameof(SummaryPage), false); return; }
         if (choice == "Check Wins for Draw#") { DrawSearchPage.PresetGame = "Fantasy 5"; await Shell.Current.GoToAsync(nameof(DrawSearchPage), false); return; }
         await GoHomeAsync();
+        await Task.Yield();
         switch (choice)
         {
-            case "Fantasy 5":    WinnerPage.ComingFrom    = "main"; await Shell.Current.GoToAsync(nameof(WinnerPage),      false); break;
-            case "Super Lotto":  SuperLottoPage.ComingFrom = "main"; await Shell.Current.GoToAsync(nameof(SuperLottoPage),  false); break;
-            case "Powerball":    PowerballPage.ComingFrom  = "main"; await Shell.Current.GoToAsync(nameof(PowerballPage),   false); break;
-            case "Mega Millions":MegaMillionsPage.ComingFrom="main"; await Shell.Current.GoToAsync(nameof(MegaMillionsPage),false); break;
-            case "Daily 3":      Daily3Page.ComingFrom     = "main"; await Shell.Current.GoToAsync(nameof(Daily3Page),      false); break;
-            case "Daily 4":      Daily4Page.ComingFrom     = "main"; await Shell.Current.GoToAsync(nameof(Daily4Page),      false); break;
-            case "Daily Derby":  DailyDerbyPage.ComingFrom = "main"; await Shell.Current.GoToAsync(nameof(DailyDerbyPage),  false); break;
+            case "Fantasy 5":    WinnerPage.ComingFrom    = "main"; AppShell.WinnerPageInstance.PrePosition(true);     await Shell.Current.GoToAsync(nameof(WinnerPage),      false); break;
+            case "Super Lotto":  SuperLottoPage.ComingFrom = "main"; AppShell.SuperLottoPageInstance.PrePosition(true); await Shell.Current.GoToAsync(nameof(SuperLottoPage),  false); break;
+            case "Powerball":    PowerballPage.ComingFrom  = "main"; AppShell.PowerballPageInstance.PrePosition(true);  await Shell.Current.GoToAsync(nameof(PowerballPage),   false); break;
+            case "Mega Millions":MegaMillionsPage.ComingFrom="main"; AppShell.MegaMillionsPageInstance.PrePosition(true);await Shell.Current.GoToAsync(nameof(MegaMillionsPage),false); break;
+            case "Daily 3":      Daily3Page.ComingFrom     = "main"; AppShell.Daily3PageInstance.PrePosition(true);     await Shell.Current.GoToAsync(nameof(Daily3Page),      false); break;
+            case "Daily 4":      Daily4Page.ComingFrom     = "main"; AppShell.Daily4PageInstance.PrePosition(true);     await Shell.Current.GoToAsync(nameof(Daily4Page),      false); break;
+            case "Daily Derby":  DailyDerbyPage.ComingFrom = "main"; AppShell.DailyDerbyPageInstance.PrePosition(true); await Shell.Current.GoToAsync(nameof(DailyDerbyPage),  false); break;
+            case "Hot Spot":      await Shell.Current.GoToAsync(nameof(HotSpotPage), false); break;
         }
     }
 
@@ -785,6 +1480,97 @@ public partial class ResultsPage : ContentPage
     {
         _ = GoHomeAsync();
         return true;
+    }
+
+    // Silently remove non-active slots whose advance dates have all expired.
+    static void AutoClearExpiredOldSets()
+    {
+        foreach (var prefix in new[] { "f5", "sl", "pb", "mm", "d3", "d4", "dd" })
+        {
+            int activeSlot = Preferences.Get($"{prefix}_active_slot", -1);
+            for (int s = 0; s < 10; s++)
+            {
+                if (s == activeSlot) continue;
+                string setData = Preferences.Get($"{prefix}_set_{s}", "");
+                if (string.IsNullOrEmpty(setData)) continue;
+                string adv = Preferences.Get($"{prefix}_adv_{s}", "");
+                // Non-active slot with no advance dates at all — leave alone (may be user's saved set)
+                if (string.IsNullOrEmpty(adv)) continue;
+                // Only clear if ALL advance dates in this slot are expired
+                bool allExpired = adv.Split('|').All(row =>
+                {
+                    if (string.IsNullOrEmpty(row) || row == "~~~" || row == "~") return true;
+                    var p = row.Split('~');
+                    if (p.Length >= 2 && !string.IsNullOrEmpty(p[1]) &&
+                        DateTime.TryParseExact(p[1], "yyyyMMdd", null,
+                            System.Globalization.DateTimeStyles.None, out var end))
+                        return end.Date < DateTime.Today;
+                    if (p.Length >= 1 && !string.IsNullOrEmpty(p[0]) &&
+                        DateTime.TryParseExact(p[0], "yyyyMMdd", null,
+                            System.Globalization.DateTimeStyles.None, out var start))
+                        return start.Date < DateTime.Today;
+                    return true;
+                });
+                if (!allExpired) continue;
+                Preferences.Remove($"{prefix}_set_{s}");
+                Preferences.Remove($"{prefix}_adv_{s}");
+                if (prefix == "d3") Preferences.Remove($"d3_drawfilters_{s}");
+            }
+        }
+    }
+
+    private async Task ClearOldSetsAsync()
+    {
+        bool confirm = await DisplayAlert("Clear Old Sets",
+            "This will permanently remove all saved sets (S2, S3, ...) that are not your current active set, for every game. Your active set numbers are kept.\n\nContinue?",
+            "Clear", "Cancel");
+        if (!confirm) return;
+
+        var games = new[] { "f5", "sl", "pb", "mm", "d3", "d4", "dd" };
+        int cleared = 0;
+        foreach (var prefix in games)
+        {
+            int activeSlot = Preferences.Get($"{prefix}_active_slot", -1);
+            for (int s = 0; s < 10; s++)
+            {
+                if (s == activeSlot) continue;
+                string setKey = $"{prefix}_set_{s}";
+                string advKey = $"{prefix}_adv_{s}";
+                if (!string.IsNullOrEmpty(Preferences.Get(setKey, "")) ||
+                    !string.IsNullOrEmpty(Preferences.Get(advKey, "")))
+                {
+                    Preferences.Remove(setKey);
+                    Preferences.Remove(advKey);
+                    if (prefix == "d3") Preferences.Remove($"d3_drawfilters_{s}");
+                    cleared++;
+                }
+            }
+            // Also clear expired advance dates on the active slot
+            if (activeSlot >= 0)
+            {
+                string advActive = Preferences.Get($"{prefix}_adv_{activeSlot}", "");
+                if (!string.IsNullOrEmpty(advActive))
+                {
+                    var rows = advActive.Split('|');
+                    bool allExpired = rows.All(row =>
+                    {
+                        if (string.IsNullOrEmpty(row) || row == "~~~" || row == "~") return true;
+                        var parts = row.Split('~');
+                        if (parts.Length < 2) return true;
+                        return DateTime.TryParseExact(parts[1], "yyyyMMdd", null,
+                            System.Globalization.DateTimeStyles.None, out var end)
+                            && end.Date < DateTime.Today;
+                    });
+                    if (allExpired)
+                        Preferences.Remove($"{prefix}_adv_{activeSlot}");
+                }
+            }
+        }
+
+        ResultsPageCls.ClearCache();
+        UpdateTicketCount();
+        await RunCheck(resultDatePicker?.Date ?? DateTime.Today);
+        await DisplayAlert("Done", $"Cleared {cleared} old set(s). Results refreshed.", "OK");
     }
 
     private async Task GoHomeAsync()
@@ -796,8 +1582,19 @@ public partial class ResultsPage : ContentPage
 
     private async void BtnRefresh_Clicked(object sender, EventArgs e)
     {
-        ResultsPageCls.ClearCache();
-        await RunCheck(resultDatePicker?.Date ?? DateTime.Today);
+        if (btnCheckTickets != null) btnCheckTickets.IsEnabled = false;
+        if (btnRefresh != null) btnRefresh.IsEnabled = false;
+        SetBusy(true, "Refreshing...");
+        try
+        {
+            ResultsPageCls.ClearCache();
+            await RunCheck(resultDatePicker?.Date ?? DateTime.Today);
+        }
+        finally
+        {
+            if (btnCheckTickets != null) btnCheckTickets.IsEnabled = true;
+            if (btnRefresh != null) btnRefresh.IsEnabled = true;
+        }
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -807,5 +1604,7 @@ public partial class ResultsPage : ContentPage
         spinner.IsVisible = busy;
         spinner.IsRunning = busy;
         lblStatus.Text = message;
+        if (!busy && _lastFetchTime > DateTime.MinValue)
+            lblLastUpdated.Text = $"Updated {_lastFetchTime:h:mm:ss tt}";
     }
 }

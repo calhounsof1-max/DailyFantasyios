@@ -27,7 +27,17 @@ public partial class MainPage : ContentPage
                                       Box8, Box9, Box10, Box11, Box12, Box13, Box14, Box15,
                                       MaxNum, HowMany })
             entry.HandlerChanged += ForceBlackText;
+
+        // Ticket lists live in the Jackpot panel's own Grid row (Row 1, "*") — keep them hidden
+        // while the panel is expanded instead of both being squeezed onto screen at once. Also
+        // re-synced (SyncListsVisibility) anywhere jackpotPanel.IsVisible itself gets set, since
+        // a disabled/hidden panel has no expanded state to hide the lists behind.
+        SyncListsVisibility();
+        jackpotPanel.ExpandedChanged += _ => SyncListsVisibility();
     }
+
+    void SyncListsVisibility() =>
+        listsContainer.IsVisible = !jackpotPanel.IsVisible || !jackpotPanel.IsExpanded;
 
     double _panPeak; // most-negative TotalX seen during this gesture
 
@@ -112,6 +122,8 @@ public partial class MainPage : ContentPage
             // TranslationX was pre-set by the caller before navigating back — just animate in
             await this.TranslateTo(0, 0, 220, Easing.CubicOut);
             HideKeyboard();
+            jackpotPanel.IsVisible = Preferences.Get(JackpotDisplay.PrefShowPanel, true);
+            SyncListsVisibility();
             return;
         }
         _initialized = true;
@@ -157,6 +169,13 @@ public partial class MainPage : ContentPage
         RestorePreferences();
         _isRestoring = false;
         await vm.LoadDataAsync();
+        jackpotPanel.IsVisible = Preferences.Get(JackpotDisplay.PrefShowPanel, true);
+        if (jackpotPanel.IsVisible)
+        {
+            jackpotPanel.Expand();
+            _ = jackpotPanel.LoadAsync();
+        }
+        SyncListsVisibility();
         // Pre-warm Results cache in background so Results page loads instantly
         _ = ResultsPageCls.LoadAllDrawsAsync();
         // Load only the user's previously saved picks (autosave); start empty if none
@@ -712,6 +731,7 @@ public partial class MainPage : ContentPage
 
     private async void BtnProcess_Clicked(object sender, EventArgs e)
     {
+        jackpotPanel.Collapse();
         // Permutations mode: checkbox checked
         // Pool = all filled boxes; Pick = PICK (MaxNum) digits per combo
         if (chkBoxPerms.IsChecked)

@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:conv="clr-namespace:DailyFantasyMAUI.Converters"
              xmlns:model="clr-namespace:DailyFantasyMAUI.Model"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
              x:Class="DailyFantasyMAUI.MainPage"
              Title="Lottery"
              Shell.NavBarIsVisible="False"
@@ -327,7 +328,9 @@
         <!-- ══════════════════════════════════════════════
              Row 7 — Lists
              ══════════════════════════════════════════════ -->
-        <Grid Grid.Row="7" BackgroundColor="#0D1B2A">
+        <Grid Grid.Row="7" BackgroundColor="#0D1B2A" RowDefinitions="Auto,*">
+            <local:JackpotDisplay x:Name="jackpotPanel" Grid.Row="0"/>
+            <Grid x:Name="listsContainer" Grid.Row="1">
 
             <!-- History list -->
             <CollectionView x:Name="lstHistory"
@@ -419,6 +422,7 @@
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
+            </Grid>
         </Grid>
 
         <!-- ══════════════════════════════════════════════

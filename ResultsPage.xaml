@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
              x:Class="DailyFantasyMAUI.ResultsPage"
              Shell.NavBarIsVisible="False"
              BackgroundColor="#F0F4F8">
@@ -10,6 +11,12 @@
         <!-- Row 0: Header -->
         <Grid Grid.Row="0" BackgroundColor="#1E2733" Padding="10,10"
               ColumnDefinitions="Auto,*,Auto,Auto">
+            <GraphicsView Grid.ColumnSpan="4"
+                          Opacity="0.70" HeightRequest="54" WidthRequest="54"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
 
             <Button Grid.Column="0" Text="⌂" FontSize="14" FontAttributes="Bold"
                     BackgroundColor="#2D3D50" TextColor="White"
@@ -25,40 +32,59 @@
                     Padding="10,0" HeightRequest="34" CornerRadius="17"
                     Clicked="BtnGameMenu_Clicked" Margin="0,0,6,0"/>
 
-            <Button Grid.Column="3" Text="Refresh" FontSize="10"
+            <Button Grid.Column="3" x:Name="btnRefresh" Text="Refresh" FontSize="10"
                     BackgroundColor="#2D3D50" TextColor="#8B9DC3"
                     Padding="8,0" HeightRequest="34" CornerRadius="17"
                     Clicked="BtnRefresh_Clicked"/>
         </Grid>
 
-        <!-- Row 1: Date picker + Check Tickets button -->
-        <Grid Grid.Row="1" BackgroundColor="White" Padding="12,8"
-              ColumnDefinitions="Auto,*,Auto">
-            <Label Grid.Column="0" Text="Date:"
-                   FontSize="13" TextColor="#555"
-                   VerticalOptions="Center" Margin="0,0,6,0"/>
-            <DatePicker Grid.Column="1" x:Name="resultDatePicker"
-                        Format="ddd MMM d, yyyy"
-                        VerticalOptions="Center"
-                        DateSelected="DatePicker_DateSelected"/>
-            <Button Grid.Column="2" Text="CHECK TICKETS"
-                    FontSize="12" FontAttributes="Bold"
-                    BackgroundColor="#1E2733" TextColor="White"
-                    Padding="12,0" HeightRequest="36" CornerRadius="18"
-                    Clicked="BtnCheckTickets_Clicked"/>
-        </Grid>
+        <!-- Row 1: Date picker + Check Tickets + Ticket Count -->
+        <VerticalStackLayout Grid.Row="1" BackgroundColor="White" Padding="12,6" Spacing="3">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                <Label Grid.Column="0" Text="Date:"
+                       FontSize="13" TextColor="#555"
+                       VerticalOptions="Center" Margin="0,0,4,0"/>
+                <DatePicker Grid.Column="1" x:Name="resultDatePicker"
+                            Format="M/d/yy"
+                            WidthRequest="90"
+                            VerticalOptions="Center"
+                            DateSelected="DatePicker_DateSelected"/>
+                <Button Grid.Column="3" x:Name="btnCheckTickets" Text="Check Tickets" IsVisible="False"
+                        FontSize="11"
+                        BackgroundColor="#1E2733" TextColor="White"
+                        Padding="8,0" HeightRequest="30" CornerRadius="15"
+                        Clicked="BtnCheckTickets_Clicked"/>
+            </Grid>
+            <FlexLayout x:Name="ticketBadgeRow"
+                        Wrap="Wrap" Direction="Row"
+                        AlignItems="Center"
+                        Margin="0,2,0,0"/>
+            <Label Text="🟢 Green = Win"
+                   FontSize="10" FontAttributes="Bold"
+                   TextColor="#2E7D32"
+                   Margin="0,2,0,0"/>
+        </VerticalStackLayout>
 
         <!-- Row 2: Status / spinner -->
         <Grid Grid.Row="2" BackgroundColor="#E8ECEF" Padding="12,5"
-              ColumnDefinitions="Auto,*">
+              ColumnDefinitions="Auto,*,Auto">
             <ActivityIndicator Grid.Column="0" x:Name="spinner"
-                               IsVisible="False" IsRunning="False"
+                               IsVisible="True" IsRunning="True"
                                Color="#FF8F00"
                                HeightRequest="20" WidthRequest="20"
                                VerticalOptions="Center" Margin="0,0,8,0"/>
             <Label Grid.Column="1" x:Name="lblStatus"
-                   Text="Select a date and tap CHECK TICKETS"
+                   Text="Loading Results page..."
                    FontSize="12" TextColor="#666" VerticalOptions="Center"/>
+            <VerticalStackLayout Grid.Column="2" Spacing="0"
+                                  VerticalOptions="Center" Margin="4,0,0,0">
+                <Label x:Name="lblLastUpdated"
+                       Text="" FontSize="10" TextColor="#999"
+                       HorizontalTextAlignment="End"/>
+                <Label x:Name="lblCountdown"
+                       Text="" FontSize="10" TextColor="#AAB8C2"
+                       HorizontalTextAlignment="End"/>
+            </VerticalStackLayout>
         </Grid>
 
         <!-- Row 3: Total Winnings Banner -->

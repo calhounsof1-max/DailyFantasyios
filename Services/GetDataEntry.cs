@@ -1026,32 +1026,59 @@ namespace DailyFantasyMAUI.Services
                 }
 
                 // Find last draw date in the local file
+                var existingLines = await File.ReadAllLinesAsync(localPath);
                 DateTime lastDate = DateTime.MinValue;
+                foreach (var l in existingLines.Reverse())
                 {
-                    var lines = await File.ReadAllLinesAsync(localPath);
-                    foreach (var l in lines.Reverse())
-                    {
-                        if (string.IsNullOrWhiteSpace(l) || l.StartsWith("D")) continue;
-                        var p = l.Split(',');
-                        if (DateTime.TryParse(p[0], out lastDate)) break;
-                    }
+                    if (string.IsNullOrWhiteSpace(l) || l.StartsWith("D")) continue;
+                    var p = l.Split(',');
+                    if (DateTime.TryParse(p[0], out lastDate)) break;
                 }
                 if (lastDate == DateTime.MinValue) return;
+
+                // Fetch once — used both to backfill any existing rows still stuck at
+                // DrawNumber 0 (a past bug wrote "0" for every newly-appended row) and
+                // to append anything newer than lastDate.
+                var recent = await GetPastDraws(30);
+                var byDate = recent
+                    .Select(d => { DateTime.TryParse(d.DrawDate, out var dt); return (dt, d.DrawNumber); })
+                    .Where(x => x.dt != default && x.DrawNumber > 0)
+                    .GroupBy(x => x.dt.Date)
+                    .ToDictionary(g => g.Key, g => g.First().DrawNumber);
+
+                bool patchedAny = false;
+                for (int i = 0; i < existingLines.Length; i++)
+                {
+                    var l = existingLines[i];
+                    if (string.IsNullOrWhiteSpace(l) || l.StartsWith("D")) continue;
+                    var p = l.Split(',');
+                    if (p.Length < 7 || !DateTime.TryParse(p[0], out var dt)) continue;
+                    if (int.TryParse(p[1], out int dn) && dn == 0 && byDate.TryGetValue(dt.Date, out int realDn))
+                    {
+                        p[1] = realDn.ToString();
+                        existingLines[i] = string.Join(",", p);
+                        patchedAny = true;
+                    }
+                }
+                if (patchedAny)
+                {
+                    await File.WriteAllLinesAsync(localPath, existingLines);
+                    _ = Logger.LogAsync("F5 CSV: backfilled missing draw numbers");
+                }
+
                 if (lastDate.Date >= DateTime.Today) return; // already up to date
 
-                // Fetch recent draws from API and append anything newer than lastDate
-                var recent = await GetPastDraws(30);
                 var toAppend = recent
                     .Where(d => DateTime.TryParse(d.DrawDate, out var dt) && dt.Date > lastDate.Date)
-                    .Select(d => { DateTime.TryParse(d.DrawDate, out var dt); return (dt, d.Numbers); })
+                    .Select(d => { DateTime.TryParse(d.DrawDate, out var dt); return (dt, d.DrawNumber, d.Numbers); })
                     .OrderBy(x => x.dt)
                     .ToList();
 
                 if (toAppend.Count == 0) return;
 
                 await using var sw = new StreamWriter(localPath, append: true, System.Text.Encoding.UTF8);
-                foreach (var (dt, nums) in toAppend)
-                    await sw.WriteLineAsync(dt.ToString("yyyy-MM-dd") + ",0," + string.Join(",", nums));
+                foreach (var (dt, drawNum, nums) in toAppend)
+                    await sw.WriteLineAsync(dt.ToString("yyyy-MM-dd") + "," + drawNum + "," + string.Join(",", nums));
 
                 _ = Logger.LogAsync($"F5 CSV: appended {toAppend.Count} new draw(s) through {toAppend[^1].dt:yyyy-MM-dd}");
             }
@@ -1115,31 +1142,59 @@ namespace DailyFantasyMAUI.Services
                     _ = Logger.LogAsync("SL CSV: initialized from bundled asset");
                 }
 
+                var existingLines = await File.ReadAllLinesAsync(localPath);
                 DateTime lastDate = DateTime.MinValue;
+                foreach (var l in existingLines.Reverse())
                 {
-                    var lines = await File.ReadAllLinesAsync(localPath);
-                    foreach (var l in lines.Reverse())
-                    {
-                        if (string.IsNullOrWhiteSpace(l) || l.StartsWith("D")) continue;
-                        var p = l.Split(',');
-                        if (DateTime.TryParse(p[0], out lastDate)) break;
-                    }
+                    if (string.IsNullOrWhiteSpace(l) || l.StartsWith("D")) continue;
+                    var p = l.Split(',');
+                    if (DateTime.TryParse(p[0], out lastDate)) break;
                 }
                 if (lastDate == DateTime.MinValue) return;
+
+                // Fetch once — used both to backfill any existing rows still stuck at
+                // DrawNumber 0 (a past bug wrote "0" for every newly-appended row) and
+                // to append anything newer than lastDate.
+                var recent = await GetSuperLottoDraws(30);
+                var byDate = recent
+                    .Select(d => { DateTime.TryParse(d.DrawDate, out var dt); return (dt, d.DrawNumber); })
+                    .Where(x => x.dt != default && x.DrawNumber > 0)
+                    .GroupBy(x => x.dt.Date)
+                    .ToDictionary(g => g.Key, g => g.First().DrawNumber);
+
+                bool patchedAny = false;
+                for (int i = 0; i < existingLines.Length; i++)
+                {
+                    var l = existingLines[i];
+                    if (string.IsNullOrWhiteSpace(l) || l.StartsWith("D")) continue;
+                    var p = l.Split(',');
+                    if (p.Length < 8 || !DateTime.TryParse(p[0], out var dt)) continue;
+                    if (int.TryParse(p[1], out int dn) && dn == 0 && byDate.TryGetValue(dt.Date, out int realDn))
+                    {
+                        p[1] = realDn.ToString();
+                        existingLines[i] = string.Join(",", p);
+                        patchedAny = true;
+                    }
+                }
+                if (patchedAny)
+                {
+                    await File.WriteAllLinesAsync(localPath, existingLines);
+                    _ = Logger.LogAsync("SL CSV: backfilled missing draw numbers");
+                }
+
                 if (lastDate.Date >= DateTime.Today) return;
 
-                var recent = await GetSuperLottoDraws(30);
                 var toAppend = recent
                     .Where(d => DateTime.TryParse(d.DrawDate, out var dt) && dt.Date > lastDate.Date)
-                    .Select(d => { DateTime.TryParse(d.DrawDate, out var dt); return (dt, d.MainNumbers, d.MegaNumber); })
+                    .Select(d => { DateTime.TryParse(d.DrawDate, out var dt); return (dt, d.DrawNumber, d.MainNumbers, d.MegaNumber); })
                     .OrderBy(x => x.dt)
                     .ToList();
 
                 if (toAppend.Count == 0) return;
 
                 await using var sw = new StreamWriter(localPath, append: true, System.Text.Encoding.UTF8);
-                foreach (var (dt, nums, mega) in toAppend)
-                    await sw.WriteLineAsync(dt.ToString("yyyy-MM-dd") + ",0," + string.Join(",", nums) + "," + mega);
+                foreach (var (dt, drawNum, nums, mega) in toAppend)
+                    await sw.WriteLineAsync(dt.ToString("yyyy-MM-dd") + "," + drawNum + "," + string.Join(",", nums) + "," + mega);
 
                 _ = Logger.LogAsync($"SL CSV: appended {toAppend.Count} new draw(s) through {toAppend[^1].dt:yyyy-MM-dd}");
             }
@@ -1180,6 +1235,324 @@ namespace DailyFantasyMAUI.Services
                 results.Reverse(); // newest first
             }
             catch (Exception ex) { SetError($"SL CSV: {ex.Message}"); }
+            return results;
+        }
+
+        // ── D4 CSV paths ─────────────────────────────────────────────────────
+        static string D4LocalCsvPath =>
+            Path.Combine(FileSystem.AppDataDirectory, "data", "myDaily4.csv");
+
+        // ── Daily update: copy bundled D4 CSV on first run, append new draws ─
+        public static async Task UpdateD4CsvAsync()
+        {
+            try
+            {
+                var localPath = D4LocalCsvPath;
+                Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+
+                if (!File.Exists(localPath))
+                {
+                    using var asset = await FileSystem.OpenAppPackageFileAsync("data/myDaily4.csv");
+                    using var fs = File.Create(localPath);
+                    await asset.CopyToAsync(fs);
+                    _ = Logger.LogAsync("D4 CSV: initialized from bundled asset");
+                }
+
+                DateTime lastDate = DateTime.MinValue;
+                int lastDrawNumber = 0;
+                {
+                    var lines = await File.ReadAllLinesAsync(localPath);
+                    foreach (var l in lines.Reverse())
+                    {
+                        if (string.IsNullOrWhiteSpace(l) || l.StartsWith("D")) continue;
+                        var p = l.Split(',');
+                        if (DateTime.TryParse(p[0], out lastDate))
+                        {
+                            if (p.Length >= 2) int.TryParse(p[1], out lastDrawNumber);
+                            break;
+                        }
+                    }
+                }
+                if (lastDate == DateTime.MinValue) return;
+                if (lastDate.Date >= DateTime.Today) return;
+
+                var recent = await GetDaily4Draws(30);
+                var toAppend = recent
+                    .Where(d => d.DrawNumber > lastDrawNumber)
+                    .Select(d => { DateTime.TryParse(d.DrawDate, out var dt); return (dt, d.DrawNumber, d.Numbers); })
+                    .OrderBy(x => x.dt)
+                    .ToList();
+
+                if (toAppend.Count == 0) return;
+
+                await using var sw = new StreamWriter(localPath, append: true, System.Text.Encoding.UTF8);
+                foreach (var (dt, dn, nums) in toAppend)
+                    await sw.WriteLineAsync(dt.ToString("yyyy-MM-dd") + "," + dn + "," + string.Join(",", nums));
+
+                _ = Logger.LogAsync($"D4 CSV: appended {toAppend.Count} new draw(s) through {toAppend[^1].dt:yyyy-MM-dd}");
+            }
+            catch (Exception ex) { _ = Logger.LogAsync($"D4 CSV update error: {ex.Message}"); }
+        }
+
+        // ── Load D4 draw history (local writable copy, falls back to bundled) ─
+        // Returns draws newest-first. Format: DrawDate,DrawNumber,N1,N2,N3,N4
+        public static async Task<List<(string DrawDate, int DrawNumber, int[] Numbers, DrawPrizeTier[] Prizes)>> LoadD4CsvDraws()
+        {
+            var results = new List<(string, int, int[], DrawPrizeTier[])>();
+            try
+            {
+                var localPath = D4LocalCsvPath;
+                Stream stream = File.Exists(localPath)
+                    ? File.OpenRead(localPath)
+                    : await FileSystem.OpenAppPackageFileAsync("data/myDaily4.csv");
+
+                using var reader = new StreamReader(stream);
+                bool header = true;
+                while (!reader.EndOfStream)
+                {
+                    var line = await reader.ReadLineAsync();
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    if (header) { header = false; continue; }
+                    var p = line.Split(',');
+                    if (p.Length < 6) continue;
+                    if (!DateTime.TryParse(p[0], out var dt)) continue;
+                    if (!int.TryParse(p[1], out int drawNum)) drawNum = 0;
+                    var nums = new int[4];
+                    bool ok = true;
+                    for (int i = 0; i < 4; i++)
+                        if (!int.TryParse(p[i + 2], out nums[i])) { ok = false; break; }
+                    if (!ok) continue;
+                    results.Add((dt.ToString("ddd MMM d, yyyy"), drawNum, nums, Array.Empty<DrawPrizeTier>()));
+                }
+                results.Reverse(); // newest first
+            }
+            catch (Exception ex) { SetError($"D4 CSV: {ex.Message}"); }
+            return results;
+        }
+
+        // ── PB CSV paths ─────────────────────────────────────────────────────
+        static string PBLocalCsvPath =>
+            Path.Combine(FileSystem.AppDataDirectory, "data", "myPowerball.csv");
+
+        // ── Daily update: copy bundled PB CSV on first run, append new draws ─
+        public static async Task UpdatePBCsvAsync()
+        {
+            try
+            {
+                var localPath = PBLocalCsvPath;
+                Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+
+                if (!File.Exists(localPath))
+                {
+                    using var asset = await FileSystem.OpenAppPackageFileAsync("data/myPowerball.csv");
+                    using var fs = File.Create(localPath);
+                    await asset.CopyToAsync(fs);
+                    _ = Logger.LogAsync("PB CSV: initialized from bundled asset");
+                }
+
+                var existingLines = await File.ReadAllLinesAsync(localPath);
+                DateTime lastDate = DateTime.MinValue;
+                foreach (var l in existingLines.Reverse())
+                {
+                    if (string.IsNullOrWhiteSpace(l) || l.StartsWith("D")) continue;
+                    var p = l.Split(',');
+                    if (DateTime.TryParse(p[0], out lastDate)) break;
+                }
+                if (lastDate == DateTime.MinValue) return;
+
+                var recent = await GetPowerballDraws(30);
+                var byDate = recent
+                    .Select(d => { DateTime.TryParse(d.DrawDate, out var dt); return (dt, d.DrawNumber); })
+                    .Where(x => x.dt != default && x.DrawNumber > 0)
+                    .GroupBy(x => x.dt.Date)
+                    .ToDictionary(g => g.Key, g => g.First().DrawNumber);
+
+                bool patchedAny = false;
+                for (int i = 0; i < existingLines.Length; i++)
+                {
+                    var l = existingLines[i];
+                    if (string.IsNullOrWhiteSpace(l) || l.StartsWith("D")) continue;
+                    var p = l.Split(',');
+                    if (p.Length < 8 || !DateTime.TryParse(p[0], out var dt)) continue;
+                    if (int.TryParse(p[1], out int dn) && dn == 0 && byDate.TryGetValue(dt.Date, out int realDn))
+                    {
+                        p[1] = realDn.ToString();
+                        existingLines[i] = string.Join(",", p);
+                        patchedAny = true;
+                    }
+                }
+                if (patchedAny)
+                {
+                    await File.WriteAllLinesAsync(localPath, existingLines);
+                    _ = Logger.LogAsync("PB CSV: backfilled missing draw numbers");
+                }
+
+                if (lastDate.Date >= DateTime.Today) return;
+
+                var toAppend = recent
+                    .Where(d => DateTime.TryParse(d.DrawDate, out var dt) && dt.Date > lastDate.Date)
+                    .Select(d => { DateTime.TryParse(d.DrawDate, out var dt); return (dt, d.DrawNumber, d.MainNumbers, d.PBNumber); })
+                    .OrderBy(x => x.dt)
+                    .ToList();
+
+                if (toAppend.Count == 0) return;
+
+                await using var sw = new StreamWriter(localPath, append: true, System.Text.Encoding.UTF8);
+                foreach (var (dt, drawNum, nums, pb) in toAppend)
+                    await sw.WriteLineAsync(dt.ToString("yyyy-MM-dd") + "," + drawNum + "," + string.Join(",", nums) + "," + pb);
+
+                _ = Logger.LogAsync($"PB CSV: appended {toAppend.Count} new draw(s) through {toAppend[^1].dt:yyyy-MM-dd}");
+            }
+            catch (Exception ex) { _ = Logger.LogAsync($"PB CSV update error: {ex.Message}"); }
+        }
+
+        // ── Load PB draw history (local writable copy, falls back to bundled) ─
+        // Returns draws newest-first. Format: DrawDate,DrawNumber,N1,N2,N3,N4,N5,Powerball
+        public static async Task<List<(string DrawDate, int DrawNumber, int[] MainNumbers, int PBNumber, DrawPrizeTier[] Prizes)>> LoadPBCsvDraws()
+        {
+            var results = new List<(string, int, int[], int, DrawPrizeTier[])>();
+            try
+            {
+                var localPath = PBLocalCsvPath;
+                Stream stream = File.Exists(localPath)
+                    ? File.OpenRead(localPath)
+                    : await FileSystem.OpenAppPackageFileAsync("data/myPowerball.csv");
+
+                using var reader = new StreamReader(stream);
+                bool header = true;
+                while (!reader.EndOfStream)
+                {
+                    var line = await reader.ReadLineAsync();
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    if (header) { header = false; continue; }
+                    var p = line.Split(',');
+                    if (p.Length < 8) continue;
+                    if (!DateTime.TryParse(p[0], out var dt)) continue;
+                    if (!int.TryParse(p[1], out int drawNum)) drawNum = 0;
+                    var nums = new int[5];
+                    bool ok = true;
+                    for (int i = 0; i < 5; i++)
+                        if (!int.TryParse(p[i + 2], out nums[i])) { ok = false; break; }
+                    if (!ok) continue;
+                    if (!int.TryParse(p[7], out int pb)) continue;
+                    results.Add((dt.ToString("ddd MMM d, yyyy"), drawNum, nums, pb, Array.Empty<DrawPrizeTier>()));
+                }
+                results.Reverse(); // newest first
+            }
+            catch (Exception ex) { SetError($"PB CSV: {ex.Message}"); }
+            return results;
+        }
+
+        // ── MM CSV paths ─────────────────────────────────────────────────────
+        static string MMLocalCsvPath =>
+            Path.Combine(FileSystem.AppDataDirectory, "data", "myMegaMillions.csv");
+
+        // ── Daily update: copy bundled MM CSV on first run, append new draws ─
+        public static async Task UpdateMMCsvAsync()
+        {
+            try
+            {
+                var localPath = MMLocalCsvPath;
+                Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+
+                if (!File.Exists(localPath))
+                {
+                    using var asset = await FileSystem.OpenAppPackageFileAsync("data/myMegaMillions.csv");
+                    using var fs = File.Create(localPath);
+                    await asset.CopyToAsync(fs);
+                    _ = Logger.LogAsync("MM CSV: initialized from bundled asset");
+                }
+
+                var existingLines = await File.ReadAllLinesAsync(localPath);
+                DateTime lastDate = DateTime.MinValue;
+                foreach (var l in existingLines.Reverse())
+                {
+                    if (string.IsNullOrWhiteSpace(l) || l.StartsWith("D")) continue;
+                    var p = l.Split(',');
+                    if (DateTime.TryParse(p[0], out lastDate)) break;
+                }
+                if (lastDate == DateTime.MinValue) return;
+
+                var recent = await GetMegaMillionsDraws(30);
+                var byDate = recent
+                    .Select(d => { DateTime.TryParse(d.DrawDate, out var dt); return (dt, d.DrawNumber); })
+                    .Where(x => x.dt != default && x.DrawNumber > 0)
+                    .GroupBy(x => x.dt.Date)
+                    .ToDictionary(g => g.Key, g => g.First().DrawNumber);
+
+                bool patchedAny = false;
+                for (int i = 0; i < existingLines.Length; i++)
+                {
+                    var l = existingLines[i];
+                    if (string.IsNullOrWhiteSpace(l) || l.StartsWith("D")) continue;
+                    var p = l.Split(',');
+                    if (p.Length < 8 || !DateTime.TryParse(p[0], out var dt)) continue;
+                    if (int.TryParse(p[1], out int dn) && dn == 0 && byDate.TryGetValue(dt.Date, out int realDn))
+                    {
+                        p[1] = realDn.ToString();
+                        existingLines[i] = string.Join(",", p);
+                        patchedAny = true;
+                    }
+                }
+                if (patchedAny)
+                {
+                    await File.WriteAllLinesAsync(localPath, existingLines);
+                    _ = Logger.LogAsync("MM CSV: backfilled missing draw numbers");
+                }
+
+                if (lastDate.Date >= DateTime.Today) return;
+
+                var toAppend = recent
+                    .Where(d => DateTime.TryParse(d.DrawDate, out var dt) && dt.Date > lastDate.Date)
+                    .Select(d => { DateTime.TryParse(d.DrawDate, out var dt); return (dt, d.DrawNumber, d.MainNumbers, d.MegaNumber); })
+                    .OrderBy(x => x.dt)
+                    .ToList();
+
+                if (toAppend.Count == 0) return;
+
+                await using var sw = new StreamWriter(localPath, append: true, System.Text.Encoding.UTF8);
+                foreach (var (dt, drawNum, nums, mega) in toAppend)
+                    await sw.WriteLineAsync(dt.ToString("yyyy-MM-dd") + "," + drawNum + "," + string.Join(",", nums) + "," + mega);
+
+                _ = Logger.LogAsync($"MM CSV: appended {toAppend.Count} new draw(s) through {toAppend[^1].dt:yyyy-MM-dd}");
+            }
+            catch (Exception ex) { _ = Logger.LogAsync($"MM CSV update error: {ex.Message}"); }
+        }
+
+        // ── Load MM draw history (local writable copy, falls back to bundled) ─
+        // Returns draws newest-first. Format: DrawDate,DrawNumber,N1,N2,N3,N4,N5,Mega
+        public static async Task<List<(string DrawDate, int DrawNumber, int[] MainNumbers, int Mega, DrawPrizeTier[] Prizes)>> LoadMMCsvDraws()
+        {
+            var results = new List<(string, int, int[], int, DrawPrizeTier[])>();
+            try
+            {
+                var localPath = MMLocalCsvPath;
+                Stream stream = File.Exists(localPath)
+                    ? File.OpenRead(localPath)
+                    : await FileSystem.OpenAppPackageFileAsync("data/myMegaMillions.csv");
+
+                using var reader = new StreamReader(stream);
+                bool header = true;
+                while (!reader.EndOfStream)
+                {
+                    var line = await reader.ReadLineAsync();
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    if (header) { header = false; continue; }
+                    var p = line.Split(',');
+                    if (p.Length < 8) continue;
+                    if (!DateTime.TryParse(p[0], out var dt)) continue;
+                    if (!int.TryParse(p[1], out int drawNum)) drawNum = 0;
+                    var nums = new int[5];
+                    bool ok = true;
+                    for (int i = 0; i < 5; i++)
+                        if (!int.TryParse(p[i + 2], out nums[i])) { ok = false; break; }
+                    if (!ok) continue;
+                    if (!int.TryParse(p[7], out int mega)) continue;
+                    results.Add((dt.ToString("ddd MMM d, yyyy"), drawNum, nums, mega, Array.Empty<DrawPrizeTier>()));
+                }
+                results.Reverse(); // newest first
+            }
+            catch (Exception ex) { SetError($"MM CSV: {ex.Message}"); }
             return results;
         }
 
@@ -1346,6 +1719,38 @@ namespace DailyFantasyMAUI.Services
         }
 
         // ── Current draw numbers (for advance-play purge) ────────────────────
+
+        /// <summary>
+        /// D3 draws twice a day, so a single "latest draw#" is ambiguous — an M-only ticket must
+        /// only ever be compared against the midday stream, or it looks expired the moment evening
+        /// posts (see D3TimingRules.cs). Mirrors the exact grouping ResultsPageCls already uses:
+        /// group recent draws by date, order each group by draw#, first = midday, second = evening.
+        /// </summary>
+        public static async Task<(int Midday, int Evening)> GetCurrentD3DrawNumbersAsync()
+        {
+            try
+            {
+                var draws = await GetDaily3Draws(4);
+                var groups = draws
+                    .GroupBy(d => d.DrawDate)
+                    .Select(g =>
+                    {
+                        var ordered = g.OrderBy(d => d.DrawNumber).ToList();
+                        var grpDate = DateTime.TryParse(g.Key, out var dt) ? dt : DateTime.MinValue;
+                        return (Date: grpDate,
+                            MiddayDrawNum:  ordered.Count >= 1 ? ordered[0].DrawNumber : 0,
+                            EveningDrawNum: ordered.Count >= 2 ? ordered[1].DrawNumber : 0);
+                    })
+                    .Where(g => g.Date != DateTime.MinValue)
+                    .OrderByDescending(g => g.Date)
+                    .ToList();
+
+                int midday  = groups.FirstOrDefault(g => g.MiddayDrawNum  > 0).MiddayDrawNum;
+                int evening = groups.FirstOrDefault(g => g.EveningDrawNum > 0).EveningDrawNum;
+                return (midday, evening);
+            }
+            catch { return (0, 0); }
+        }
 
         /// <summary>
         /// Fetches the latest draw number for each game from calottery.com.
