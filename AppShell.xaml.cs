@@ -46,6 +46,9 @@ public partial class AppShell : Shell
 	static HotSpotPage? _hotSpotPage;
 	internal static HotSpotPage HotSpotPageInstance => _hotSpotPage ??= new();
 
+	static DailyFantasyMAUI.LotteryDirectory.StateLotteryPage? _stateLotteryPage;
+	internal static DailyFantasyMAUI.LotteryDirectory.StateLotteryPage StateLotteryPageInstance => _stateLotteryPage ??= new();
+
 	// Stage 2 port — same lazy-construct pattern as HotSpotPage above, matching how the
 	// Android app's AppShell.xaml.cs lazily constructs every one of its own routes.
 	static AboutPage?               _aboutPage;
@@ -142,6 +145,7 @@ public partial class AppShell : Shell
 		Routing.RegisterRoute(nameof(DrawSearchPage),        new SingletonRouteFactory(DrawSearchPageInstance));
 		Routing.RegisterRoute(nameof(PrintPreviewPage),      new SingletonRouteFactory(PrintPreviewPageInstance));
 		Routing.RegisterRoute(nameof(HotSpotPage),           new LazySingletonRouteFactory(() => HotSpotPageInstance));
+		Routing.RegisterRoute(nameof(DailyFantasyMAUI.LotteryDirectory.StateLotteryPage), new LazySingletonRouteFactory(() => StateLotteryPageInstance));
 
 		Routing.RegisterRoute(nameof(AboutPage),               new LazySingletonRouteFactory(() => AboutPageInstance));
 		Routing.RegisterRoute(nameof(BackTestPage),            new LazySingletonRouteFactory(() => BackTestPageInstance));

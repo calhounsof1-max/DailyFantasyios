@@ -16,17 +16,24 @@ namespace DailyFantasyMAUI.ViewModel
         private ObservableCollection<string> _combinations = new();
         private ObservableCollection<ModelDaily> _recurrenceResults = new();
         private ObservableCollection<string> _drawsHistory = new();
-        private string _lastNumberHit = "Loading...";
+        private string _lastNumberHit = DateTime.Today.ToString("MMMM d, yyyy");
         private double _possibleCombinations;
         private int _numberInList;
         private bool _isLoading;
         private int _activeTab; // 0=History, 1=Recurrence, 2=Combos, 3=Draws
         private string _statusMessage = "";
+        private double _loadingProgress;
+        private string _loadingMessage = "Starting...";
+        private bool _showBubbles = Preferences.Get("main_show_bubbles", false);
+        private bool _hasMegaBall = false;
 
         // Shared across pages so Daily3Page can access the last generated combos
         public static List<string> SharedCombos { get; set; } = new();
 
         readonly ComboCalc _calc = new();
+
+        // After the first load the preloader tasks are stale; subsequent reloads go to disk.
+        bool _preloaderConsumed = false;
 
         public ObservableCollection<ModelDaily> DataFantasy { get => _dataFantasy; set { _dataFantasy = value; OnPropertyChanged(); } }
         public ObservableCollection<ModelDaily> DataSuperLotto { get => _dataSuperLotto; set { _dataSuperLotto = value; OnPropertyChanged(); } }
@@ -41,6 +48,20 @@ namespace DailyFantasyMAUI.ViewModel
         public bool IsLoading { get => _isLoading; set { _isLoading = value; OnPropertyChanged(); } }
         public int ActiveTab { get => _activeTab; set { _activeTab = value; OnPropertyChanged(); OnPropertyChanged(nameof(ShowHistory)); OnPropertyChanged(nameof(ShowRecurrence)); OnPropertyChanged(nameof(ShowCombos)); OnPropertyChanged(nameof(ShowDraws)); } }
         public string StatusMessage { get => _statusMessage; set { _statusMessage = value; OnPropertyChanged(); } }
+        public double LoadingProgress { get => _loadingProgress; set { _loadingProgress = value; OnPropertyChanged(); } }
+        public string LoadingMessage  { get => _loadingMessage;  set { _loadingMessage  = value; OnPropertyChanged(); } }
+
+        public bool ShowBubbles
+        {
+            get => _showBubbles;
+            set { _showBubbles = value; OnPropertyChanged(); }
+        }
+
+        public bool HasMegaBall
+        {
+            get => _hasMegaBall;
+            set { _hasMegaBall = value; OnPropertyChanged(); }
+        }
 
         public bool ShowHistory => _activeTab == 0;
         public bool ShowRecurrence => _activeTab == 1;
@@ -50,24 +71,32 @@ namespace DailyFantasyMAUI.ViewModel
         public async Task LoadDataAsync()
         {
             IsLoading = true;
-            StatusMessage = "Loading draw history...";
+            LoadingProgress = 0.05;
+            LoadingMessage  = "Loading Fantasy 5...";
 
-            // Load from bundled/local files immediately — no network wait
+            // Small delays let the progress bar animation stay visible even when
+            // the preloader has already loaded the data in the background.
             await LoadFromFileAsync();
-            await LoadSLFromFileAsync();
-            await LoadD3FromFileAsync();
+            await Task.Delay(180);
+            LoadingProgress = 0.42;
+            LoadingMessage  = "Loading Super Lotto...";
 
-            if (_dataFantasy.Count > 0)
-            {
-                var latest = _dataFantasy[0];
-                LastNumberHit = $"[{latest.DrawDate}] {latest.N1}, {latest.N2}, {latest.N3}, {latest.N4}, {latest.N5}";
-            }
-            else
-            {
-                LastNumberHit = "No draw data available";
-            }
+            await LoadSLFromFileAsync();
+            await Task.Delay(180);
+            LoadingProgress = 0.75;
+            LoadingMessage  = "Loading Daily 3...";
+
+            await LoadD3FromFileAsync();
+            await Task.Delay(180);
+            LoadingProgress = 1.0;
+            LoadingMessage  = "Ready!";
+
+            LastNumberHit = DateTime.Today.ToString("MMMM d, yyyy");
             IsLoading = false;
             StatusMessage = $"Ready — {_dataFantasy.Count} F5 · {_dataSuperLotto.Count} SL · {_dataDaily3.Count} D3 draws";
+
+            // Preloader data is now used — future reloads must go to disk
+            _preloaderConsumed = true;
 
             // Update CSVs from API in background — don't block the UI
             _ = UpdateAllCsvsInBackgroundAsync();
@@ -82,6 +111,9 @@ namespace DailyFantasyMAUI.ViewModel
                     await GetDataEntry.UpdateF5CsvAsync();
                     await GetDataEntry.UpdateSLCsvAsync();
                     await GetDataEntry.UpdateD3CsvAsync();
+                    await GetDataEntry.UpdateMMCsvAsync();
+                    await GetDataEntry.UpdatePBCsvAsync();
+                    await GetDataEntry.UpdateD4CsvAsync();
                     await GetDataEntry.UpdateJackpotCacheAsync(); // fetch all jackpot results once per day
                 });
 
@@ -91,11 +123,7 @@ namespace DailyFantasyMAUI.ViewModel
                     await LoadFromFileAsync();
                     await LoadSLFromFileAsync();
                     await LoadD3FromFileAsync();
-                    if (_dataFantasy.Count > 0)
-                    {
-                        var latest = _dataFantasy[0];
-                        LastNumberHit = $"[{latest.DrawDate}] {latest.N1}, {latest.N2}, {latest.N3}, {latest.N4}, {latest.N5}";
-                    }
+                    LastNumberHit = DateTime.Today.ToString("MMMM d, yyyy");
                     StatusMessage = $"Updated — {_dataFantasy.Count} F5 · {_dataSuperLotto.Count} SL · {_dataDaily3.Count} D3 draws";
                 });
             }
@@ -111,14 +139,13 @@ namespace DailyFantasyMAUI.ViewModel
                 await GetDataEntry.UpdateF5CsvAsync();
                 await GetDataEntry.UpdateSLCsvAsync();
                 await GetDataEntry.UpdateD3CsvAsync();
+                await GetDataEntry.UpdateMMCsvAsync();
+                await GetDataEntry.UpdatePBCsvAsync();
+                await GetDataEntry.UpdateD4CsvAsync();
                 await LoadFromFileAsync();
                 await LoadSLFromFileAsync();
                 await LoadD3FromFileAsync();
-                if (_dataFantasy.Count > 0)
-                {
-                    var latest = _dataFantasy[0];
-                    LastNumberHit = $"[{latest.DrawDate}] {latest.N1}, {latest.N2}, {latest.N3}, {latest.N4}, {latest.N5}";
-                }
+                LastNumberHit = DateTime.Today.ToString("MMMM d, yyyy");
                 StatusMessage = $"Refreshed — {_dataFantasy.Count} F5 · {_dataSuperLotto.Count} SL · {_dataDaily3.Count} D3 draws";
             }
             catch (Exception ex)
@@ -135,7 +162,9 @@ namespace DailyFantasyMAUI.ViewModel
         {
             try
             {
-                var draws = await GetDataEntry.LoadF5CsvDraws();
+                var draws = _preloaderConsumed
+                    ? await GetDataEntry.LoadF5CsvDraws()
+                    : await AppPreloader.F5Task;
                 _dataFantasy.Clear();
                 foreach (var (drawDate, drawNum, nums, _) in draws)
                 {
@@ -160,7 +189,9 @@ namespace DailyFantasyMAUI.ViewModel
         {
             try
             {
-                var draws = await GetDataEntry.LoadSLCsvDraws();
+                var draws = _preloaderConsumed
+                    ? await GetDataEntry.LoadSLCsvDraws()
+                    : await AppPreloader.SLTask;
                 _dataSuperLotto.Clear();
                 foreach (var (drawDate, drawNum, mainNums, mega, _) in draws)
                 {
@@ -186,7 +217,9 @@ namespace DailyFantasyMAUI.ViewModel
         {
             try
             {
-                var draws = await GetDataEntry.LoadD3CsvDraws();
+                var draws = _preloaderConsumed
+                    ? await GetDataEntry.LoadD3CsvDraws()
+                    : await AppPreloader.D3Task;
                 _dataDaily3.Clear();
                 foreach (var (drawDate, drawNum, nums, drawTime) in draws)
                 {

@@ -12,12 +12,12 @@
     <ContentPage.Resources>
         <conv:BoolToColorConverter x:Key="BoolToColor"/>
 
-        <!-- Ball box border -->
+        <!-- Ball box border — round lottery-ball style -->
         <Style x:Key="BallFrame" TargetType="Border">
-            <Setter Property="BackgroundColor" Value="#D6E8FF"/>
-            <Setter Property="Stroke" Value="#2A5298"/>
-            <Setter Property="StrokeThickness" Value="1.5"/>
-            <Setter Property="StrokeShape" Value="RoundRectangle 6"/>
+            <Setter Property="BackgroundColor" Value="#1A3F8A"/>
+            <Setter Property="Stroke" Value="#60A5FA"/>
+            <Setter Property="StrokeThickness" Value="2"/>
+            <Setter Property="StrokeShape" Value="RoundRectangle 20"/>
             <Setter Property="HeightRequest" Value="26"/>
         </Style>
 
@@ -26,9 +26,9 @@
             <Setter Property="FontSize" Value="10"/>
             <Setter Property="FontAttributes" Value="Bold"/>
             <Setter Property="TextColor" Value="White"/>
-            <Setter Property="HeightRequest" Value="30"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="HeightRequest" Value="34"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="6,0"/>
         </Style>
 
         <!-- Stat card (COMBOS / COUNT) -->
@@ -41,7 +41,7 @@
         </Style>
     </ContentPage.Resources>
 
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto,Auto">
         <Grid.GestureRecognizers>
             <PanGestureRecognizer PanUpdated="OnPagePan"/>
         </Grid.GestureRecognizers>
@@ -49,16 +49,33 @@
         <!-- ══════════════════════════════════════════════
              Row 0 — Header
              ══════════════════════════════════════════════ -->
-        <Grid Grid.Row="0" BackgroundColor="#0A1628" Padding="14,12,14,12">
+        <Grid Grid.Row="0" BackgroundColor="#0A1628" Padding="14,7,14,7">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <Label Grid.Column="0" Text="California Lottery" TextColor="White"
-                   FontSize="11" FontAttributes="Bold" CharacterSpacing="0"
-                   VerticalOptions="Center" LineBreakMode="NoWrap"/>
+            <!-- Logo + title in column 0 -->
+            <Grid Grid.Column="0" ColumnDefinitions="44,*" ColumnSpacing="6" VerticalOptions="Center">
+                <GraphicsView Grid.Column="0"
+                              Opacity="0.90" HeightRequest="40" WidthRequest="40"
+                              VerticalOptions="Center">
+                    <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+                </GraphicsView>
+                <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
+                    <Label Text="CA 7 Tracker" TextColor="#60A5FA"
+                           FontSize="14" FontAttributes="Bold" CharacterSpacing="0.5"
+                           LineBreakMode="NoWrap" TextDecorations="None">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="CalLottery_Tapped"/>
+                        </Label.GestureRecognizers>
+                    </Label>
+                    <Label Text="California Lottery" TextColor="#4A7FB5"
+                           FontSize="9" CharacterSpacing="1"
+                           LineBreakMode="NoWrap"/>
+                </VerticalStackLayout>
+            </Grid>
 
             <Button Grid.Column="1" x:Name="btnNavDropdown"
                     Text="Games ▾" FontSize="12" FontAttributes="Bold"
@@ -67,179 +84,199 @@
                     Margin="0,0,8,0"
                     Clicked="BtnNavDropdown_Clicked"/>
 
-            <!-- Mode switcher — colors overridden by UpdateModeButtons() -->
-            <Border Grid.Column="2" BackgroundColor="#132540" StrokeThickness="0"
-                    StrokeShape="RoundRectangle 10" Padding="3">
-                <HorizontalStackLayout Spacing="2" VerticalOptions="Center">
-                    <Button x:Name="btnModeF5" Text="F5" FontSize="11" FontAttributes="Bold"
-                            BackgroundColor="#FF8F00" TextColor="White"
-                            Padding="10,0" HeightRequest="30" CornerRadius="7"
-                            Clicked="BtnModeF5_Clicked"/>
-                    <Button x:Name="btnModeSL" Text="SL" FontSize="11" FontAttributes="Bold"
-                            BackgroundColor="#3D3D5C" TextColor="#8B9DC3"
-                            Padding="10,0" HeightRequest="30" CornerRadius="7"
-                            Clicked="BtnModeSL_Clicked"/>
-                    <Button x:Name="btnModeD3" Text="D3" FontSize="11" FontAttributes="Bold"
-                            BackgroundColor="#3D3D5C" TextColor="#8B9DC3"
-                            Padding="10,0" HeightRequest="30" CornerRadius="7"
-                            Clicked="BtnModeD3_Clicked"/>
-                </HorizontalStackLayout>
-            </Border>
+            <!-- Mode selector — single dropdown button -->
+            <Button Grid.Column="2" x:Name="btnModeSelect"
+                    Text="F5 ▾" FontSize="11" FontAttributes="Bold"
+                    BackgroundColor="#FF8F00" TextColor="White"
+                    Padding="10,0" HeightRequest="30" CornerRadius="8"
+                    Clicked="BtnModeSelect_Clicked"/>
         </Grid>
 
         <!-- ══════════════════════════════════════════════
              Row 1 — Last Draw card
              ══════════════════════════════════════════════ -->
         <Grid Grid.Row="1" BackgroundColor="#0E2039"
-              ColumnDefinitions="4,Auto,*" ColumnSpacing="0">
+              ColumnDefinitions="4,Auto,*,Auto" ColumnSpacing="0">
             <BoxView Grid.Column="0" BackgroundColor="#F59E0B"/>
-            <Label Grid.Column="1" Text="LAST" FontSize="9" FontAttributes="Bold"
-                   TextColor="#F59E0B" CharacterSpacing="1"
-                   VerticalOptions="Center" Margin="10,0,6,0"/>
             <Label Grid.Column="2" x:Name="txtLastDraw"
                    Text="{Binding LastNumberHit}"
-                   Padding="0,10" FontSize="13" TextColor="#94B8D8"
+                   Padding="0,5" Margin="12,0,0,0" FontSize="13" TextColor="#94B8D8"
                    LineBreakMode="WordWrap"/>
+            <Label Grid.Column="3" x:Name="txtTicketCount"
+                   FontSize="11" FontAttributes="Bold"
+                   TextColor="#F59E0B" VerticalOptions="Center"
+                   Margin="0,0,10,0">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="TxtTicketCount_Tapped"/>
+                </Label.GestureRecognizers>
+            </Label>
         </Grid>
 
         <!-- ══════════════════════════════════════════════
              Row 2 — Number boxes 1–5
              ══════════════════════════════════════════════ -->
-        <Grid Grid.Row="2" Margin="10,6,10,2" ColumnSpacing="5"
+        <Grid Grid.Row="2" Margin="10,2,10,1" ColumnSpacing="4"
               ColumnDefinitions="*,*,*,*,*">
             <Border Grid.Column="0" Style="{StaticResource BallFrame}">
                 <Entry x:Name="Box1" Text="1" Keyboard="Numeric"
-                       TextColor="Black" BackgroundColor="#D6E8FF"
+                       TextColor="White" BackgroundColor="Transparent"
                        FontSize="13" FontAttributes="Bold"
-                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="22"/>
+                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="20"/>
             </Border>
             <Border Grid.Column="1" Style="{StaticResource BallFrame}">
                 <Entry x:Name="Box2" Text="2" Keyboard="Numeric"
-                       TextColor="Black" BackgroundColor="#D6E8FF"
+                       TextColor="White" BackgroundColor="Transparent"
                        FontSize="13" FontAttributes="Bold"
-                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="22"/>
+                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="20"/>
             </Border>
             <Border Grid.Column="2" Style="{StaticResource BallFrame}">
                 <Entry x:Name="Box3" Text="3" Keyboard="Numeric"
-                       TextColor="Black" BackgroundColor="#D6E8FF"
+                       TextColor="White" BackgroundColor="Transparent"
                        FontSize="13" FontAttributes="Bold"
-                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="22"/>
+                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="20"/>
             </Border>
             <Border Grid.Column="3" Style="{StaticResource BallFrame}">
                 <Entry x:Name="Box4" Text="4" Keyboard="Numeric"
-                       TextColor="Black" BackgroundColor="#D6E8FF"
+                       TextColor="White" BackgroundColor="Transparent"
                        FontSize="13" FontAttributes="Bold"
-                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="22"/>
+                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="20"/>
             </Border>
             <Border Grid.Column="4" Style="{StaticResource BallFrame}">
                 <Entry x:Name="Box5" Text="5" Keyboard="Numeric"
-                       TextColor="Black" BackgroundColor="#D6E8FF"
+                       TextColor="White" BackgroundColor="Transparent"
                        FontSize="13" FontAttributes="Bold"
-                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="22"/>
+                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="20"/>
             </Border>
         </Grid>
 
         <!-- Row 3 — Number boxes 6–10 -->
-        <Grid Grid.Row="3" Margin="10,2,10,2" ColumnSpacing="5"
+        <Grid Grid.Row="3" Margin="10,1,10,1" ColumnSpacing="4"
               ColumnDefinitions="*,*,*,*,*">
             <Border Grid.Column="0" Style="{StaticResource BallFrame}">
                 <Entry x:Name="Box6" Text="6" Keyboard="Numeric"
-                       TextColor="Black" BackgroundColor="#D6E8FF"
+                       TextColor="White" BackgroundColor="Transparent"
                        FontSize="13" FontAttributes="Bold"
-                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="22"/>
+                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="20"/>
             </Border>
             <Border Grid.Column="1" Style="{StaticResource BallFrame}">
                 <Entry x:Name="Box7" Text="7" Keyboard="Numeric"
-                       TextColor="Black" BackgroundColor="#D6E8FF"
+                       TextColor="White" BackgroundColor="Transparent"
                        FontSize="13" FontAttributes="Bold"
-                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="22"/>
+                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="20"/>
             </Border>
             <Border Grid.Column="2" Style="{StaticResource BallFrame}">
                 <Entry x:Name="Box8" Text="8" Keyboard="Numeric"
-                       TextColor="Black" BackgroundColor="#D6E8FF"
+                       TextColor="White" BackgroundColor="Transparent"
                        FontSize="13" FontAttributes="Bold"
-                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="22"/>
+                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="20"/>
             </Border>
             <Border Grid.Column="3" Style="{StaticResource BallFrame}">
                 <Entry x:Name="Box9" Text="9" Keyboard="Numeric"
-                       TextColor="Black" BackgroundColor="#D6E8FF"
+                       TextColor="White" BackgroundColor="Transparent"
                        FontSize="13" FontAttributes="Bold"
-                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="22"/>
+                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="20"/>
             </Border>
             <Border Grid.Column="4" Style="{StaticResource BallFrame}">
                 <Entry x:Name="Box10" Text="10" Keyboard="Numeric"
-                       TextColor="Black" BackgroundColor="#D6E8FF"
+                       TextColor="White" BackgroundColor="Transparent"
                        FontSize="13" FontAttributes="Bold"
-                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="22"/>
+                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="20"/>
             </Border>
         </Grid>
 
-        <!-- Row 4 — Number boxes 11–15 -->
-        <Grid Grid.Row="4" Margin="10,2,10,0" ColumnSpacing="5"
-              ColumnDefinitions="*,*,*,*,*">
-            <Border Grid.Column="0" Style="{StaticResource BallFrame}">
-                <Entry x:Name="Box11" Text="11" Keyboard="Numeric"
-                       TextColor="Black" BackgroundColor="#D6E8FF"
-                       FontSize="13" FontAttributes="Bold"
-                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="22"/>
+        <!-- Row 4 — Box11–15 always visible; Mega Ball row shown below for SL/PB/MM -->
+        <VerticalStackLayout Grid.Row="4" Spacing="2" Padding="0,0,0,6">
+            <Grid x:Name="boxRow3" Margin="10,2,10,0" ColumnSpacing="4"
+                  ColumnDefinitions="*,*,*,*,*">
+                <Border Grid.Column="0" Style="{StaticResource BallFrame}">
+                    <Entry x:Name="Box11" Text="11" Keyboard="Numeric"
+                           TextColor="White" BackgroundColor="Transparent"
+                           FontSize="13" FontAttributes="Bold"
+                           HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="20"/>
+                </Border>
+                <Border Grid.Column="1" Style="{StaticResource BallFrame}">
+                    <Entry x:Name="Box12" Text="12" Keyboard="Numeric"
+                           TextColor="White" BackgroundColor="Transparent"
+                           FontSize="13" FontAttributes="Bold"
+                           HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="20"/>
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource BallFrame}">
+                    <Entry x:Name="Box13" Text="13" Keyboard="Numeric"
+                           TextColor="White" BackgroundColor="Transparent"
+                           FontSize="13" FontAttributes="Bold"
+                           HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="20"/>
+                </Border>
+                <Border Grid.Column="3" Style="{StaticResource BallFrame}">
+                    <Entry x:Name="Box14" Text="14" Keyboard="Numeric"
+                           TextColor="White" BackgroundColor="Transparent"
+                           FontSize="13" FontAttributes="Bold"
+                           HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="20"/>
+                </Border>
+                <Border Grid.Column="4" Style="{StaticResource BallFrame}">
+                    <Entry x:Name="Box15" Text="15" Keyboard="Numeric"
+                           TextColor="White" BackgroundColor="Transparent"
+                           FontSize="13" FontAttributes="Bold"
+                           HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="20"/>
+                </Border>
+            </Grid>
+
+            <!-- Mega Ball row — shown for SL / PB / MM -->
+            <Border x:Name="megaRow" IsVisible="False"
+                    Margin="10,2,0,0" HeightRequest="32"
+                    HorizontalOptions="Start"
+                    BackgroundColor="#1A3F8A" Stroke="#F59E0B"
+                    StrokeThickness="2" StrokeShape="RoundRectangle 20">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="MegaBall_Tapped"/>
+                </Border.GestureRecognizers>
+                <HorizontalStackLayout Spacing="8" Padding="10,0">
+                    <Label Text="⭐ MEGA"
+                           FontSize="9" FontAttributes="Bold"
+                           TextColor="#F59E0B" VerticalOptions="Center"/>
+                    <Label x:Name="MegaLabel" Text="—"
+                           TextColor="#F59E0B" FontSize="14" FontAttributes="Bold"
+                           MinimumWidthRequest="30"
+                           HorizontalOptions="Center" VerticalOptions="Center"/>
+                    <Label x:Name="lblMegaRange"
+                           Text="1–27" FontSize="9" TextColor="#F59E0B"
+                           VerticalOptions="Center"/>
+                </HorizontalStackLayout>
             </Border>
-            <Border Grid.Column="1" Style="{StaticResource BallFrame}">
-                <Entry x:Name="Box12" Text="12" Keyboard="Numeric"
-                       TextColor="Black" BackgroundColor="#D6E8FF"
-                       FontSize="13" FontAttributes="Bold"
-                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="22"/>
-            </Border>
-            <Border Grid.Column="2" Style="{StaticResource BallFrame}">
-                <Entry x:Name="Box13" Text="13" Keyboard="Numeric"
-                       TextColor="Black" BackgroundColor="#D6E8FF"
-                       FontSize="13" FontAttributes="Bold"
-                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="22"/>
-            </Border>
-            <Border Grid.Column="3" Style="{StaticResource BallFrame}">
-                <Entry x:Name="Box14" Text="14" Keyboard="Numeric"
-                       TextColor="Black" BackgroundColor="#D6E8FF"
-                       FontSize="13" FontAttributes="Bold"
-                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="22"/>
-            </Border>
-            <Border Grid.Column="4" Style="{StaticResource BallFrame}">
-                <Entry x:Name="Box15" Text="15" Keyboard="Numeric"
-                       TextColor="Black" BackgroundColor="#D6E8FF"
-                       FontSize="13" FontAttributes="Bold"
-                       HorizontalTextAlignment="Center" MaxLength="2" HeightRequest="22"/>
-            </Border>
-        </Grid>
+        </VerticalStackLayout>
 
         <!-- ══════════════════════════════════════════════
              Row 5 — PICK / FROM / COMBOS / COUNT
              ══════════════════════════════════════════════ -->
-        <Grid Grid.Row="5" Margin="10,10,10,0" ColumnSpacing="6"
+        <Grid Grid.Row="5" Margin="10,4,10,0" ColumnSpacing="6"
               ColumnDefinitions="*,*,Auto,Auto">
 
             <!-- PICK -->
             <Border Grid.Column="0" BackgroundColor="#0E2039" Stroke="#1E3A5F"
-                    StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="0">
-                <Grid RowDefinitions="Auto,*">
-                    <Label Grid.Row="0" Text="PICK" FontSize="8" FontAttributes="Bold"
-                           TextColor="#4A7FB5" CharacterSpacing="1"
-                           HorizontalOptions="Center" Margin="0,4,0,0"/>
+                    StrokeThickness="1" StrokeShape="RoundRectangle 8"
+                    Padding="0,2,0,0" VerticalOptions="Start">
+                <Grid RowDefinitions="Auto,*" Padding="0">
+                    <Label Grid.Row="0" Text="PICK" FontSize="9" FontAttributes="Bold"
+                           TextColor="White" CharacterSpacing="1"
+                           HorizontalOptions="Center"/>
                     <Entry Grid.Row="1" x:Name="MaxNum" Text="5" Keyboard="Numeric"
                            FontSize="13" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                           TextColor="Black" BackgroundColor="#D6E8FF"
-                           HeightRequest="24" TextChanged="MaxNum_TextChanged"/>
+                           TextColor="White" BackgroundColor="#0E2039"
+                           HeightRequest="28" TextChanged="MaxNum_TextChanged"/>
                 </Grid>
             </Border>
 
             <!-- FROM -->
             <Border Grid.Column="1" BackgroundColor="#0E2039" Stroke="#1E3A5F"
-                    StrokeThickness="1" StrokeShape="RoundRectangle 8" Padding="0">
-                <Grid RowDefinitions="Auto,*">
-                    <Label Grid.Row="0" Text="FROM" FontSize="8" FontAttributes="Bold"
-                           TextColor="#4A7FB5" CharacterSpacing="1"
-                           HorizontalOptions="Center" Margin="0,4,0,0"/>
+                    StrokeThickness="1" StrokeShape="RoundRectangle 8"
+                    Padding="0,2,0,0" VerticalOptions="Start">
+                <Grid RowDefinitions="Auto,*" Padding="0">
+                    <Label Grid.Row="0" Text="FROM" FontSize="9" FontAttributes="Bold"
+                           TextColor="White" CharacterSpacing="1"
+                           HorizontalOptions="Center"/>
                     <Entry Grid.Row="1" x:Name="HowMany" Text="39" Keyboard="Numeric"
                            FontSize="13" FontAttributes="Bold" HorizontalTextAlignment="Center"
-                           TextColor="Black" BackgroundColor="#D6E8FF"
-                           HeightRequest="24" TextChanged="HowMany_TextChanged"/>
+                           TextColor="White" BackgroundColor="#0E2039"
+                           HeightRequest="28" TextChanged="HowMany_TextChanged"/>
                 </Grid>
             </Border>
 
@@ -252,7 +289,7 @@
                            TextColor="#4A7FB5" CharacterSpacing="0.5" HorizontalOptions="Center"/>
                     <Label x:Name="posComb"
                            Text="{Binding PossibleCombinations, StringFormat='{0:N0}'}"
-                           FontSize="11" FontAttributes="Bold"
+                           FontSize="16" FontAttributes="Bold"
                            TextColor="#F59E0B" HorizontalOptions="Center"/>
                 </VerticalStackLayout>
             </Border>
@@ -266,7 +303,7 @@
                            TextColor="#4A7FB5" CharacterSpacing="0.5" HorizontalOptions="Center"/>
                     <Label x:Name="lblCount"
                            Text="{Binding NumberInList}"
-                           FontSize="11" FontAttributes="Bold"
+                           FontSize="16" FontAttributes="Bold"
                            TextColor="#EF4444" HorizontalOptions="Center"/>
                 </VerticalStackLayout>
             </Border>
@@ -276,9 +313,9 @@
              Row 6 — Action buttons
              ══════════════════════════════════════════════ -->
         <Grid Grid.Row="6" Margin="10,8,10,8" ColumnSpacing="5"
-              ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto">
+              ColumnDefinitions="*,Auto,Auto,Auto,Auto">
 
-            <Button Grid.Column="0" Text="🎲 QP"
+            <Button Grid.Column="0" Text="🎲 Quick"
                     Style="{StaticResource ActionBtn}"
                     BackgroundColor="#6D28D9"
                     Clicked="BtnQuickPick_Clicked"/>
@@ -288,45 +325,32 @@
                     BackgroundColor="#475569"
                     Clicked="BtnShiftRight_Clicked" IsVisible="False"/>
 
-            <Button Grid.Column="2" Text="CLR"
+            <Button Grid.Column="2" Text="✕ Clear"
                     Style="{StaticResource ActionBtn}"
                     BackgroundColor="#B91C1C"
                     Clicked="BtnClear_Clicked"/>
 
-            <Grid Grid.Column="3" ColumnDefinitions="Auto,*" ColumnSpacing="0">
+            <Grid Grid.Column="3" ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="2">
                 <CheckBox x:Name="chkBoxPerms" Grid.Column="0"
                           Color="#3B82F6" VerticalOptions="Center" Margin="2,0,0,0"/>
-                <Button Grid.Column="1" Text="Combos"
+                <Label Grid.Column="1" Text="Perms"
+                       FontSize="9" FontAttributes="Bold" TextColor="#3B82F6"
+                       VerticalOptions="Center" Margin="0,0,4,0"/>
+                <Button Grid.Column="2" Text="⚡ Combos"
                         Style="{StaticResource ActionBtn}"
                         BackgroundColor="#2563EB"
                         Clicked="BtnProcess_Clicked"/>
             </Grid>
 
-            <Button Grid.Column="4" Text="Draws"
+            <Button Grid.Column="4" Text="🔍 Draws"
                     Style="{StaticResource ActionBtn}"
                     BackgroundColor="#0F766E"
                     Clicked="BtnDraws_Clicked"/>
 
-            <Picker x:Name="cmbRecurrence" Grid.Column="5"
-                    WidthRequest="42" HeightRequest="30"
-                    BackgroundColor="#132540" FontSize="10" TextColor="White"
-                    SelectedIndexChanged="Recurrence_Changed">
-                <Picker.Items>
-                    <x:String>2</x:String>
-                    <x:String>3</x:String>
-                    <x:String>4</x:String>
-                    <x:String>5</x:String>
-                </Picker.Items>
-            </Picker>
-
-            <Button Grid.Column="6" Text="Match"
-                    Style="{StaticResource ActionBtn}"
-                    BackgroundColor="#DC2626"
-                    Clicked="BtnRecurrence_Clicked"/>
         </Grid>
 
         <!-- ══════════════════════════════════════════════
-             Row 7 — Lists
+             Row 7 — Lists + Jackpot Panel
              ══════════════════════════════════════════════ -->
         <Grid Grid.Row="7" BackgroundColor="#0D1B2A" RowDefinitions="Auto,*">
             <local:JackpotDisplay x:Name="jackpotPanel" Grid.Row="0"/>
@@ -340,7 +364,7 @@
                             SelectionChanged="History_SelectionChanged">
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
-                        <Grid Padding="16,12" BackgroundColor="#0D1B2A">
+                        <Grid Padding="10,5" BackgroundColor="#0D1B2A">
                             <VisualStateManager.VisualStateGroups>
                                 <VisualStateGroup Name="CommonStates">
                                     <VisualState Name="Normal">
@@ -350,21 +374,32 @@
                                     </VisualState>
                                     <VisualState Name="Selected">
                                         <VisualState.Setters>
-                                            <Setter Property="BackgroundColor" Value="#1A3050"/>
+                                            <Setter Property="BackgroundColor" Value="#0D1B2A"/>
                                         </VisualState.Setters>
                                     </VisualState>
                                 </VisualStateGroup>
                             </VisualStateManager.VisualStateGroups>
-                            <Label Text="{Binding .}" FontFamily="Monospace" FontSize="17"
-                                   TextColor="#C8DFF2" BackgroundColor="Transparent"/>
+                            <Border BackgroundColor="#0E2039" Stroke="#1E3A5F"
+                                    StrokeThickness="1" StrokeShape="RoundRectangle 10">
+                                <Grid ColumnDefinitions="4,*" ColumnSpacing="0">
+                                    <BoxView Grid.Column="0" BackgroundColor="#3B82F6"
+                                             WidthRequest="4" CornerRadius="4,0,4,0"/>
+                                    <local:BubbleNumberRow Grid.Column="1"
+                                           Text="{Binding .}"
+                                           ShowBubbles="{Binding Source={RelativeSource AncestorType={x:Type local:MainPage}}, Path=BindingContext.ShowBubbles}"
+                                           HasMegaBall="{Binding Source={RelativeSource AncestorType={x:Type local:MainPage}}, Path=BindingContext.HasMegaBall}"
+                                           AccentColor="#3B82F6"
+                                           PlainTextColor="#C8DFF2"/>
+                                </Grid>
+                            </Border>
                         </Grid>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
 
-            <!-- Recurrence results -->
+            <!-- Recurrence results (hidden – replaced by BackTestPage) -->
             <CollectionView x:Name="lstRecurrence"
-                            IsVisible="{Binding ShowRecurrence}"
+                            IsVisible="False"
                             ItemsSource="{Binding RecurrenceResults}"
                             SelectionMode="Single"
                             SelectionChanged="Recurrence_SelectionChanged">
@@ -401,7 +436,7 @@
                             SelectionChanged="Combos_SelectionChanged">
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
-                        <Grid Padding="16,10" BackgroundColor="#0D1B2A">
+                        <Grid Padding="10,5" BackgroundColor="#0D1B2A">
                             <VisualStateManager.VisualStateGroups>
                                 <VisualStateGroup Name="CommonStates">
                                     <VisualState Name="Normal">
@@ -411,13 +446,24 @@
                                     </VisualState>
                                     <VisualState Name="Selected">
                                         <VisualState.Setters>
-                                            <Setter Property="BackgroundColor" Value="#1A0D3A"/>
+                                            <Setter Property="BackgroundColor" Value="#0D1B2A"/>
                                         </VisualState.Setters>
                                     </VisualState>
                                 </VisualStateGroup>
                             </VisualStateManager.VisualStateGroups>
-                            <Label Text="{Binding .}" FontFamily="Monospace"
-                                   FontSize="16" TextColor="#A78BFA"/>
+                            <Border BackgroundColor="#100B28" Stroke="#3D2080"
+                                    StrokeThickness="1" StrokeShape="RoundRectangle 10">
+                                <Grid ColumnDefinitions="4,*" ColumnSpacing="0">
+                                    <BoxView Grid.Column="0" BackgroundColor="#F59E0B"
+                                             WidthRequest="4" CornerRadius="4,0,4,0"/>
+                                    <local:BubbleNumberRow Grid.Column="1"
+                                           Text="{Binding .}"
+                                           ShowBubbles="{Binding Source={RelativeSource AncestorType={x:Type local:MainPage}}, Path=BindingContext.ShowBubbles}"
+                                           HasMegaBall="{Binding Source={RelativeSource AncestorType={x:Type local:MainPage}}, Path=BindingContext.HasMegaBall}"
+                                           AccentColor="#F59E0B"
+                                           PlainTextColor="#FBBF24"/>
+                                </Grid>
+                            </Border>
                         </Grid>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
@@ -442,52 +488,128 @@
              Row 9 — Bottom nav bar
              ══════════════════════════════════════════════ -->
         <Grid Grid.Row="9" ColumnDefinitions="*,*,*,*,*,*,*"
-              HeightRequest="56" BackgroundColor="#080F1A">
+              HeightRequest="60" BackgroundColor="#080F1A">
             <BoxView Grid.Column="0" Grid.ColumnSpan="7"
                      HeightRequest="1" BackgroundColor="#1E3A5F"
                      VerticalOptions="Start"/>
-            <Button Grid.Column="0" Text="Results" FontSize="10" FontAttributes="Bold"
-                    BackgroundColor="#14532D" TextColor="#4ADE80"
-                    CornerRadius="0" Padding="0,0" Clicked="BtnResults_Clicked"/>
-            <Button Grid.Column="1" Text="Jackpot" FontSize="10" FontAttributes="Bold"
-                    BackgroundColor="#431407" TextColor="#FB923C"
-                    CornerRadius="0" Padding="0,0" Clicked="BtnJackpot_Clicked"/>
-            <Button Grid.Column="2" Text="Options" FontSize="10" FontAttributes="Bold"
-                    BackgroundColor="#0F2542" TextColor="#60A5FA"
-                    CornerRadius="0" Padding="0,0" Clicked="BtnOptions_Clicked"/>
-            <Button Grid.Column="3" Text="Advance" FontSize="10" FontAttributes="Bold"
-                    BackgroundColor="#0F2542" TextColor="#A78BFA"
-                    CornerRadius="0" Padding="0,0" Clicked="BtnAdvance_Clicked"/>
-            <Button Grid.Column="4" Text="Summary" FontSize="10" FontAttributes="Bold"
-                    BackgroundColor="#1A3A1A" TextColor="#4ADE80"
-                    CornerRadius="0" Padding="0,0" Clicked="BtnSummary_Clicked"/>
-            <Button Grid.Column="5" Text="Save" FontSize="10" FontAttributes="Bold"
-                    BackgroundColor="#1E3A8A" TextColor="#93C5FD"
-                    CornerRadius="0" Padding="0,0" Clicked="BtnSave_Clicked"/>
-            <Button Grid.Column="6" Text="🖨 Print" FontSize="10" FontAttributes="Bold"
-                    BackgroundColor="#1C2B40" TextColor="#CBD5E1"
-                    CornerRadius="0" Padding="0,0" Clicked="BtnPrint_Clicked"/>
+
+            <Border Grid.Column="0" BackgroundColor="#14532D" Margin="3,2,3,1" Padding="0,0,0,3"
+                    StrokeThickness="0" StrokeShape="RoundRectangle 12">
+                <Border.GestureRecognizers><TapGestureRecognizer Tapped="BtnResults_Clicked"/></Border.GestureRecognizers>
+                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="1">
+                    <Label Text="💲" FontSize="22" HorizontalOptions="Center" TextColor="#4ADE80"/>
+                    <Label x:Name="lblResultsNav" Text="Results" FontSize="8" FontAttributes="Bold" HorizontalOptions="Center" TextColor="#4ADE80"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Grid.Column="1" BackgroundColor="#431407" Margin="3,2,3,1" Padding="0,0,0,3"
+                    StrokeThickness="0" StrokeShape="RoundRectangle 12">
+                <Border.GestureRecognizers><TapGestureRecognizer Tapped="BtnJackpot_Clicked"/></Border.GestureRecognizers>
+                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="1">
+                    <Label Text="💲" FontSize="22" HorizontalOptions="Center" TextColor="#FB923C"/>
+                    <Label Text="Jackpot" FontSize="8" FontAttributes="Bold" HorizontalOptions="Center" TextColor="#FB923C"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Grid.Column="2" BackgroundColor="#0F2542" Margin="3,2,3,1" Padding="0,0,0,3"
+                    StrokeThickness="0" StrokeShape="RoundRectangle 12">
+                <Border.GestureRecognizers><TapGestureRecognizer Tapped="BtnOptions_Clicked"/></Border.GestureRecognizers>
+                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="1">
+                    <Label Text="⚙️" FontSize="22" HorizontalOptions="Center" TextColor="#60A5FA"/>
+                    <Label Text="Options" FontSize="8" FontAttributes="Bold" HorizontalOptions="Center" TextColor="#60A5FA"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Grid.Column="3" BackgroundColor="#0F2542" Margin="3,2,3,1" Padding="0,0,0,3"
+                    StrokeThickness="0" StrokeShape="RoundRectangle 12">
+                <Border.GestureRecognizers><TapGestureRecognizer Tapped="BtnAdvance_Clicked"/></Border.GestureRecognizers>
+                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="1">
+                    <Label Text="🔔" FontSize="22" HorizontalOptions="Center" TextColor="#A78BFA"/>
+                    <Label Text="Advance" FontSize="8" FontAttributes="Bold" HorizontalOptions="Center" TextColor="#A78BFA"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Grid.Column="4" BackgroundColor="#1A3A1A" Margin="3,2,3,1" Padding="0,0,0,3"
+                    StrokeThickness="0" StrokeShape="RoundRectangle 12">
+                <Border.GestureRecognizers><TapGestureRecognizer Tapped="BtnSummary_Clicked"/></Border.GestureRecognizers>
+                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="1">
+                    <Label Text="💳" FontSize="22" HorizontalOptions="Center" TextColor="#4ADE80"/>
+                    <Label Text="Spend" FontSize="8" FontAttributes="Bold" HorizontalOptions="Center" TextColor="#4ADE80"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Grid.Column="5" BackgroundColor="#1E3A8A" Margin="3,2,3,1" Padding="0,0,0,3"
+                    StrokeThickness="0" StrokeShape="RoundRectangle 12">
+                <Border.GestureRecognizers><TapGestureRecognizer Tapped="BtnSave_Clicked"/></Border.GestureRecognizers>
+                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="1">
+                    <Label Text="💾" FontSize="22" HorizontalOptions="Center" TextColor="#93C5FD"/>
+                    <Label Text="Save" FontSize="8" FontAttributes="Bold" HorizontalOptions="Center" TextColor="#93C5FD"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Grid.Column="6" BackgroundColor="#1C2B40" Margin="3,2,3,1" Padding="0,0,0,3"
+                    StrokeThickness="0" StrokeShape="RoundRectangle 12">
+                <Border.GestureRecognizers><TapGestureRecognizer Tapped="BtnPrint_Clicked"/></Border.GestureRecognizers>
+                <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="1">
+                    <Label Text="🖨" FontSize="22" HorizontalOptions="Center" TextColor="#CBD5E1"/>
+                    <Label Text="Print" FontSize="8" FontAttributes="Bold" HorizontalOptions="Center" TextColor="#CBD5E1"/>
+                </VerticalStackLayout>
+            </Border>
+
         </Grid>
 
         <!-- ══════════════════════════════════════════════
              Row 10 — Insert combos (combos tab only)
              ══════════════════════════════════════════════ -->
-        <Button Grid.Row="10" x:Name="btnInsertToWinner"
-                Text="Insert Combos → F5 Winner"
-                FontSize="13" FontAttributes="Bold"
-                BackgroundColor="#C2410C" TextColor="White"
-                HeightRequest="44" Margin="10,4,10,8" CornerRadius="10"
-                IsVisible="{Binding ShowCombos}"
-                Clicked="BtnInsertToWinner_Clicked"/>
+        <Grid Grid.Row="10" x:Name="insertCombosRow" IsVisible="False"
+              ColumnDefinitions="*,Auto" Margin="10,4,10,8">
+            <Button Grid.Column="0" x:Name="btnInsertToWinner"
+                    Text="Insert Combos → F5 Winner"
+                    FontSize="13" FontAttributes="Bold"
+                    BackgroundColor="#C2410C" TextColor="White"
+                    HeightRequest="44" CornerRadius="10"
+                    Clicked="BtnInsertToWinner_Clicked"/>
+            <Button Grid.Column="1" x:Name="btnClearCombos"
+                    Text="✕"
+                    FontSize="16" FontAttributes="Bold"
+                    BackgroundColor="#546E7A" TextColor="White"
+                    HeightRequest="44" WidthRequest="44" CornerRadius="10"
+                    Margin="6,0,0,0"
+                    Clicked="BtnClearCombos_Clicked"/>
+        </Grid>
 
-        <!-- Loading overlay -->
+        <!-- Nav loading overlay — shown instantly when navigating to slow pages (Results etc.) -->
+        <Grid Grid.Row="0" Grid.RowSpan="11" x:Name="navLoadingOverlay"
+              BackgroundColor="#000000" Opacity="0.001" InputTransparent="True">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="14">
+                <ActivityIndicator x:Name="navLoadingSpinner" IsRunning="False"
+                                   Color="#F59E0B" WidthRequest="52" HeightRequest="52"/>
+                <Label x:Name="navLoadingLabel" Text="Loading Results..."
+                       TextColor="White" FontSize="15" FontAttributes="Bold"
+                       HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+        </Grid>
+
+        <!-- Loading overlay — matches splash screen, shows progress.
+             IsVisible is managed in code-behind (not bound) so hiding it can fade
+             instead of snapping instantly — see the vm.PropertyChanged hookup in
+             MainPage.xaml.cs. -->
         <Grid Grid.Row="0" Grid.RowSpan="11" x:Name="loadingOverlay"
-              BackgroundColor="#C0000000" IsVisible="{Binding IsLoading}">
-            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="18">
-                <ActivityIndicator IsRunning="True" Color="#F59E0B"
-                                   WidthRequest="60" HeightRequest="60"/>
-                <Label Text="Loading draw data..." TextColor="White"
-                       FontSize="16" HorizontalOptions="Center" FontAttributes="Bold"/>
+              BackgroundColor="#0F1923" IsVisible="False">
+            <VerticalStackLayout VerticalOptions="Center" HorizontalOptions="Center"
+                                 Spacing="18" Padding="48,0">
+                <Image Source="ball_logo.svg" WidthRequest="110" HeightRequest="110"
+                       HorizontalOptions="Center"/>
+                <Label Text="CA Lottery Tracker" TextColor="White"
+                       FontSize="22" FontAttributes="Bold" HorizontalOptions="Center"/>
+                <ProgressBar x:Name="loadingBar"
+                             Progress="{Binding LoadingProgress}"
+                             ProgressColor="#F59E0B"
+                             WidthRequest="280" ScaleY="4"
+                             HorizontalOptions="Center"
+                             Margin="0,10,0,10"/>
+                <Label Text="{Binding LoadingMessage}" TextColor="#90CAF9"
+                       FontSize="13" HorizontalOptions="Center"/>
             </VerticalStackLayout>
         </Grid>
 
@@ -639,6 +761,38 @@
                 </VerticalStackLayout>
             </Border>
         </Grid>
+
+        <Grid Grid.Row="0" Grid.RowSpan="11" x:Name="searchNumOverlay"
+              BackgroundColor="#CC000000" IsVisible="False">
+            <Border BackgroundColor="#0E2039" Stroke="#1E3A5F" StrokeThickness="1.5"
+                    StrokeShape="RoundRectangle 20" Padding="20"
+                    VerticalOptions="Center" HorizontalOptions="Center" WidthRequest="320">
+                <VerticalStackLayout Spacing="14">
+                    <Label x:Name="searchNumTitle" Text="Search Sets" FontSize="17" FontAttributes="Bold"
+                           HorizontalOptions="Center" TextColor="White"/>
+                    <Label Text="Leave boxes blank to skip a number"
+                           FontSize="11" HorizontalOptions="Center" TextColor="#4A7FB5"/>
+                    <FlexLayout x:Name="searchNumBoxes" Wrap="Wrap" JustifyContent="Center"
+                                HorizontalOptions="Center" Margin="0,4"/>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <Button Grid.Column="0" Text="Cancel"
+                                BackgroundColor="#1E293B" TextColor="White"
+                                CornerRadius="10" HeightRequest="44"
+                                Clicked="SearchNumCancel_Clicked"/>
+                        <Button Grid.Column="1" Text="Search"
+                                BackgroundColor="#0F766E" TextColor="White"
+                                CornerRadius="10" HeightRequest="44"
+                                Clicked="SearchNumSearch_Clicked"/>
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+
+        <!-- Row 11 — safe-area spacer: extends the nav bar's background color under the
+             system nav bar so button labels in Row 9 aren't clipped by it. Height is set
+             at runtime from the device's real inset (see MainPage.xaml.cs constructor). -->
+        <BoxView Grid.Row="11" x:Name="bottomSafeAreaSpacer"
+                 HeightRequest="0" BackgroundColor="#080F1A"/>
 
     </Grid>
 </ContentPage>

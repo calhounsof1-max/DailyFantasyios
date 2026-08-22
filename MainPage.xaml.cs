@@ -1,3 +1,4 @@
+using DailyFantasyMAUI.LotteryDirectory;
 using DailyFantasyMAUI.Services;
 using DailyFantasyMAUI.ViewModel;
 
@@ -5,23 +6,27 @@ namespace DailyFantasyMAUI;
 
 public partial class MainPage : ContentPage
 {
-    internal const string HotSpotOnlyModeKey = "hotspot_only_mode";
-
-    // Referenced by other game pages' "Go to Game" menu (MainPage.Instance?.ShowNavOverlay(...))
-    // to show a loading indicator while Shell pops back to Home before navigating onward. Reuses
-    // the existing loadingOverlay/vm.IsLoading rather than Android's separate nav-specific
-    // overlay+label, since iOS's XAML doesn't have that second overlay — good enough to show
-    // loading feedback without adding new UI just for this.
-    internal static MainPage? Instance;
-    internal void ShowNavOverlay(string label) => vm.IsLoading = true;
-    internal void HideNavOverlay() => vm.IsLoading = false;
-
     readonly MainViewModel vm = new();
-    int _mode = 0; // 0=F5, 1=SL, 2=D3
+    int _mode = 0; // 0=F5, 1=SL, 2=D3, 3=PB, 4=MM
     bool _isRestoring = false;
     bool _initialized = false;
     bool _isPanning = false;
     bool _boxesDirty = false; // true only after user edits a box; cleared after Save adds to list
+    bool _navigating = false;
+    bool _keepOverlayOnAppearing = false; // set by ShowNavOverlay to survive PopToRoot
+    internal static bool SuppressAutoRestore = false; // set true after user-initiated wipe/purge
+    internal static MainPage? Instance;
+    internal void ShowNavOverlay(string label)
+    {
+        navLoadingLabel.Text = label;
+        navLoadingOverlay.Opacity = 1; navLoadingOverlay.InputTransparent = false;
+        navLoadingSpinner.IsRunning = true;
+        _keepOverlayOnAppearing = true;
+    }
+    internal void HideNavOverlay()
+    {
+    }
+    string _megaBall = ""; // value for mega ball (SL/PB/MM modes)
     bool _savingPick = false; // suppresses History_SelectionChanged during Save
     Entry[] _boxes = null!;
     System.Collections.ObjectModel.ObservableCollection<string>? _picksRef;
@@ -31,12 +36,6 @@ public partial class MainPage : ContentPage
         InitializeComponent();
         BindingContext = vm;
         Instance = this;
-        cmbRecurrence.SelectedIndex = 0;
-
-        foreach (var entry in new[] { Box1, Box2, Box3, Box4, Box5, Box6, Box7,
-                                      Box8, Box9, Box10, Box11, Box12, Box13, Box14, Box15,
-                                      MaxNum, HowMany })
-            entry.HandlerChanged += ForceBlackText;
 
         // Ticket lists live in the Jackpot panel's own Grid row (Row 1, "*") — keep them hidden
         // while the panel is expanded instead of both being squeezed onto screen at once. Also
@@ -44,10 +43,68 @@ public partial class MainPage : ContentPage
         // a disabled/hidden panel has no expanded state to hide the lists behind.
         SyncListsVisibility();
         jackpotPanel.ExpandedChanged += _ => SyncListsVisibility();
+
+        // Show/hide the loading overlay ourselves instead of an IsVisible binding, so hiding
+        // it can fade (~150ms) instead of snapping instantly — the vm's own load timing is
+        // untouched, this only smooths the visual transition once IsLoading flips.
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(MainViewModel.IsLoading)) return;
+            if (vm.IsLoading)
+            {
+                loadingOverlay.Opacity = 1;
+                loadingOverlay.IsVisible = true;
+            }
+            else
+            {
+                _ = FadeHideLoadingOverlay();
+            }
+        };
+
+        foreach (var entry in new[] { Box1, Box2, Box3, Box4, Box5, Box6, Box7,
+                                      Box8, Box9, Box10, Box11, Box12, Box13, Box14, Box15 })
+            entry.HandlerChanged += ForceBlackText;
+
+        foreach (var entry in new[] { MaxNum, HowMany })
+            entry.HandlerChanged += ForceWhiteText;
+
+        // Update Results button indicator whenever Enhance Mode setting changes
+        EnhanceModeService.SettingChanged += UpdateResultsNavIndicator;
+
+#if ANDROID
+        // Extend the nav bar's background under the system nav bar so the
+        // Results/Jackpot/Options/etc. labels in the bottom nav row aren't clipped.
+        // The inset can arrive after this constructor runs, so apply now (in case
+        // it's already known) AND react to it arriving later.
+        void ApplyBottomInset() => MainThread.BeginInvokeOnMainThread(() =>
+        {
+            // Trim a bit off the raw inset — the enlarged/lowered buttons above already
+            // absorb some of it, so using the full raw value left visibly excess dark space.
+            double trimmed = Math.Max(0, SafeAreaInsets.BottomDp - 30);
+            if (trimmed > 0)
+                bottomSafeAreaSpacer.HeightRequest = trimmed;
+        });
+        ApplyBottomInset();
+        SafeAreaInsets.Changed += ApplyBottomInset;
+#endif
     }
 
-    void SyncListsVisibility() =>
-        listsContainer.IsVisible = !jackpotPanel.IsVisible || !jackpotPanel.IsExpanded;
+    async Task FadeHideLoadingOverlay()
+    {
+        await loadingOverlay.FadeTo(0, 150, Easing.CubicOut);
+        loadingOverlay.IsVisible = false;
+        loadingOverlay.Opacity = 1; // reset so it's fully opaque next time IsLoading goes true
+    }
+
+    void UpdateResultsNavIndicator()
+    {
+        bool on = EnhanceModeService.IsEnhanced(EnhanceModeService.ResultsPageKey);
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            lblResultsNav.Text = on ? "Results ✨" : "Results";
+            vm.ShowBubbles = EnhanceModeService.IsEnhanced(EnhanceModeService.MainListKey);
+        });
+    }
 
     double _panPeak; // most-negative TotalX seen during this gesture
 
@@ -90,8 +147,20 @@ public partial class MainPage : ContentPage
 #endif
     }
 
+    private void ForceWhiteText(object? sender, EventArgs e)
+    {
+#if ANDROID
+        if (sender is Entry entry &&
+            entry.Handler?.PlatformView is Android.Widget.EditText et)
+        {
+            et.SetTextColor(Android.Graphics.Color.White);
+            et.SetSelectAllOnFocus(true);
+        }
+#endif
+    }
+
     string PicksAutoSavePath => Path.Combine(FileSystem.AppDataDirectory,
-        $"_autosave_{(_mode == 1 ? "SL" : _mode == 2 ? "D3" : "F5")}.txt");
+        $"_autosave_{(_mode == 1 ? "SL" : _mode == 2 ? "D3" : _mode == 3 ? "PB" : _mode == 4 ? "MM" : "F5")}.txt");
 
     void ReHookPicksAutoSave()
     {
@@ -126,16 +195,36 @@ public partial class MainPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        vm.LastNumberHit = DateTime.Today.ToString("MMMM d, yyyy");
+        UpdateResultsNavIndicator();
+        MaxNum.TextColor  = Colors.White;
+        HowMany.TextColor = Colors.White;
 
         if (_initialized)
         {
+            _navigating = false;
             // TranslationX was pre-set by the caller before navigating back — just animate in
             await this.TranslateTo(0, 0, 220, Easing.CubicOut);
+            if (!_navigating && !_keepOverlayOnAppearing)
+            {
+                navLoadingOverlay.Opacity = 0.001; navLoadingOverlay.InputTransparent = true;
+                navLoadingSpinner.IsRunning = false;
+            }
+            _keepOverlayOnAppearing = false;
             HideKeyboard();
             jackpotPanel.IsVisible = Preferences.Get(JackpotDisplay.PrefShowPanel, true);
             SyncListsVisibility();
+            // Wait for any in-progress game page log write, then refresh the ticket count.
+            if (Services.TicketLogService.PendingWriteTask != null)
+            {
+                await Services.TicketLogService.PendingWriteTask;
+                Services.TicketLogService.PendingWriteTask = null;
+            }
+            UpdateTicketCount();
             return;
         }
+        navLoadingOverlay.Opacity = 0.001; navLoadingOverlay.InputTransparent = true;
+        navLoadingSpinner.IsRunning = false;
         _initialized = true;
 
         // TEMP DIAGNOSTIC — timing checkpoints to find what's blocking the UI thread on cold
@@ -144,7 +233,7 @@ public partial class MainPage : ContentPage
         var _diagSw = System.Diagnostics.Stopwatch.StartNew();
         var _diagLog = new System.Text.StringBuilder();
         void DiagMark(string label) => _diagLog.AppendLine($"{_diagSw.ElapsedMilliseconds,6}ms  {label}");
-        DiagMark("OnAppearing start");
+        DiagMark("cold-start branch entered");
 
         // Hot Spot Only mode: skip straight to Hot Spot on cold launch instead of ever
         // showing Home — everything below still runs unchanged afterward, underneath Hot
@@ -152,8 +241,29 @@ public partial class MainPage : ContentPage
         if (Preferences.Get(HotSpotOnlyModeKey, false))
             await Shell.Current.GoToAsync(nameof(HotSpotPage), false);
 
+        jackpotPanel.IsVisible = Preferences.Get(JackpotDisplay.PrefShowPanel, true);
+        SyncListsVisibility();
+
+        // Prime the nav overlay so Android pre-renders it — fixes first-tap black screen not
+        // showing. Done here, behind the loading overlay (shown immediately below and covering
+        // the whole screen for the next second-plus anyway), so this 32ms opacity flip is never
+        // actually visible — it used to run at the very end of startup, well after the user was
+        // already looking at the loaded page, which caused a visible "Loading Results..." flash.
+        vm.IsLoading = true; // shows loadingOverlay immediately, ahead of anything else rendering
+        navLoadingOverlay.InputTransparent = false;
+        navLoadingOverlay.Opacity = 1;
+        await Task.Delay(32);
+        navLoadingOverlay.Opacity = 0.001;
+        navLoadingOverlay.InputTransparent = true;
+
         // Auto-purge expired advance plays on every app open
         _ = CheckAutoPurgeOnStartupAsync();
+
+        // ── Auto-restore: if all ticket data is gone, offer to restore from latest backup ──
+        // Skip if user just intentionally wiped/purged their data
+        if (!SuppressAutoRestore)
+            _ = CheckAutoRestoreAsync();
+        SuppressAutoRestore = false;
 
         // One-time: clear old bundled/hardcoded picks from autosave files
         if (!Preferences.Get("picks_cleared_v2", false))
@@ -187,17 +297,13 @@ public partial class MainPage : ContentPage
         _isRestoring = true;
         RestorePreferences();
         _isRestoring = false;
+        MaxNum.TextColor  = Colors.White;
+        HowMany.TextColor = Colors.White;
         DiagMark("before vm.LoadDataAsync");
         await vm.LoadDataAsync();
         DiagMark("after vm.LoadDataAsync");
-        jackpotPanel.IsVisible = Preferences.Get(JackpotDisplay.PrefShowPanel, true);
-        if (jackpotPanel.IsVisible)
-        {
-            jackpotPanel.Expand();
-            _ = jackpotPanel.LoadAsync();
-        }
-        SyncListsVisibility();
-        DiagMark("after jackpotPanel init (LoadAsync fired, not awaited)");
+        await loadingBar.ProgressTo(1.0, 300, Easing.CubicOut);
+        await Task.Delay(200); // brief pause so user sees "Ready!" before overlay hides
         // Pre-warm Results cache in background so Results page loads instantly
         _ = ResultsPageCls.LoadAllDrawsAsync();
         DiagMark("after ResultsPageCls.LoadAllDrawsAsync fired (not awaited)");
@@ -211,15 +317,25 @@ public partial class MainPage : ContentPage
         ReHookPicksAutoSave();
         // Enforce mode-correct PICK/FROM
         if (_mode == 2) { MaxNum.Text = "3"; }
-        else if (_mode == 1) { MaxNum.Text = "6"; }
+        else { MaxNum.Text = "5"; }  // F5, SL, PB, MM all pick 5 main numbers
         UpdateBoxMaxLength(_mode);
+        // Show mega ball row for SL / PB / MM
+        bool showMegaOnLoad = (_mode == 1 || _mode == 3 || _mode == 4);
+        megaRow.IsVisible = showMegaOnLoad;
+        vm.HasMegaBall = showMegaOnLoad;
+        if (_mode == 1) lblMegaRange.Text = "1–27";
+        else if (_mode == 3) lblMegaRange.Text = "1–26";
+        else if (_mode == 4) lblMegaRange.Text = "1–25";
         UpdateCombosLabel();
         if (int.TryParse(HowMany.Text, out int from)) HighlightBoxes(from);
         btnInsertToWinner.Text = _mode == 0 ? "Insert Combos → F5 Winner"
                                 : _mode == 1 ? "Insert Combos → SL Winner"
+                                : _mode == 3 ? "Insert Combos → Powerball"
+                                : _mode == 4 ? "Insert Combos → Mega Millions"
                                 :              "Insert Combos → Daily 3";
         DiagMark("before UpdateModeButtons/RecurrencePicker");
         UpdateModeButtons();
+        UpdateTicketCount();
         UpdateRecurrencePicker(_mode);
         vm.ActiveTab = 0;
         DiagMark("before Task.Delay(300)");
@@ -228,19 +344,32 @@ public partial class MainPage : ContentPage
         MaxNum.Unfocus();
         HowMany.Unfocus();
         HideKeyboard();
-        DiagMark("OnAppearing end");
+        DiagMark("before jackpotPanel.Expand/LoadAsync");
+        jackpotPanel.IsVisible = Preferences.Get(JackpotDisplay.PrefShowPanel, true);
+        if (jackpotPanel.IsVisible)
+        {
+            jackpotPanel.Expand();
+            _ = jackpotPanel.LoadAsync();
+        }
+        SyncListsVisibility();
+        DiagMark("OnAppearing end (jackpotPanel.LoadAsync fired, not awaited)");
 
         // Show in-app alert for advance tickets expiring today or tomorrow (launch only)
         AdvancePlayNotificationService.CheckAndNotify();
-        if (AdvancePlayNotificationService.PendingLaunchTitle != null)
+        if (AdvancePlayNotificationService.PendingLaunchTitle != null
+            && Preferences.Get("launch_expiry_alert_enabled", true))
         {
             string title = AdvancePlayNotificationService.PendingLaunchTitle;
             string body  = AdvancePlayNotificationService.PendingLaunchBody ?? "";
             AdvancePlayNotificationService.ClearLaunchAlert();
             try { await DisplayAlert(title, body, "OK"); } catch { }
         }
+        else
+        {
+            AdvancePlayNotificationService.ClearLaunchAlert();
+        }
 
-        // TEMP DIAGNOSTIC — see the note at the top of this method.
+        // TEMP DIAGNOSTIC — see the note earlier in this method.
         try { await DisplayAlert("Startup timing (temp diagnostic)", _diagLog.ToString(), "OK"); } catch { }
     }
 
@@ -287,27 +416,65 @@ public partial class MainPage : ContentPage
 
     // ── Mode toggle (F5 / SL / D3) ────────────────────────────────────────────
 
+    private async void UpdateTicketCount()
+    {
+        int total = await TicketCountService.GetTotalAsync();
+        txtTicketCount.Text = total > 0 ? $"🎟 {total}" : "";
+    }
+
+    private async void TxtTicketCount_Tapped(object sender, TappedEventArgs e)
+    {
+        await Shell.Current.GoToAsync(nameof(TicketSummaryPage), false);
+    }
+
     private void UpdateModeButtons()
     {
-        btnModeF5.BackgroundColor = _mode == 0 ? Color.FromArgb("#FF8F00") : Color.FromArgb("#3D3D5C");
-        btnModeF5.TextColor       = _mode == 0 ? Colors.White : Color.FromArgb("#8B9DC3");
-        btnModeSL.BackgroundColor = _mode == 1 ? Color.FromArgb("#7B1FA2") : Color.FromArgb("#3D3D5C");
-        btnModeSL.TextColor       = _mode == 1 ? Colors.White : Color.FromArgb("#8B9DC3");
-        btnModeD3.BackgroundColor = _mode == 2 ? Color.FromArgb("#1565C0") : Color.FromArgb("#3D3D5C");
-        btnModeD3.TextColor       = _mode == 2 ? Colors.White : Color.FromArgb("#8B9DC3");
+        string[] labels = { "F5", "SL", "D3", "PB", "MM" };
+        string[] colors = { "#FF8F00", "#7B1FA2", "#1565C0", "#C62828", "#1565C0" };
+        btnModeSelect.Text            = labels[_mode] + " ▾";
+        btnModeSelect.BackgroundColor = Color.FromArgb(colors[_mode]);
+        btnModeSelect.TextColor       = Colors.White;
+    }
+
+    private async void BtnModeSelect_Clicked(object sender, EventArgs e)
+    {
+        string? result = await DisplayActionSheet("Select Game Mode", "Cancel", null,
+            "F5 — Fantasy 5", "SL — Super Lotto", "D3 — Daily 3",
+            "PB — Powerball", "MM — Mega Millions");
+        if (result == null || result == "Cancel") return;
+        int newMode = result.StartsWith("F5") ? 0
+                    : result.StartsWith("SL") ? 1
+                    : result.StartsWith("D3") ? 2
+                    : result.StartsWith("PB") ? 3
+                    : 4;
+        await SwitchMode(newMode);
     }
 
     private async Task SwitchMode(int mode)
     {
         if (_mode == mode) return;
         _mode = mode;
-        MaxNum.Text  = mode == 2 ? "3" : mode == 1 ? "6" : "5";
+        // SL/PB/MM: PICK=5 main numbers (mega ball is separate); D3: PICK=3 digits
+        MaxNum.Text  = mode == 2 ? "3" : "5";
         Preferences.Set("gameMode", _mode);
         UpdateModeButtons();
         UpdateRecurrencePicker(mode);
         UpdateBoxMaxLength(mode);
+        // Show mega ball row for SL / PB / MM
+        bool showMega = (mode == 1 || mode == 3 || mode == 4);
+        megaRow.IsVisible = showMega;
+        vm.HasMegaBall = showMega;
+        if (mode == 1)      lblMegaRange.Text = "1–27";
+        else if (mode == 3) lblMegaRange.Text = "1–26";
+        else if (mode == 4) lblMegaRange.Text = "1–25";
+        else                lblMegaRange.Text = "";
+        _megaBall = "";
+        MegaLabel.Text = "—";
+        MegaLabel.TextColor = Color.FromArgb("#F59E0B");
         btnInsertToWinner.Text = mode == 0 ? "Insert Combos → F5 Winner"
                                 : mode == 1 ? "Insert Combos → SL Winner"
+                                : mode == 3 ? "Insert Combos → Powerball"
+                                : mode == 4 ? "Insert Combos → Mega Millions"
                                 :              "Insert Combos → Daily 3";
         if (File.Exists(PicksAutoSavePath))
         {
@@ -320,11 +487,22 @@ public partial class MainPage : ContentPage
         }
         ReHookPicksAutoSave();
         UpdateCombosLabel();
+        UpdateTicketCount();
     }
 
-    private async void BtnModeF5_Clicked(object sender, EventArgs e) => await SwitchMode(0);
-    private async void BtnModeSL_Clicked(object sender, EventArgs e) => await SwitchMode(1);
-    private async void BtnModeD3_Clicked(object sender, EventArgs e) => await SwitchMode(2);
+
+    // ── Mega Ball tap-to-enter ────────────────────────────────────────────────
+    private async void MegaBall_Tapped(object sender, EventArgs e)
+    {
+        string range = lblMegaRange.Text; // e.g. "1–27"
+        string? result = await DisplayPromptAsync("⭐ Mega Ball", $"Enter mega ball number ({range}):",
+            initialValue: _megaBall, maxLength: 2, keyboard: Keyboard.Numeric);
+        if (result == null) return;
+        result = result.Trim();
+        _megaBall = result;
+        MegaLabel.Text = string.IsNullOrEmpty(result) ? "—" : result;
+        MegaLabel.TextColor = string.IsNullOrEmpty(result) ? Color.FromArgb("#F59E0B") : Colors.White;
+    }
 
     // ── History selection → fill boxes ───────────────────────────────────────
 
@@ -350,7 +528,7 @@ public partial class MainPage : ContentPage
 
         if (!_showingDraws)
         {
-            int count = _mode == 1 ? 6 : isFiveNum ? 5 : 3;
+            int count = (_mode == 1 || _mode == 3 || _mode == 4) ? 6 : isFiveNum ? 5 : 3;
             for (int i = 0; i < count && i < _boxes.Length && i < parts.Length; i++)
                 _boxes[i].Text = parts[i];
             _boxesDirty = false; // selecting an item to view doesn't arm Save
@@ -651,11 +829,10 @@ public partial class MainPage : ContentPage
     private void BtnQuickPick_Clicked(object sender, EventArgs e)
     {
         if (_boxes == null) return;
-        string gameName = _mode == 0 ? "Fantasy 5" : _mode == 1 ? "Super Lotto" : "Daily 3";
+        string gameName = _mode == 0 ? "Fantasy 5" : _mode == 1 ? "Super Lotto" : _mode == 3 ? "Powerball" : _mode == 4 ? "Mega Millions" : "Daily 3";
         qpTitle.Text = $"🎲 Smart Quick Pick — {gameName}";
         _qpStrategy = 0;
         UpdateQpStrategyButtons();
-        // FROM box drives how many numbers to generate — mirror it into the dialog
         qpFrom.Text = HowMany.Text;
         qpProgressArea.IsVisible = false;
         qpSpinner.IsRunning = false;
@@ -694,8 +871,8 @@ public partial class MainPage : ContentPage
 
         // FROM box = how many numbers to generate; game range is always fixed (F5=39, SL=47, D3=9)
         if (!int.TryParse(qpFrom.Text, out int pickCount) || pickCount <= 0)
-            pickCount = _mode == 2 ? 3 : _mode == 1 ? 6 : 5;
-        int gameMax = _mode == 1 ? 47 : _mode == 2 ? 9 : 39;
+            pickCount = _mode == 2 ? 3 : 5;   // all non-D3 games pick 5 main numbers
+        int gameMax = _mode == 1 ? 47 : _mode == 2 ? 9 : _mode == 3 ? 69 : _mode == 4 ? 70 : 39;
         pickCount = Math.Min(pickCount, _boxes.Length);
 
         int.TryParse(qpLastN.Text, out int lastN);
@@ -718,12 +895,39 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        // Guarantee at least 10 seconds elapsed since the user hit Generate
+        // Rotating hype messages to keep user engaged while we wait
         var elapsed = (DateTime.UtcNow - start).TotalMilliseconds;
         if (elapsed < 10000)
         {
-            qpProgressMsg.Text = "Finalizing selection...";
+            string[] hypeMessages =
+            [
+                "🔥 Scanning hot number streaks...",
+                "📊 Analyzing draw frequency patterns...",
+                "🎯 Targeting high-probability picks...",
+                "⚡ Running probability simulations...",
+                "🌟 Identifying lucky combinations...",
+                "🔮 Cross-referencing draw history...",
+                "💫 Narrowing down the best picks...",
+                "🎲 Almost ready — locking in numbers...",
+                "✨ Finalizing your lucky selection..."
+            ];
+            int msgIdx = 0;
+            qpProgressMsg.Text = hypeMessages[0];
+            using var cts = new CancellationTokenSource();
+            _ = Task.Run(async () =>
+            {
+                while (!cts.Token.IsCancellationRequested)
+                {
+                    try { await Task.Delay(1100, cts.Token); }
+                    catch (TaskCanceledException) { break; }
+                    int next = (msgIdx + 1) % hypeMessages.Length;
+                    msgIdx = next;
+                    MainThread.BeginInvokeOnMainThread(
+                        () => qpProgressMsg.Text = hypeMessages[next]);
+                }
+            }, CancellationToken.None);
             await Task.Delay((int)(10000 - elapsed));
+            cts.Cancel();
         }
 
         qpSpinner.IsRunning = false;
@@ -733,6 +937,8 @@ public partial class MainPage : ContentPage
         for (int i = 0; i < _boxes.Length; i++)
             _boxes[i].Text = i < result.Count ? result[i].ToString() : "";
         _isRestoring = false;
+        HowMany.Text = result.Count.ToString();
+        HighlightBoxes(result.Count);
         _boxesDirty = true;
         SavePreferences();
 
@@ -747,6 +953,12 @@ public partial class MainPage : ContentPage
         };
         vm.StatusMessage = $"Smart QP [{stratLabel}]: {string.Join(", ", result)}";
     }
+
+    // Ticket lists (Row 1 of the Jackpot panel's Grid) are hidden whenever the panel is both
+    // visible and expanded — visible whenever the panel is off/disabled or collapsed to just
+    // its header.
+    void SyncListsVisibility() =>
+        listsContainer.IsVisible = !jackpotPanel.IsVisible || !jackpotPanel.IsExpanded;
 
     private void BtnShiftRight_Clicked(object sender, EventArgs e)
     {
@@ -793,14 +1005,40 @@ public partial class MainPage : ContentPage
                 }
                 pool[i] = v;
             }
+            // Switch to combo tab before setting items (MAUI/Android CollectionView rendering fix)
+            vm.Combinations = new System.Collections.ObjectModel.ObservableCollection<string>();
+            vm.ActiveTab = 2;
+            _showInsertBar = false;
+            UpdateInsertBar();
             string sep = _mode == 2 ? "" : " ";
             var perms = GetOrderedPerms(pool, pickCount, sep);
             vm.Combinations = new System.Collections.ObjectModel.ObservableCollection<string>(perms);
             MainViewModel.SharedCombos = perms;
             vm.NumberInList = perms.Count;
             vm.StatusMessage = $"All {pickCount}-digit combos from {pool.Length} numbers — {perms.Count} total";
-            vm.ActiveTab = 2;
+            _showInsertBar = true;
+            UpdateInsertBar();
             return;
+        }
+
+        // For SL/PB/MM: require a mega ball before generating combos
+        if (_mode == 1 || _mode == 3 || _mode == 4)
+        {
+            if (string.IsNullOrWhiteSpace(_megaBall))
+            {
+                await DisplayAlert("⭐ Mega Ball Required",
+                    "Please enter a Mega Ball number before generating combos.",
+                    "OK");
+                // Auto-open the mega ball prompt
+                string range = lblMegaRange.Text;
+                string? result = await DisplayPromptAsync("⭐ Mega Ball", $"Enter mega ball number ({range}):",
+                    initialValue: "", maxLength: 2, keyboard: Keyboard.Numeric);
+                if (string.IsNullOrWhiteSpace(result)) return;
+                _megaBall = result.Trim();
+                MegaLabel.Text = _megaBall;
+                MegaLabel.TextColor = Colors.White;
+                // Now fall through to generate combos
+            }
         }
 
         if (!int.TryParse(MaxNum.Text, out int maxNum) || !int.TryParse(HowMany.Text, out int howMany)) return;
@@ -815,9 +1053,18 @@ public partial class MainPage : ContentPage
         for (int i = _boxes.Length + 1; i < 100; i++)
             mNum[i] = i;
 
-        vm.IsLoading = true;
         long total = (long)Math.Round(vm.PossibleCombinations);
-        vm.StatusMessage = $"Adding 0 of {total:N0}...";
+
+        // Switch to combo tab FIRST so CollectionView is visible before items arrive —
+        // MAUI/Android won't render items set on a hidden CollectionView.
+        vm.Combinations = new System.Collections.ObjectModel.ObservableCollection<string>();
+        vm.ActiveTab = 2;
+        _showInsertBar = false;
+        UpdateInsertBar();
+        vm.StatusMessage = $"Computing {total:N0} combinations...";
+
+        var btn = (Button)sender;
+        btn.IsEnabled = false;
 
         var progress = new Progress<int>(count =>
             vm.StatusMessage = $"Adding {count:N0} of {total:N0}...");
@@ -825,11 +1072,22 @@ public partial class MainPage : ContentPage
         try
         {
             var results = await Task.Run(() => vm.ComputeCombinationsAsync(mNum, maxNum, howMany, count => ((IProgress<int>)progress).Report(count)));
+
+            // For SL/PB/MM: append the fixed mega ball to every combo
+            string megaTag = "";
+            if ((_mode == 1 || _mode == 3 || _mode == 4) && int.TryParse(_megaBall, out int megaVal) && megaVal > 0)
+            {
+                string megaStr = megaVal.ToString();
+                results = results.Select(c => c + " " + megaStr).ToList();
+                megaTag = $"  ·  Mega: {megaStr}";
+            }
+
             vm.Combinations = new System.Collections.ObjectModel.ObservableCollection<string>(results);
             MainViewModel.SharedCombos = results;
             vm.NumberInList = results.Count;
-            vm.StatusMessage = $"Complete — {results.Count:N0} of {total:N0} added";
-            vm.ActiveTab = 2;
+            vm.StatusMessage = $"Complete — {results.Count:N0} of {total:N0} added{megaTag}";
+            _showInsertBar = true;
+            UpdateInsertBar();
         }
         catch (Exception ex)
         {
@@ -838,39 +1096,14 @@ public partial class MainPage : ContentPage
         }
         finally
         {
-            vm.IsLoading = false;
+            btn.IsEnabled = true;
         }
     }
 
-    // ── Recurrence ────────────────────────────────────────────────────────────
+    // ── Recurrence (moved to BackTestPage) ───────────────────────────────────
 
     private void Recurrence_Changed(object sender, EventArgs e) { }
-
-    private void BtnRecurrence_Clicked(object sender, EventArgs e)
-    {
-        string matchCount = cmbRecurrence.SelectedIndex >= 0
-            ? cmbRecurrence.Items[cmbRecurrence.SelectedIndex]
-            : "2";
-
-        if (_mode == 1) // Super Lotto: box1–5 main, box6 = Mega/bonus
-        {
-            string numbers = $"{Box1.Text} {Box2.Text} {Box3.Text} {Box4.Text} {Box5.Text} {Box6.Text}";
-            vm.SearchRecurrenceSL(numbers, matchCount);
-        }
-        else if (_mode == 2) // Daily 3: box1–3
-        {
-            string numbers = $"{Box1.Text} {Box2.Text} {Box3.Text}";
-            vm.SearchRecurrenceD3(numbers, matchCount);
-        }
-        else // Fantasy 5: box1–5
-        {
-            string numbers = $"{Box1.Text} {Box2.Text} {Box3.Text} {Box4.Text} {Box5.Text}";
-            vm.SearchRecurrence(numbers, matchCount);
-        }
-
-        vm.StatusMessage = $"Complete — {vm.NumberInList} matches found";
-        vm.ActiveTab = 1;
-    }
+    private void BtnRecurrence_Clicked(object sender, EventArgs e) { }
 
     private void UpdateBoxMaxLength(int mode)
     {
@@ -880,19 +1113,7 @@ public partial class MainPage : ContentPage
             box.MaxLength = maxLen;
     }
 
-    private void UpdateRecurrencePicker(int mode)
-    {
-        string current = cmbRecurrence.SelectedIndex >= 0
-            ? cmbRecurrence.Items[cmbRecurrence.SelectedIndex] : "2";
-        cmbRecurrence.Items.Clear();
-        cmbRecurrence.Items.Add("2");
-        cmbRecurrence.Items.Add("3");
-        if (mode != 2) cmbRecurrence.Items.Add("4"); // D3 max is 3
-        if (mode != 2) cmbRecurrence.Items.Add("5");
-        if (mode == 1) cmbRecurrence.Items.Add("6");
-        int idx = cmbRecurrence.Items.IndexOf(current);
-        cmbRecurrence.SelectedIndex = idx >= 0 ? idx : 0;
-    }
+    private void UpdateRecurrencePicker(int mode) { }
 
     // ── Draws toggle (reuses History listbox) ────────────────────────────────
 
@@ -923,57 +1144,73 @@ public partial class MainPage : ContentPage
     {
         if (_isPanning) return;
         SavePreferences();
-        vm.IsLoading = true;
-        await Task.Yield(); // let spinner render before navigation work starts
+        navLoadingLabel.Text = "Loading Fantasy 5...";
+        _navigating = true;
+        navLoadingOverlay.Opacity = 1; navLoadingOverlay.InputTransparent = false;
+        navLoadingSpinner.IsRunning = true;
+        await Task.Yield();
+        await Task.Delay(100);
         AppShell.WinnerPageInstance.PrePosition(true);
         await Shell.Current.GoToAsync(nameof(WinnerPage), false);
-        vm.IsLoading = false;
     }
 
     private async void BtnSuperLotto_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;
         SavePreferences();
-        vm.IsLoading = true;
+        navLoadingLabel.Text = "Loading Super Lotto...";
+        _navigating = true;
+        navLoadingOverlay.Opacity = 1; navLoadingOverlay.InputTransparent = false;
+        navLoadingSpinner.IsRunning = true;
         await Task.Yield();
+        await Task.Delay(100);
         SuperLottoPage.ComingFrom = "main";
         AppShell.SuperLottoPageInstance.PrePosition(true);
         await Shell.Current.GoToAsync(nameof(SuperLottoPage), false);
-        vm.IsLoading = false;
     }
 
     private async void BtnDaily3_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;
         SavePreferences();
-        vm.IsLoading = true;
+        navLoadingLabel.Text = "Loading Daily 3...";
+        _navigating = true;
+        navLoadingOverlay.Opacity = 1; navLoadingOverlay.InputTransparent = false;
+        navLoadingSpinner.IsRunning = true;
         await Task.Yield();
+        await Task.Delay(100);
         Daily3Page.ComingFrom = "main";
         AppShell.Daily3PageInstance.PrePosition(true);
         await Shell.Current.GoToAsync(nameof(Daily3Page), false);
-        vm.IsLoading = false;
     }
 
     private async void BtnPowerball_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;
         SavePreferences();
-        vm.IsLoading = true;
+        navLoadingLabel.Text = "Loading Powerball...";
+        _navigating = true;
+        navLoadingOverlay.Opacity = 1; navLoadingOverlay.InputTransparent = false;
+        navLoadingSpinner.IsRunning = true;
         await Task.Yield();
+        await Task.Delay(100);
         AppShell.PowerballPageInstance.PrePosition(true);
         await Shell.Current.GoToAsync(nameof(PowerballPage), false);
-        vm.IsLoading = false;
     }
 
     private async void BtnNavDropdown_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;
         string result = await DisplayActionSheet(null, "Cancel", null,
-            "Fantasy 5", "Super Lotto", "Daily 3", "Daily 4", "Powerball", "Mega Millions", "Daily Derby", "Hot Spot", "Jackpot Winners");
+            "Fantasy 5", "Super Lotto", "Daily 3", "Daily 4", "Powerball", "Mega Millions", "Daily Derby", "Hot Spot", "Scratchers", "Jackpot Winners", "🍀 Check My Numbers", "🎰 Other State Lotteries");
         if (result == null || result == "Cancel") return;
         SavePreferences();
-        vm.IsLoading = true;
-        await Task.Yield(); // let spinner render before navigation work starts
+        navLoadingLabel.Text = $"Loading {result}...";
+        _navigating = true;
+        navLoadingOverlay.Opacity = 1; navLoadingOverlay.InputTransparent = false;
+        navLoadingSpinner.IsRunning = true;
+        await Task.Yield();
+        await Task.Delay(100);
         switch (result)
         {
             case "Fantasy 5":
@@ -1012,19 +1249,38 @@ public partial class MainPage : ContentPage
                 break;
             case "Hot Spot":
                 await Shell.Current.GoToAsync(nameof(HotSpotPage), false);
+                HideNavOverlay();
                 break;
             case "Jackpot Winners":
                 AppShell.JackpotPageInstance.PrePosition(true);
                 await Shell.Current.GoToAsync(nameof(JackpotPage), false);
+                HideNavOverlay();
+                break;
+            case "Scratchers":
+                await Shell.Current.GoToAsync(nameof(ScatchersPage), false);
+                HideNavOverlay();
+                break;
+            case "🍀 Check My Numbers":
+                await Shell.Current.GoToAsync(nameof(CheckMyNumber), false);
+                HideNavOverlay();
+                break;
+            case "🎰 Other State Lotteries":
+                await Shell.Current.GoToAsync(nameof(StateLotteryPage), false);
+                HideNavOverlay();
                 break;
         }
-        vm.IsLoading = false;
     }
 
     private async void BtnResults_Clicked(object sender, EventArgs e)
     {
         if (_isPanning) return;
         SavePreferences();
+        navLoadingLabel.Text = "Loading Results...";
+        _navigating = true;
+        navLoadingOverlay.Opacity = 1; navLoadingOverlay.InputTransparent = false;
+        navLoadingSpinner.IsRunning = true;
+        await Task.Yield();
+        await Task.Delay(100); // let the spinner paint before navigating
         AppShell.ResultsPageInstance.PrePosition(true);
         await Shell.Current.GoToAsync(nameof(ResultsPage), false);
     }
@@ -1038,15 +1294,18 @@ public partial class MainPage : ContentPage
 
     // ── Tab switching ─────────────────────────────────────────────────────────
 
-    private void TabHistory_Clicked(object sender, EventArgs e) => vm.ActiveTab = 0;
-    private void TabRecurrence_Clicked(object sender, EventArgs e) => vm.ActiveTab = 1;
-    private void TabCombos_Clicked(object sender, EventArgs e) => vm.ActiveTab = 2;
+    private void TabHistory_Clicked(object sender, EventArgs e) { vm.ActiveTab = 0; UpdateInsertBar(); }
+    private void TabRecurrence_Clicked(object sender, EventArgs e) { vm.ActiveTab = 1; UpdateInsertBar(); }
+    private void TabCombos_Clicked(object sender, EventArgs e) { _showInsertBar = true; vm.ActiveTab = 2; UpdateInsertBar(); }
+
+    internal const string HotSpotOnlyModeKey = "hotspot_only_mode";
 
     private async void BtnOptions_Clicked(object sender, EventArgs e)
     {
         string action = await DisplayActionSheet("Options", "Cancel", null,
-            "Data Files", "🗓 Ticket Calendar", "My Favorites", "Load Picks", "Import Tickets...", "Generate Numbers",
-            "Clear List", "Delete Multiple...", "Search Sets", "Check Wins for Draw#", "Today Purchase Tickets");
+            "Data Files", "My Favorites", "Load Picks", "Import Tickets...", "Generate Numbers",
+            "Clear List", "Delete Multiple...", "Search Sets", "Check Wins for Draw#", "Today Purchase Tickets",
+            "🗓 Ticket Calendar", "Purge Files");
         switch (action)
         {
             case "Data Files":              await Shell.Current.GoToAsync(nameof(DataViewerPage), false); break;
@@ -1057,12 +1316,32 @@ public partial class MainPage : ContentPage
             case "Generate Numbers":        BtnGenerateNumbers_Clicked(sender, e); break;
             case "Search Sets":             await Task.Delay(300); await SearchSetsAsync(); break;
             case "Check Wins for Draw#":    DrawSearchPage.PresetGame = "Daily 3"; await Shell.Current.GoToAsync(nameof(DrawSearchPage), false); break;
-            case "Today Purchase Tickets":  await Shell.Current.GoToAsync(nameof(TicketLogPage), false); break;
+            case "Today Purchase Tickets":
+                navLoadingLabel.Text = "Loading Ticket Log...";
+                _navigating = true;
+                navLoadingOverlay.Opacity = 1; navLoadingOverlay.InputTransparent = false;
+                navLoadingSpinner.IsRunning = true;
+                await Task.Yield();
+                await Task.Delay(100);
+                await Shell.Current.GoToAsync(nameof(TicketLogPage), false);
+                break;
+            case "Purge Files":             await ShowPurgeFilesDialogAsync(); break;
             case "Clear List":
-                if (vm.Picks.Count == 0) { vm.StatusMessage = "List is already empty"; break; }
-                bool confirmClear = await DisplayAlert("Clear List", $"Remove all {vm.Picks.Count} items from the list?", "Clear All", "Cancel");
-                if (confirmClear)
+                string clearConfirm = await DisplayActionSheet("Are you sure?", "Cancel", null, "Yes, clear list");
+                if (clearConfirm != "Yes, clear list") break;
+                if (vm.ActiveTab == 2)
                 {
+                    vm.Combinations.Clear();
+                    vm.StatusMessage = "Combos cleared";
+                }
+                else if (vm.ActiveTab == 1)
+                {
+                    vm.RecurrenceResults.Clear();
+                    vm.StatusMessage = "Results cleared";
+                }
+                else
+                {
+                    if (_showingDraws) { vm.StatusMessage = "Switch to My Picks to clear"; break; }
                     vm.Picks.Clear();
                     _boxesDirty = false;
                     try { File.WriteAllLines(PicksAutoSavePath, vm.Picks); } catch { }
@@ -1076,31 +1355,53 @@ public partial class MainPage : ContentPage
     }
 
     private async void BtnSummary_Clicked(object sender, EventArgs e)
-        => await Shell.Current.GoToAsync(nameof(SummaryPage), false);
+    {
+        navLoadingLabel.Text = "Loading Spend...";
+        _navigating = true;
+        navLoadingOverlay.Opacity = 1; navLoadingOverlay.InputTransparent = false;
+        navLoadingSpinner.IsRunning = true;
+        await Task.Yield();
+        await Task.Delay(100);
+        await Shell.Current.GoToAsync(nameof(SummaryPage), false);
+    }
 
     private async void BtnPrint_Clicked(object sender, EventArgs e)
         => await Shell.Current.GoToAsync(nameof(PrintPreviewPage), false);
 
     private async void BtnAdvance_Clicked(object sender, EventArgs e)
     {
-        string action = await DisplayActionSheet("Advance", "Cancel", null,
-            "View Sets", "Archive", "Export Sets", "Refresh Data",
-            "Voice Settings", "Notifications", "Games Expiration", "Purge All Games",
-            "Backup Data", "Restore Data", "About");
-        switch (action)
+        bool reopenAdvance;
+        do
         {
-            case "View Sets":        BtnViewSets_Clicked(sender, e); break;
-            case "Archive":          BtnArchive_Clicked(sender, e); break;
-            case "Export Sets":      await Task.Delay(300); await ExportAllSetsAsync(); break;
-            case "Refresh Data":     await vm.RefreshAllDataAsync(); break;
-            case "Voice Settings":   await ShowVoiceSettingsAsync(); break;
-            case "Notifications":    await Shell.Current.GoToAsync(nameof(NotificationsPage), false); break;
-            case "Games Expiration": await Shell.Current.GoToAsync(nameof(AdvanceGamesPage), false); break;
-            case "Purge All Games":  await PurgeAllGamesAsync(); break;
-            case "Backup Data":      await BackupDataAsync(); break;
-            case "Restore Data":     await RestoreDataAsync(); break;
-            case "About":            await Shell.Current.GoToAsync(nameof(AboutPage), false); break;
-        }
+            reopenAdvance = false;
+            string enhanceLabel = "✨ Enhance Mode";
+            // "Account" deliberately left out — AccountPage/LoginPage/AuthService/
+            // PaidAppApiClient hit a live paid-subscription backend (upgrds.com with a
+            // hardcoded API key) and weren't ported without confirming that's the right
+            // target for the iOS app.
+            string action = await DisplayActionSheet("Advance", "Cancel", null,
+                "View Sets", "Archive", "Export Sets", "Refresh Data",
+                "Voice Settings", "Notifications", "Games Expiration",
+                enhanceLabel, "About");
+            switch (action)
+            {
+                case "View Sets":           BtnViewSets_Clicked(sender, e); break;
+                case "Archive":             BtnArchive_Clicked(sender, e); break;
+                case "Export Sets":         await Task.Delay(300); await ExportAllSetsAsync(); break;
+                case "Refresh Data":        await vm.RefreshAllDataAsync(); break;
+                case "Voice Settings":      await ShowVoiceSettingsAsync(); break;
+                case "Notifications":       await Shell.Current.GoToAsync(nameof(NotificationsPage), false); break;
+                case "Games Expiration":    await Shell.Current.GoToAsync(nameof(AdvanceGamesPage), false); break;
+                case "About":               await Shell.Current.GoToAsync(nameof(AboutPage),   false); break;
+                default:
+                    if (action == enhanceLabel)
+                    {
+                        bool wentBack = await EnhanceModeService.ShowDialogAsync(this);
+                        if (wentBack) reopenAdvance = true;
+                    }
+                    break;
+            }
+        } while (reopenAdvance);
     }
 
     // ── Purge helpers ─────────────────────────────────────────────────────────
@@ -1120,15 +1421,25 @@ public partial class MainPage : ContentPage
     /// Deletes all expired rows (Play To &lt; today, or draw# &lt; calottery current) that have no recorded win.
     /// Returns the number of rows deleted.
     /// </summary>
-    static async Task<int> ExecutePurgeAsync(Dictionary<string, int>? currentDrawNumbers = null)
+    // dryRun=true counts expired rows without deleting anything (used for confirm dialog preview)
+    internal static async Task<int> ExecutePurgeAsync(Dictionary<string, int>? currentDrawNumbers = null, bool dryRun = false)
     {
         var winRecords = await SummaryPage.LoadAllAsync();
         var today = DateTime.Today;
+        var nowTimeOfDay = DateTime.Now.TimeOfDay;
         int deleted = 0;
+
+        // D3 draws twice a day, so a single combined "current draw#" can't tell an M-only ticket
+        // from an E-only one apart and has no 6am grace window — the exact class of bug that lost
+        // a real ticket (2026-08-05). Route D3 rows through D3TimingRules.ShouldRetire below, the
+        // same already-proven logic Results/ScanAdvancePastWins use, instead of inventing a second
+        // simplified check here. Fetched once, used only for D3 rows.
+        var (d3Midday, d3Evening) = await GetDataEntry.GetCurrentD3DrawNumbersAsync();
 
         foreach (var (prefix, cols, extra, tempKeys) in _purgeGames)
         {
             string gameKey = prefix.ToUpper();
+            bool isD3 = prefix == "d3";
             int activeSlot = Preferences.Get($"{prefix}_active_slot", -1);
             int currentDn = 0;
             currentDrawNumbers?.TryGetValue(prefix, out currentDn);
@@ -1144,6 +1455,8 @@ public partial class MainPage : ContentPage
                 string advRaw = Preferences.Get(advKey, "");
                 var advParts = string.IsNullOrEmpty(advRaw) ? new string[10] : advRaw.Split('|');
                 if (advParts.Length < 10) Array.Resize(ref advParts, 10);
+
+                string[]? rowDrawFilters = isD3 ? ResultsPageCls.ReadD3DrawFilters(i) : null;
 
                 bool anyKept = false;
                 for (int r = 0; r < 10; r++)
@@ -1163,19 +1476,32 @@ public partial class MainPage : ContentPage
                                     System.Globalization.DateTimeStyles.None, out var ed)) end = ed;
                             if (DateTime.TryParseExact(pair[0], "yyyyMMdd", null,
                                     System.Globalization.DateTimeStyles.None, out var sd)) start = sd;
-                            var refDate = end ?? start;
-                            if (refDate.HasValue)
-                                // Delete all expired rows — wins are pre-saved to SummaryPage before purge runs
-                                keep = refDate.Value.Date >= today;
 
-                            // Also purge if the stored draw# (higher of start/end) is already past — but never purge winners.
-                            // If no draw# is stored, skip this check and rely on date only.
-                            if (keep && !hasWin && currentDn > 0 && pair.Length >= 3)
+                            int storedDn = 0;
+                            if (pair.Length >= 3)
                             {
                                 string storedDnStr = pair.Length >= 4 && !string.IsNullOrWhiteSpace(pair[3])
                                     ? pair[3] : pair[2];
-                                if (!string.IsNullOrWhiteSpace(storedDnStr) &&
-                                    int.TryParse(storedDnStr, out int storedDn) && storedDn > 0 && storedDn < currentDn)
+                                int.TryParse(storedDnStr, out storedDn);
+                            }
+
+                            if (isD3)
+                            {
+                                string df = rowDrawFilters != null && r < rowDrawFilters.Length ? rowDrawFilters[r] : "B";
+                                keep = !D3TimingRules.ShouldRetire(
+                                    end, start, storedDn, df, d3Midday, d3Evening, today, nowTimeOfDay);
+                            }
+                            else
+                            {
+                                // Use end date as expiry: a multi-draw ticket started in the past is still
+                                // active if its end date is today or later. Fall back to start if no end date.
+                                var expiryDate = end ?? start;
+                                if (expiryDate.HasValue)
+                                    keep = expiryDate.Value.Date >= today;
+
+                                // Also purge if the stored draw# (higher of start/end) is already past — but never purge winners.
+                                // If no draw# is stored, skip this check and rely on date only.
+                                if (keep && !hasWin && currentDn > 0 && storedDn > 0 && storedDn < currentDn)
                                     keep = false;
                             }
                         }
@@ -1184,33 +1510,87 @@ public partial class MainPage : ContentPage
                     if (!keep)
                     {
                         deleted++;
-                        for (int c = 0; c < cols; c++)
-                            if (r * cols + c < vals.Length) vals[r * cols + c] = "";
-                        if (r < advParts.Length) advParts[r] = "~";
+                        if (!dryRun)
+                        {
+                            for (int c = 0; c < cols; c++)
+                                if (r * cols + c < vals.Length) vals[r * cols + c] = "";
+                            if (r < advParts.Length) advParts[r] = "~";
+                        }
                     }
                     else anyKept = true;
                 }
 
-                string newData = string.Join("|", vals);
-                if (newData.Replace("|", "").Trim().Length == 0)
+                if (!dryRun)
                 {
-                    Preferences.Remove(setKey);
-                    Preferences.Remove(advKey);
-                    foreach (var ex in extra) Preferences.Remove($"{ex}{i}");
-                    // If this was the active slot, clear the temp in-memory keys too
-                    // so the game page doesn't restore stale data from its temp cache
-                    if (i == activeSlot)
-                        foreach (var tk in tempKeys) Preferences.Remove(tk);
-                }
-                else
-                {
-                    Preferences.Set(setKey, newData);
-                    Preferences.Set(advKey, string.Join("|", advParts));
+                    string newData = string.Join("|", vals);
+                    if (newData.Replace("|", "").Trim().Length == 0)
+                    {
+                        Preferences.Remove(setKey);
+                        Preferences.Remove(advKey);
+                        foreach (var ex in extra) Preferences.Remove($"{ex}{i}");
+                        // NOTE: do NOT remove tempKeys (e.g. d3_entries) here.
+                        // Those are the user's live numbers on the game page and must survive purge.
+                    }
+                    else
+                    {
+                        Preferences.Set(setKey, newData);
+                        Preferences.Set(advKey, string.Join("|", advParts));
+                    }
                 }
             }
         }
 
+        // Drop in-memory caches on all game pages so they can't write stale data back to prefs
+        if (!dryRun && deleted > 0)
+            InvalidateAllGamePageCaches();
+
         return deleted;
+    }
+
+    static void InvalidateAllGamePageCaches()
+    {
+        AppShell.WinnerPageInstance.InvalidateAfterPurge();
+        AppShell.SuperLottoPageInstance.InvalidateAfterPurge();
+        AppShell.Daily3PageInstance.InvalidateAfterPurge();
+        AppShell.Daily4PageInstance.InvalidateAfterPurge();
+        AppShell.PowerballPageInstance.InvalidateAfterPurge();
+        AppShell.MegaMillionsPageInstance.InvalidateAfterPurge();
+        AppShell.DailyDerbyPageInstance.InvalidateAfterPurge();
+        // Also clear the active tempKeys so game pages re-read from (now-purged) prefs
+        foreach (var (prefix, _, _, tempKeys) in _purgeGames)
+        {
+            if (string.IsNullOrEmpty(Preferences.Get($"{prefix}_set_{Preferences.Get($"{prefix}_active_slot", 0)}", "")))
+                foreach (var tk in tempKeys) Preferences.Remove(tk);
+        }
+    }
+
+    /// <summary>
+    /// Wipes ALL game data for every game and every slot — tickets, advance dates, bet types, everything.
+    /// This is a full nuclear clear and cannot be undone.
+    /// </summary>
+    internal static void ExecuteFullWipe()
+    {
+        SuppressAutoRestore = true;
+        foreach (var (prefix, cols, extra, tempKeys) in _purgeGames)
+        {
+            for (int i = 0; i < 10; i++)
+            {
+                Preferences.Remove($"{prefix}_set_{i}");
+                Preferences.Remove($"{prefix}_adv_{i}");
+                Preferences.Remove($"{prefix}_freeplay_{i}");
+                Preferences.Remove($"excl_set_{prefix}_{i}");
+                foreach (var ex in extra)
+                    Preferences.Remove($"{ex}{i}");
+            }
+            foreach (var tk in tempKeys)
+                Preferences.Remove(tk);
+            Preferences.Remove($"{prefix}_active_slot");
+            Preferences.Remove($"{prefix}_freeplay_live");
+        }
+        // Clear the in-memory cache so Results page re-reads current (empty) prefs on next visit
+        AppShell.ResultsPageInstance.InvalidateCache();
+        // Drop all game page in-memory caches so they can't write stale data back to prefs
+        InvalidateAllGamePageCaches();
     }
 
     /// <summary>
@@ -1230,7 +1610,7 @@ public partial class MainPage : ContentPage
                 {
                     if (!DateTime.TryParse(aw.DrawDate, out var awDate) || awDate == default)
                         awDate = date;
-                    string sk = $"auto_{aw.Game}_{aw.SetNumber}_{aw.RowNumber}_{awDate:yyyyMMdd}";
+                    string sk = $"auto_{aw.Game}_{awDate:yyyyMMdd}_{aw.Numbers.Replace(" ", "")}";
                     var (awAmt, _, _, awFree) = ResultsPage.ParsePrize(aw.Prize);
                     await SummaryPage.AddWinAsync(new WinningRecord
                     {
@@ -1249,32 +1629,116 @@ public partial class MainPage : ContentPage
     }
 
     /// <summary>
-    /// Checks on app open for expired plays and auto-purges them, showing a popup if anything was removed.
+    /// Silently writes a backup JSON to Downloads (no dialog). Used before purge to prevent data loss.
+    /// </summary>
+    internal static async Task<string?> AutoBackupSilentAsync()
+    {
+        try
+        {
+            var root = new System.Text.Json.Nodes.JsonObject();
+            var gamesNode = new System.Text.Json.Nodes.JsonObject();
+            foreach (var (prefix, _, extras) in _backupGames)
+            {
+                var slots = new System.Text.Json.Nodes.JsonObject();
+                for (int i = 0; i < 10; i++)
+                {
+                    string setKey = $"{prefix}_set_{i}";
+                    string advKey = $"{prefix}_adv_{i}";
+                    string setRaw = Preferences.Get(setKey, "");
+                    string advRaw = Preferences.Get(advKey, "");
+                    if (string.IsNullOrEmpty(setRaw) && string.IsNullOrEmpty(advRaw)) continue;
+                    var slot = new System.Text.Json.Nodes.JsonObject();
+                    if (!string.IsNullOrEmpty(setRaw)) slot["set"] = setRaw;
+                    if (!string.IsNullOrEmpty(advRaw)) slot["adv"] = advRaw;
+                    foreach (var ex in extras)
+                    {
+                        string exRaw = Preferences.Get($"{ex}{i}", "");
+                        if (!string.IsNullOrEmpty(exRaw)) slot[ex.TrimEnd('_')] = exRaw;
+                    }
+                    slots[$"{i}"] = slot;
+                }
+                if (slots.Count > 0) gamesNode[prefix] = slots;
+            }
+            root["games"] = gamesNode;
+            root["version"]   = 1;
+            root["backed_up"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            string json = root.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            string fileName = $"DailyFantasy_autopurge_{DateTime.Now:yyyyMMdd_HHmmss}.json";
+#if ANDROID
+            string? dl = Android.OS.Environment.GetExternalStoragePublicDirectory(
+                Android.OS.Environment.DirectoryDownloads)?.AbsolutePath;
+            if (!string.IsNullOrEmpty(dl))
+            {
+                Directory.CreateDirectory(dl);
+                string path = Path.Combine(dl, fileName);
+                await File.WriteAllTextAsync(path, json);
+                return path;
+            }
+#endif
+            string cachePath = Path.Combine(FileSystem.CacheDirectory, fileName);
+            await File.WriteAllTextAsync(cachePath, json);
+            return cachePath;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// On first launch after a reinstall (all ticket prefs missing), automatically offers
+    /// to restore from the most recent backup in Downloads. Runs silently if no backup exists.
+    /// </summary>
+    // No-op on iOS: relies on Services.BackupService.ListTimestampedBackups() (a directory of
+    // dated backup files) which is Android-only, entirely #if ANDROID with no cross-platform
+    // fallback — a real design decision for iOS, not a straight port (see the deferred backup
+    // work noted elsewhere in this app). iOS still has its own single-file share/restore flow
+    // via BackupDataAsync()/RestoreDataAsync() (Advance menu → Backup Data/Restore Data),
+    // just not this automatic on-launch "did my data disappear" check.
+    Task CheckAutoRestoreAsync() => Task.CompletedTask;
+
+    /// <summary>
+    /// Checks on app open for expired plays. Saves a backup first, then asks user to confirm before deleting anything.
     /// </summary>
     async Task CheckAutoPurgeOnStartupAsync()
     {
+        // If auto-purge is disabled (default), never show the dialog on startup.
+        if (!Preferences.Get("purge_auto_enabled", false)) return;
+
+        // Only ask once per calendar day — if user already answered today (Yes or No), skip.
+        string todayKey = $"purge_asked_{DateTime.Today:yyyyMMdd}";
+        if (Preferences.Get(todayKey, false)) return;
+
         await PreSaveAdvanceWinsAsync();   // detect wins BEFORE purging
         var currentDrawNumbers = await GetDataEntry.GetCurrentDrawNumbersAsync();
+
+        // Preview: count expired rows WITHOUT deleting
+        int expiredCount = await ExecutePurgeAsync(currentDrawNumbers, dryRun: true);
+        if (expiredCount == 0) return;
+
+        // Mark as asked for today BEFORE showing dialog — prevents repeat if app is killed mid-dialog
+        Preferences.Set(todayKey, true);
+
+        // Save backup BEFORE asking — so the data is safe no matter what the user picks
+        string? backupPath = await AutoBackupSilentAsync();
+        string backupNote = backupPath != null
+            ? $"\n\nBackup saved to Downloads before any deletion."
+            : "";
+
+        bool confirm = await DisplayAlert("Expired Tickets",
+            $"{expiredCount} advance play{(expiredCount == 1 ? "" : "s")} have expired and have no recorded win.\n\nRemove them?{backupNote}",
+            "Yes, Remove", "No, Keep All");
+        if (!confirm) return;
+
         int deleted = await ExecutePurgeAsync(currentDrawNumbers);
         if (deleted > 0)
-            await DisplayAlert("Auto-Purge",
-                $"{deleted} expired play{(deleted == 1 ? "" : "s")} with no win were automatically removed.",
+            await DisplayAlert("Purge Complete",
+                $"{deleted} expired play{(deleted == 1 ? "" : "s")} removed.",
                 "OK");
     }
 
-    private async Task PurgeAllGamesAsync()
+    private async Task ShowPurgeFilesDialogAsync()
     {
-        bool confirm = await DisplayAlert("Purge All Games",
-            "Clear all rows in every game? Rows with future advance dates or recorded wins will be preserved.",
-            "Yes, Purge", "Cancel");
-        if (!confirm) return;
-
-        var currentDrawNumbers = await GetDataEntry.GetCurrentDrawNumbersAsync();
-        int deleted = await ExecutePurgeAsync(currentDrawNumbers);
-        string msg = deleted > 0
-            ? $"Done. {deleted} expired row{(deleted == 1 ? "" : "s")} removed."
-            : "Nothing to purge — all rows are active or have wins.";
-        await DisplayAlert("Purge Complete", msg, "OK");
+        var page = new PurgeFilesPage();
+        await Navigation.PushModalAsync(page, animated: false);
+        await page.WaitForCloseAsync();
     }
 
     // ── Backup / Restore ──────────────────────────────────────────
@@ -1300,6 +1764,13 @@ public partial class MainPage : ContentPage
         "win_interval_minutes", "win_min_amount",
         "fantasy5_game_id", "sl_game_id", "mm_game_id",
     ];
+
+    // Explicit type per scalar key — backup/restore must agree on these or a stale
+    // backup file (saved under an older type) can silently corrupt a key's native
+    // storage type on restore, crashing every future read of it (see notif_phone bug).
+    static readonly HashSet<string> _stringScalarKeys = ["notif_phone", "notif_times", "win_check_times"];
+    static readonly HashSet<string> _boolScalarKeys    =
+        ["voice_mute_beep", "notif_enabled", "notif_sms_enabled", "win_alert_enabled", "win_interval_enabled"];
 
     private async Task BackupDataAsync()
     {
@@ -1336,14 +1807,25 @@ public partial class MainPage : ContentPage
             }
             root["games"] = gamesNode;
 
-            // Scalar prefs
+            // Scalar prefs — read each with its known native type so backup/restore
+            // can never disagree on type and corrupt a key (see notif_phone bug).
             var scalars = new System.Text.Json.Nodes.JsonObject();
             foreach (var key in _scalarKeys)
             {
-                // Try int, bool, string in that order
-                try   { scalars[key] = Preferences.Get(key, int.MinValue); if ((int)scalars[key]! == int.MinValue) scalars.Remove(key); continue; } catch { }
-                try   { scalars[key] = Preferences.Get(key, false);        continue; } catch { }
-                      { var s = Preferences.Get(key, ""); if (!string.IsNullOrEmpty(s)) scalars[key] = s; }
+                if (_stringScalarKeys.Contains(key))
+                {
+                    string s = SafePreferences.GetString(key, "");
+                    if (!string.IsNullOrEmpty(s)) scalars[key] = s;
+                }
+                else if (_boolScalarKeys.Contains(key))
+                {
+                    scalars[key] = SafePreferences.GetBool(key, false);
+                }
+                else
+                {
+                    int i = SafePreferences.GetInt(key, int.MinValue);
+                    if (i != int.MinValue) scalars[key] = i;
+                }
             }
             root["scalars"] = scalars;
 
@@ -1353,15 +1835,36 @@ public partial class MainPage : ContentPage
             string json     = root.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
             string fileName = $"DailyFantasy_backup_{DateTime.Now:yyyyMMdd_HHmmss}.json";
 
-            // Write to cache dir then share — no storage permission needed on any Android version
-            string path = Path.Combine(FileSystem.CacheDirectory, fileName);
-            await File.WriteAllTextAsync(path, json);
-
-            await Share.Default.RequestAsync(new ShareFileRequest
+            // Save directly to Downloads so the file is always easy to find and restore
+            string? savedPath = null;
+#if ANDROID
+            try
             {
-                Title = "Save Backup",
-                File  = new ShareFile(path, "application/json"),
-            });
+                var downloadsDir = Android.OS.Environment.GetExternalStoragePublicDirectory(
+                    Android.OS.Environment.DirectoryDownloads)?.AbsolutePath;
+                if (!string.IsNullOrEmpty(downloadsDir))
+                {
+                    Directory.CreateDirectory(downloadsDir);
+                    savedPath = Path.Combine(downloadsDir, fileName);
+                    await File.WriteAllTextAsync(savedPath, json);
+                }
+            }
+            catch { savedPath = null; }
+#endif
+            // Also write to cache dir for sharing (and as fallback)
+            string cachePath = Path.Combine(FileSystem.CacheDirectory, fileName);
+            await File.WriteAllTextAsync(cachePath, json);
+
+            if (savedPath != null)
+                await DisplayAlert("Backup Saved",
+                    $"Backup saved to Downloads:\n{fileName}\n\nUse 'Restore Game Numbers' to restore it anytime.",
+                    "OK");
+            else
+                await Share.Default.RequestAsync(new ShareFileRequest
+                {
+                    Title = "Save Backup",
+                    File  = new ShareFile(cachePath, "application/json"),
+                });
         }
         catch (Exception ex)
         {
@@ -1373,23 +1876,111 @@ public partial class MainPage : ContentPage
     {
         try
         {
-            var result = await FilePicker.Default.PickAsync(new PickOptions
-            {
-                PickerTitle    = "Select backup JSON file",
-                FileTypes      = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
-                {
-                    { DevicePlatform.Android, new[] { "application/json", "*/*" } },
-                }),
-            });
+            // Scan common locations for DailyFantasy backup files
+            var found = new List<(string DisplayName, string FullPath, DateTime Modified)>();
 
-            if (result == null) return;
+            var searchDirs = new List<string> { FileSystem.AppDataDirectory, FileSystem.CacheDirectory };
+#if ANDROID
+            try
+            {
+                string? dl = Android.OS.Environment.GetExternalStoragePublicDirectory(
+                    Android.OS.Environment.DirectoryDownloads)?.AbsolutePath;
+                if (!string.IsNullOrEmpty(dl) && Directory.Exists(dl))
+                {
+                    searchDirs.Add(dl);
+                    // Also check common subfolder names
+                    foreach (var sub in new[] { "DailyFantasyBackup", "DailyFantasy", "Backup" })
+                    {
+                        string subDir = Path.Combine(dl, sub);
+                        if (Directory.Exists(subDir)) searchDirs.Add(subDir);
+                    }
+                }
+            }
+            catch { }
+#endif
+            foreach (var dir in searchDirs)
+            {
+                try
+                {
+                    // Search this folder and one level of subdirectories
+                    foreach (var f in Directory.GetFiles(dir, "*.json", SearchOption.AllDirectories))
+                    {
+                        var info = new FileInfo(f);
+                        if (found.Any(x => x.FullPath == f)) continue; // no duplicates
+                        found.Add((info.Name, f, info.LastWriteTime));
+                    }
+                }
+                catch { }
+            }
+
+            string fullPath;
+
+            // Also scan via MediaStore so we can read Downloads without storage permission
+#if ANDROID
+            try
+            {
+                var cr = Android.App.Application.Context.ContentResolver;
+                var uri = Android.Provider.MediaStore.Files.GetContentUri("external");
+                var proj = new[] {
+                    Android.Provider.MediaStore.IMediaColumns.Data,
+                    Android.Provider.MediaStore.IMediaColumns.DisplayName,
+                    Android.Provider.MediaStore.IMediaColumns.DateModified
+                };
+                using var cursor = cr?.Query(uri, proj,
+                    $"{Android.Provider.MediaStore.IMediaColumns.DisplayName} LIKE ?",
+                    new[] { "DailyFantasy_backup_%.json" }, null);
+                while (cursor?.MoveToNext() == true)
+                {
+                    string? path = cursor.GetString(0);
+                    string? name = cursor.GetString(1);
+                    long   mod  = cursor.GetLong(2);
+                    if (string.IsNullOrEmpty(path) || found.Any(x => x.FullPath == path)) continue;
+                    var dt = DateTimeOffset.FromUnixTimeSeconds(mod).LocalDateTime;
+                    found.Add((name ?? Path.GetFileName(path), path, dt));
+                }
+            }
+            catch { }
+#endif
+
+            found = found.OrderByDescending(f => f.Modified).ToList();
+
+            // Ask the user how they want to find the file — Browse is the primary option
+            string? mode = await DisplayActionSheet(
+                "Restore Game Numbers",
+                "Cancel", null,
+                "📂 Browse Phone (any folder)",
+                found.Count > 0 ? $"📋 Pick from {found.Count} recent backup(s)" : "📋 No recent backups found");
+            if (mode == null || mode == "Cancel") return;
+
+            if (mode.StartsWith("📂"))
+            {
+                var pick = await FilePicker.Default.PickAsync(new PickOptions { PickerTitle = "Select backup JSON file" });
+                if (pick == null) return;
+                fullPath = pick.FullPath;
+            }
+            else
+            {
+                if (found.Count == 0)
+                {
+                    await DisplayAlert("No Backups Found",
+                        "No backup files were found automatically.\nUse '📂 Browse Phone' to navigate to your backup folder.",
+                        "OK");
+                    return;
+                }
+                var menuItems = found.Select(f => $"{f.Modified:M/d/yy h:mmtt}  {f.DisplayName}").ToArray();
+                string? chosen = await DisplayActionSheet("Select backup", "Cancel", null, menuItems);
+                if (chosen == null || chosen == "Cancel") return;
+                int idx = Array.IndexOf(menuItems, chosen);
+                if (idx < 0) return;
+                fullPath = found[idx].FullPath;
+            }
 
             bool confirm = await DisplayAlert("Restore Data",
-                $"This will overwrite your current data with the backup.\n\nFile: {result.FileName}\n\nContinue?",
+                $"This will overwrite your current data with the backup.\n\nFile: {Path.GetFileName(fullPath)}\n\nContinue?",
                 "Yes, Restore", "Cancel");
             if (!confirm) return;
 
-            string json = await File.ReadAllTextAsync(result.FullPath);
+            string json = await File.ReadAllTextAsync(fullPath);
             var root    = System.Text.Json.Nodes.JsonNode.Parse(json)?.AsObject();
             if (root == null) { await DisplayAlert("Error", "Invalid backup file.", "OK"); return; }
 
@@ -1421,20 +2012,29 @@ public partial class MainPage : ContentPage
                 }
             }
 
-            // Scalar prefs — store as strings; each page re-reads with its own default type
+            // Scalar prefs — coerce to each key's known native type (not whatever type the
+            // JSON happened to hold) so an older-format backup file can never write the
+            // wrong native type into a key and crash every future read of it.
             if (root["scalars"] is System.Text.Json.Nodes.JsonObject scalars)
             {
                 foreach (var (key, val) in scalars)
                 {
                     if (val == null) continue;
-                    var kind = val.GetValue<System.Text.Json.JsonElement>().ValueKind;
-                    if (kind == System.Text.Json.JsonValueKind.True || kind == System.Text.Json.JsonValueKind.False)
-                        Preferences.Set(key, val.GetValue<bool>());
-                    else if (kind == System.Text.Json.JsonValueKind.Number)
-                        Preferences.Set(key, val.GetValue<int>());
-                    else
-                        Preferences.Set(key, val.GetValue<string>() ?? "");
-                    restored++;
+                    try
+                    {
+                        var elem = val.GetValue<System.Text.Json.JsonElement>();
+                        if (_stringScalarKeys.Contains(key))
+                            Preferences.Set(key, elem.ValueKind == System.Text.Json.JsonValueKind.String
+                                ? elem.GetString() ?? "" : elem.ToString());
+                        else if (_boolScalarKeys.Contains(key))
+                            Preferences.Set(key, elem.ValueKind == System.Text.Json.JsonValueKind.True
+                                || (elem.ValueKind == System.Text.Json.JsonValueKind.Number && elem.GetInt32() != 0));
+                        else
+                            Preferences.Set(key, elem.ValueKind == System.Text.Json.JsonValueKind.Number
+                                ? elem.GetInt32() : int.Parse(elem.GetString() ?? "0"));
+                        restored++;
+                    }
+                    catch { /* skip a scalar we can't safely coerce rather than corrupt the key */ }
                 }
             }
 
@@ -1444,6 +2044,43 @@ public partial class MainPage : ContentPage
         {
             await DisplayAlert("Restore Failed", ex.Message, "OK");
         }
+    }
+
+    async Task RestoreLogBackupAsync()
+    {
+#if ANDROID
+        var backups = Services.BackupService.ListBackups();
+        if (backups.Count == 0)
+        {
+            await DisplayAlert("No Backups", "No backup files found in Downloads/DailyFantasyBackup/.", "OK");
+            return;
+        }
+
+        // Step 1: pick a backup date
+        string? chosen = await DisplayActionSheet("Restore Log Backup:", "Cancel", null, backups.ToArray());
+        if (string.IsNullOrEmpty(chosen) || chosen == "Cancel") return;
+
+        // Step 2: pick what to restore
+        string? what = await DisplayActionSheet("What do you want to restore?", "Cancel", null,
+            "All", "Ticket Log only", "Spending only", "Winnings only");
+        if (string.IsNullOrEmpty(what) || what == "Cancel") return;
+
+        List<string> files = what switch
+        {
+            "Ticket Log only" => ["ticket_log.json"],
+            "Spending only"   => ["spending_log.json"],
+            "Winnings only"   => ["winnings_log.json"],
+            _                 => ["ticket_log.json", "spending_log.json", "winnings_log.json"],
+        };
+
+        bool ok = await DisplayAlert("Restore",
+            $"Restore {what} from {chosen}?", "Restore", "Cancel");
+        if (!ok) return;
+
+        bool success = await Services.BackupService.RestoreSelectiveAsync(chosen, files);
+        await DisplayAlert(success ? "Restored" : "Error",
+            success ? $"{what} restored from {chosen}." : "Could not restore from that backup file.", "OK");
+#endif
     }
 
     async Task ShowVoiceSettingsAsync()
@@ -1500,6 +2137,81 @@ public partial class MainPage : ContentPage
 
     // ── Search Sets ───────────────────────────────────────────────────────────
 
+    TaskCompletionSource<string?>? _searchNumTcs;
+    Entry[] _searchNumEntries = Array.Empty<Entry>();
+
+    /// <summary>Numbered-box popup for Search Sets, replacing a single free-typed "5 12 27"
+    /// text field (hard to type on a phone keyboard, easy to mis-space) with individual
+    /// auto-advancing digit boxes matching the app's existing main-picker box style. Box count
+    /// matches the selected game's own pick count (6 for "All Games", the widest of any game).
+    /// Returns the same space-joined format the old prompt did, so the parsing logic below is
+    /// unchanged; blank boxes are simply skipped, preserving partial-number search.</summary>
+    Task<string?> PromptSearchNumbersAsync(string title, int boxCount)
+    {
+        searchNumTitle.Text = title;
+        searchNumBoxes.Children.Clear();
+
+        _searchNumEntries = new Entry[boxCount];
+        for (int i = 0; i < boxCount; i++)
+        {
+            var entry = new Entry
+            {
+                Keyboard = Keyboard.Numeric,
+                MaxLength = 2,
+                TextColor = Colors.White,
+                BackgroundColor = Colors.Transparent,
+                FontSize = 15,
+                FontAttributes = FontAttributes.Bold,
+                HorizontalTextAlignment = TextAlignment.Center,
+                WidthRequest = 42,
+                HeightRequest = 42,
+                Margin = new Thickness(3),
+            };
+            var border = new Border
+            {
+                Content = entry,
+                BackgroundColor = Color.FromArgb("#1E293B"),
+                Stroke = new SolidColorBrush(Color.FromArgb("#3B82F6")),
+                StrokeThickness = 1.5,
+                StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = new CornerRadius(10) },
+                WidthRequest = 48,
+                HeightRequest = 48,
+            };
+            _searchNumEntries[i] = entry;
+            searchNumBoxes.Children.Add(border);
+        }
+        for (int i = 0; i < boxCount; i++)
+        {
+            int idx = i;
+            EntryHelper.AttachBackspace(_searchNumEntries[i], () => { if (idx > 0) EntryHelper.SelectAll(_searchNumEntries[idx - 1]); });
+            _searchNumEntries[i].TextChanged += (_, _) =>
+            {
+                if (_searchNumEntries[idx].Text?.Length == 2 && idx + 1 < _searchNumEntries.Length)
+                    _searchNumEntries[idx + 1].Focus();
+            };
+        }
+
+        _searchNumTcs = new TaskCompletionSource<string?>();
+        searchNumOverlay.IsVisible = true;
+        _searchNumEntries[0].Focus();
+        return _searchNumTcs.Task;
+    }
+
+    private void SearchNumSearch_Clicked(object sender, EventArgs e)
+    {
+        searchNumOverlay.IsVisible = false;
+        string joined = string.Join(" ", _searchNumEntries
+            .Select(en => en.Text?.Trim() ?? "")
+            .Where(t => t.Length > 0));
+        _searchNumTcs?.TrySetResult(joined);
+    }
+
+    private void SearchNumCancel_Clicked(object sender, EventArgs e)
+    {
+        searchNumOverlay.IsVisible = false;
+        _searchNumTcs?.TrySetResult(null);
+    }
+
     private async Task SearchSetsAsync()
     {
         // Pick which game to search
@@ -1509,21 +2221,14 @@ public partial class MainPage : ContentPage
             "Powerball", "Mega Millions", "Daily Derby");
         if (string.IsNullOrEmpty(game) || game == "Cancel") return;
 
-        string lastInput = "";
+        int boxCount = game == "All Games" ? 6 : ExportGames.First(g => g.Caption == game).Cols;
 
         while (true)
         {
-        // Prompt for numbers to search (pre-filled with last search)
-        string? input = await DisplayPromptAsync(
-            "Search Sets",
-            "Enter numbers (use ; to search multiple rows)\n(e.g.  5 12 27  or  5 12; 8 15 33)",
-            "Search", "Cancel",
-            initialValue: lastInput,
-            placeholder: "e.g. 5 12 27",
-            keyboard: Keyboard.Default);
+        // Prompt for numbers to search via individual boxes (blank ones are skipped)
+        string? input = await PromptSearchNumbersAsync($"Search {game}", boxCount);
 
         if (string.IsNullOrWhiteSpace(input)) return;
-        lastInput = input;
 
         // Split by ";" to allow multiple searches in one go
         var searches = input.Split(';', StringSplitOptions.RemoveEmptyEntries);
@@ -1571,9 +2276,9 @@ public partial class MainPage : ContentPage
                         var matched = rowNums.Where(n => searchNums.Contains(n)).ToList();
                         if (matched.Count < searchNums.Count) continue;
 
-                        string rowDisplay = string.Join("  ", rowNums.Select(n =>
+                        string rowDisplay = string.Join(" ", rowNums.Select(n =>
                             matched.Contains(n) ? $"[{n}]" : n));
-                        gameHits.Add($"  Set {slot + 1}, Row {r + 1}: {rowDisplay}");
+                        gameHits.Add($"  S{slot + 1}·R{r + 1}: {rowDisplay}");
                         searchHits++;
                         totalHits++;
                     }
@@ -1601,9 +2306,9 @@ public partial class MainPage : ContentPage
                                 .ToList();
                             var matched = rowNums.Where(n => searchNums.Contains(n)).ToList();
                             if (matched.Count < searchNums.Count) continue;
-                            string rowDisplay = string.Join("  ", rowNums.Select(n =>
+                            string rowDisplay = string.Join(" ", rowNums.Select(n =>
                                 matched.Contains(n) ? $"[{n}]" : n));
-                            gameHits.Add($"  Picks #{li + 1}: {rowDisplay}");
+                            gameHits.Add($"  P{li + 1}: {rowDisplay}");
                             searchHits++;
                             totalHits++;
                         }
@@ -2038,6 +2743,9 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
 
     // ── Status bar: tap to copy ───────────────────────────────────────────────
 
+    private async void CalLottery_Tapped(object sender, TappedEventArgs e)
+        => await Launcher.OpenAsync("https://www.calottery.com");
+
     private async void StatusBar_Tapped(object sender, TappedEventArgs e)
     {
         string log = await Logger.ReadLogAsync();
@@ -2050,6 +2758,17 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
 
     // ── Insert Combos → checker page slots ───────────────────────────────────
 
+    private bool _showInsertBar = true;
+
+    private void UpdateInsertBar()
+        => insertCombosRow.IsVisible = vm.ShowCombos && _showInsertBar;
+
+    private void BtnClearCombos_Clicked(object sender, EventArgs e)
+    {
+        _showInsertBar = false;
+        UpdateInsertBar();
+    }
+
     private async void BtnInsertToWinner_Clicked(object sender, EventArgs e)
     {
         if (vm.Combinations.Count == 0)
@@ -2058,7 +2777,7 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
             return;
         }
 
-        string pageName0 = _mode == 0 ? "F5 Winner" : _mode == 1 ? "Super Lotto" : "Daily 3";
+        string pageName0 = _mode == 0 ? "F5 Winner" : _mode == 1 ? "Super Lotto" : _mode == 3 ? "Powerball" : _mode == 4 ? "Mega Millions" : "Daily 3";
         string insertMode = await DisplayActionSheet(
             $"Insert {vm.Combinations.Count:N0} combos into {pageName0}?",
             "Cancel", null,
@@ -2068,20 +2787,37 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
 
         const int WRows = 10;
         const int TotalSlots = 10;
-        int wCols         = _mode == 1 ? 6 : _mode == 0 ? 5 : 3;
-        string slotPrefix = _mode == 0 ? "f5_set_" : _mode == 1 ? "sl_set_" : "d3_set_";
-        string pageName   = _mode == 0 ? "F5 Winner" : _mode == 1 ? "Super Lotto" : "Daily 3";
+        int wCols         = (_mode == 1 || _mode == 3 || _mode == 4) ? 6 : _mode == 0 ? 5 : 3;
+        string slotPrefix = _mode == 0 ? "f5_set_" : _mode == 1 ? "sl_set_" : _mode == 3 ? "pb_set_" : _mode == 4 ? "mm_set_" : "d3_set_";
+        string pageName   = _mode == 0 ? "F5 Winner" : _mode == 1 ? "Super Lotto" : _mode == 3 ? "Powerball" : _mode == 4 ? "Mega Millions" : "Daily 3";
 
         // Clear all slots first if user chose "Clear all sets & insert"
         // Preserve/nuke/restore: collect advance rows → nuke all slots → restore advance rows
         if (insertMode == "Clear all sets & insert")
         {
+            // Count existing tickets that will be wiped
+            int existingCount = 0;
+            for (int s = 0; s < 10; s++)
+            {
+                string raw = Preferences.Get($"{slotPrefix}{s}", "");
+                if (!string.IsNullOrEmpty(raw))
+                    existingCount += raw.Split('|').Count(v => !string.IsNullOrWhiteSpace(v)) / wCols;
+            }
+            if (existingCount > 0)
+            {
+                bool confirmed = await DisplayAlert(
+                    "⚠️ This Will Delete Your Tickets",
+                    $"You have {existingCount} existing ticket row(s) in {pageName}.\n\nThis will permanently delete ALL of them before inserting the new combos.\n\nAre you sure?",
+                    "Yes, Delete & Insert", "Cancel");
+                if (!confirmed) return;
+            }
             // Step 0: flush active page's in-memory advance dates to Preferences first
             if (_mode == 0) AppShell.WinnerPageInstance.FlushAdvanceDates();
             else if (_mode == 1) AppShell.SuperLottoPageInstance.FlushAdvanceDates();
-            else AppShell.Daily3PageInstance.FlushAdvanceDates();
+            else if (_mode == 2) AppShell.Daily3PageInstance.FlushAdvanceDates();
+            // PB/MM pages save advance dates directly to Preferences; no flush needed
 
-            string advPrefix  = _mode == 0 ? "f5_adv_"  : _mode == 1 ? "sl_adv_"  : "d3_adv_";
+            string advPrefix  = _mode == 0 ? "f5_adv_" : _mode == 1 ? "sl_adv_" : _mode == 3 ? "pb_adv_" : _mode == 4 ? "mm_adv_" : "d3_adv_";
             string[] extraDel = _mode == 2 ? new[] { "d3_btypes_", "d3_drawfilters_" } : Array.Empty<string>();
             var today = DateTime.Today;
 
@@ -2319,6 +3055,32 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
 
     private async void BtnSave_Clicked(object sender, EventArgs e)
     {
+        string? choice = await DisplayActionSheet("Save", "Cancel", null,
+            "Save to Slot", "Save to MyFavorite", "Backup Manager");
+        if (choice == null || choice == "Cancel") return;
+
+        if (choice == "Backup Manager")
+        {
+            await Shell.Current.GoToAsync("BackupPage");
+            return;
+        }
+
+        if (choice == "Save to MyFavorite")
+        {
+            bool isCombos = vm.ActiveTab == 2;
+            var items = isCombos ? vm.Combinations.ToList() : vm.Picks.ToList();
+            string caption = isCombos ? "Combos"
+                           : _mode == 1 ? "SL Picks"
+                           : _mode == 2 ? "D3 Picks"
+                           : _mode == 3 ? "PB Picks"
+                           : _mode == 4 ? "MM Picks"
+                           : "F5 Picks";
+            await MyFavoritePage.SaveCurrentToMyFavoriteAsync(
+                caption, "picks", 0, string.Join("\n", items));
+            return;
+        }
+
+        // Save to Slot
         SavePreferences();
 
         int count;
@@ -2349,4 +3111,255 @@ td{padding:6px 5px;text-align:center;font-size:15px;font-weight:bold}
             btn.Text = orig; btn.BackgroundColor = origColor;
         }
     }
+}
+
+// ── Purge Files dialog page ────────────────────────────────────────────────
+
+file class PurgeFilesPage : ContentPage
+{
+    readonly TaskCompletionSource _tcs = new();
+    readonly Label  _toggleLabel;
+    readonly Button _toggleBtn;
+    readonly Label  _resultLabel;
+
+    public PurgeFilesPage()
+    {
+        BackgroundColor = Color.FromArgb("#1E2733");
+
+        bool autoOn = Preferences.Get("purge_auto_enabled", false);
+
+        // ── Toggle button ──────────────────────────────────────────────────
+        _toggleLabel = new Label
+        {
+            Text            = "Auto-Purge on Startup:",
+            TextColor       = Colors.White,
+            FontSize        = 14,
+            VerticalOptions = LayoutOptions.Center,
+        };
+
+        _toggleBtn = new Button
+        {
+            Text              = autoOn ? "ON" : "OFF",
+            BackgroundColor   = autoOn ? Color.FromArgb("#2E7D32") : Color.FromArgb("#546E7A"),
+            TextColor         = Colors.White,
+            FontSize          = 13,
+            FontAttributes    = FontAttributes.Bold,
+            CornerRadius      = 8,
+            HeightRequest     = 36,
+            MinimumHeightRequest = 0,
+            WidthRequest      = 60,
+            Padding           = new Thickness(0),
+        };
+        _toggleBtn.Clicked += OnToggle;
+
+        var toggleRow = new Grid
+        {
+            ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+            ColumnSpacing     = 10,
+        };
+        toggleRow.Add(_toggleLabel, 0, 0);
+        toggleRow.Add(_toggleBtn,   1, 0);
+
+        // ── Result label ───────────────────────────────────────────────────
+        _resultLabel = new Label
+        {
+            Text            = "",
+            TextColor       = Color.FromArgb("#A5D6A7"),
+            FontSize        = 13,
+            HorizontalTextAlignment = TextAlignment.Center,
+            IsVisible       = false,
+        };
+
+        // ── Purge Files button ─────────────────────────────────────────────
+        var purgeBtn = new Button
+        {
+            Text              = "Purge Files",
+            BackgroundColor   = Color.FromArgb("#B71C1C"),
+            TextColor         = Colors.White,
+            FontSize          = 15,
+            FontAttributes    = FontAttributes.Bold,
+            CornerRadius      = 10,
+            HeightRequest     = 46,
+            MinimumHeightRequest = 0,
+        };
+        purgeBtn.Clicked += OnPurgeFiles;
+
+        // ── Wipe All Data button ───────────────────────────────────────────
+        var wipeAllBtn = new Button
+        {
+            Text              = "Wipe ALL Game Data",
+            BackgroundColor   = Color.FromArgb("#E65100"),
+            TextColor         = Colors.White,
+            FontSize          = 14,
+            FontAttributes    = FontAttributes.Bold,
+            CornerRadius      = 10,
+            HeightRequest     = 46,
+            MinimumHeightRequest = 0,
+        };
+        wipeAllBtn.Clicked += OnWipeAllData;
+
+        // ── Close button ───────────────────────────────────────────────────
+        var closeBtn = new Button
+        {
+            Text              = "Close",
+            BackgroundColor   = Color.FromArgb("#37474F"),
+            TextColor         = Colors.White,
+            FontSize          = 15,
+            CornerRadius      = 10,
+            HeightRequest     = 46,
+            MinimumHeightRequest = 0,
+        };
+        closeBtn.Clicked += OnClose;
+
+        // ── Layout ─────────────────────────────────────────────────────────
+        var card = new Border
+        {
+            BackgroundColor = Color.FromArgb("#263238"),
+            StrokeShape     = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 14 },
+            Stroke          = Color.FromArgb("#455A64"),
+            Padding         = new Thickness(20, 18),
+            Margin          = new Thickness(24, 0),
+            Content = new VerticalStackLayout
+            {
+                Spacing = 16,
+                Children =
+                {
+                    new Label
+                    {
+                        Text              = "Purge Files",
+                        TextColor         = Colors.White,
+                        FontSize          = 18,
+                        FontAttributes    = FontAttributes.Bold,
+                        HorizontalTextAlignment = TextAlignment.Center,
+                    },
+                    new BoxView { HeightRequest = 1, BackgroundColor = Color.FromArgb("#455A64") },
+                    toggleRow,
+                    new Label
+                    {
+                        Text      = "When ON, the app will check for expired advance plays each time it opens and ask if you want to remove them.\n\nWhen OFF, no automatic purge or message will appear.",
+                        TextColor = Color.FromArgb("#B0BEC5"),
+                        FontSize  = 12,
+                    },
+                    new BoxView { HeightRequest = 1, BackgroundColor = Color.FromArgb("#455A64") },
+                    _resultLabel,
+                    purgeBtn,
+                    new BoxView { HeightRequest = 1, BackgroundColor = Color.FromArgb("#455A64") },
+                    new Label
+                    {
+                        Text      = "Wipe ALL — removes every ticket and advance date in all 7 games, all 10 slots. Cannot be undone.",
+                        TextColor = Color.FromArgb("#FFAB91"),
+                        FontSize  = 11,
+                    },
+                    wipeAllBtn,
+                    closeBtn,
+                }
+            }
+        };
+
+        Content = new Grid
+        {
+            BackgroundColor = Color.FromArgb("#80000000"),
+            Children =
+            {
+                new ScrollView
+                {
+                    Content             = card,
+                    VerticalOptions     = LayoutOptions.Center,
+                }
+            }
+        };
+    }
+
+    void OnToggle(object? s, EventArgs e)
+    {
+        bool current = Preferences.Get("purge_auto_enabled", false);
+        bool next    = !current;
+        Preferences.Set("purge_auto_enabled", next);
+        _toggleBtn.Text            = next ? "ON"  : "OFF";
+        _toggleBtn.BackgroundColor = next ? Color.FromArgb("#2E7D32") : Color.FromArgb("#546E7A");
+        _resultLabel.Text      = next ? "Auto-Purge enabled — will check on next app open."
+                                      : "Auto-Purge disabled — no messages will appear.";
+        _resultLabel.TextColor = next ? Color.FromArgb("#A5D6A7") : Color.FromArgb("#EF9A9A");
+        _resultLabel.IsVisible = true;
+    }
+
+    async void OnPurgeFiles(object? s, EventArgs e)
+    {
+        _resultLabel.Text      = "Checking for expired plays...";
+        _resultLabel.TextColor = Color.FromArgb("#FFE082");
+        _resultLabel.IsVisible = true;
+
+        try
+        {
+            var drawNumbers = await GetDataEntry.GetCurrentDrawNumbersAsync();
+
+            // Preview first — same dry-run/confirm/backup safety net Auto-Purge already has.
+            // This button used to delete immediately with no preview, no confirmation, and no
+            // backup — the exact gap that let a real active ticket get purged (2026-08-05).
+            int expiredCount = await MainPage.ExecutePurgeAsync(drawNumbers, dryRun: true);
+            if (expiredCount == 0)
+            {
+                _resultLabel.Text      = "Nothing to purge — all rows are active or have wins.";
+                _resultLabel.TextColor = Color.FromArgb("#A5D6A7");
+                return;
+            }
+
+            string? backupPath = await MainPage.AutoBackupSilentAsync();
+            string backupNote = backupPath != null ? "\n\nBackup saved to Downloads before any deletion." : "";
+            bool confirm = await DisplayAlert("Expired Tickets",
+                $"{expiredCount} advance play{(expiredCount == 1 ? "" : "s")} have expired and have no recorded win.\n\nRemove them?{backupNote}",
+                "Yes, Remove", "Cancel");
+            if (!confirm)
+            {
+                _resultLabel.Text      = "Cancelled — nothing removed.";
+                _resultLabel.TextColor = Color.FromArgb("#A5D6A7");
+                return;
+            }
+
+            MainPage.SuppressAutoRestore = true;
+            int deleted = await MainPage.ExecutePurgeAsync(drawNumbers);
+            _resultLabel.Text      = $"Done — {deleted} expired play{(deleted == 1 ? "" : "s")} removed.";
+            _resultLabel.TextColor = Color.FromArgb("#A5D6A7");
+        }
+        catch (Exception ex)
+        {
+            _resultLabel.Text      = $"Error: {ex.Message}";
+            _resultLabel.TextColor = Color.FromArgb("#EF9A9A");
+        }
+    }
+
+    async void OnWipeAllData(object? s, EventArgs e)
+    {
+        bool confirm1 = await DisplayAlert(
+            "Wipe ALL Game Data",
+            "This will delete every ticket and every advance date in all 7 games across all 10 slots.\n\nThis cannot be undone.",
+            "Yes, Wipe Everything", "Cancel");
+        if (!confirm1) return;
+
+        bool confirm2 = await DisplayAlert(
+            "Are you sure?",
+            "All game data will be permanently erased. Continue?",
+            "Erase Everything", "Cancel");
+        if (!confirm2) return;
+
+        MainPage.ExecuteFullWipe();
+
+        // Also clear today's auto-logged spending entries so Log Today starts fresh
+        string today2 = DateTime.Today.ToString("yyyy-MM-dd");
+        var spendRecs = await SpendingTracker.LoadAllAsync();
+        spendRecs.RemoveAll(r => r.Date == today2 && (r.Note == "auto" || r.Note == "M" || r.Note == "E"));
+        await SpendingTracker.SaveAllAsync(spendRecs);
+
+        _resultLabel.Text      = "All game data wiped. All 7 games cleared.";
+        _resultLabel.TextColor = Color.FromArgb("#FFAB91");
+        _resultLabel.IsVisible = true;
+    }
+
+    void OnClose(object? s, EventArgs e)
+    {
+        Navigation.PopModalAsync(animated: false);
+        _tcs.TrySetResult();
+    }
+
+    public Task WaitForCloseAsync() => _tcs.Task;
 }

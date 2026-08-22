@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    StateLotteryPage.xaml  ·  LotteryDirectory/
+    US State Lottery Directory — matches app dark-navy theme.
+    Data is populated in OnAppearing (lazy, never loads at startup).
+-->
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
+             x:Class="DailyFantasyMAUI.LotteryDirectory.StateLotteryPage"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#0D1B2A">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*">
+
+        <!-- ══════════════════════════════════════════════════════════
+             HEADER
+        ══════════════════════════════════════════════════════════ -->
+        <Grid Grid.Row="0" Padding="10,46,10,14"
+              ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
+            <Grid.Background>
+                <LinearGradientBrush EndPoint="0,1">
+                    <GradientStop Color="#0A1628" Offset="0"/>
+                    <GradientStop Color="#0D1B2A" Offset="1"/>
+                </LinearGradientBrush>
+            </Grid.Background>
+
+            <!-- Big logo watermark (centered, behind everything) -->
+            <GraphicsView Grid.Column="0" Grid.ColumnSpan="3"
+                          Grid.Row="0" Grid.RowSpan="2"
+                          Opacity="0.70" HeightRequest="54" WidthRequest="54"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
+
+            <!-- Back button -->
+            <Button Grid.Column="0" Grid.Row="0"
+                    Text="◀" FontSize="16"
+                    BackgroundColor="Transparent" TextColor="White"
+                    Padding="4,0" HeightRequest="34" WidthRequest="40"
+                    VerticalOptions="Center"
+                    Clicked="BtnBack_Clicked"/>
+
+            <!-- Title + subtitle stacked in centre column -->
+            <VerticalStackLayout Grid.Column="1" Grid.Row="0" Spacing="2"
+                                 HorizontalOptions="Center" VerticalOptions="Center">
+                <Label Text="US State Lotteries"
+                       TextColor="White" FontSize="18" FontAttributes="Bold"
+                       HorizontalOptions="Center"/>
+                <Label x:Name="LblStats"
+                       TextColor="#60A5FA" FontSize="11"
+                       HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+
+            <!-- Active count badge -->
+            <Border Grid.Column="2" Grid.Row="0"
+                    BackgroundColor="#1A3F8A"
+                    StrokeShape="RoundRectangle 18"
+                    StrokeThickness="0"
+                    Padding="12,6"
+                    VerticalOptions="Center">
+                <Label x:Name="LblActiveCount"
+                       TextColor="White"
+                       FontSize="14" FontAttributes="Bold"
+                       HorizontalOptions="Center"/>
+            </Border>
+
+            <!-- Divider -->
+            <BoxView Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3"
+                     Color="#1E3A5F" HeightRequest="1"
+                     Margin="0,12,0,0"/>
+        </Grid>
+
+        <!-- ══════════════════════════════════════════════════════════
+             SEARCH BAR
+        ══════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="1"
+                BackgroundColor="#0E2039"
+                StrokeShape="RoundRectangle 14"
+                StrokeThickness="1" Stroke="#1E3A5F"
+                Margin="14,10,14,0" Padding="10,2">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <Label Grid.Column="0"
+                       Text="🔍" FontSize="17"
+                       VerticalOptions="Center"
+                       Margin="0,0,6,0"/>
+                <Entry Grid.Column="1"
+                       x:Name="SearchEntry"
+                       Placeholder="Search state or lottery name…"
+                       PlaceholderColor="#3D5A78"
+                       TextColor="White"
+                       BackgroundColor="Transparent"
+                       ClearButtonVisibility="WhileEditing"
+                       TextChanged="OnSearchTextChanged"/>
+                <Label Grid.Column="2"
+                       x:Name="LblResultCount"
+                       TextColor="#3D5A78" FontSize="11"
+                       VerticalOptions="Center"
+                       Margin="4,0,4,0"/>
+            </Grid>
+        </Border>
+
+        <!-- ══════════════════════════════════════════════════════════
+             REGION FILTER CHIPS  (built in code-behind)
+        ══════════════════════════════════════════════════════════ -->
+        <ScrollView Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalScrollBarVisibility="Never"
+                    Margin="14,10,14,0">
+            <HorizontalStackLayout x:Name="ChipBar" Spacing="6"/>
+        </ScrollView>
+
+        <!-- ══════════════════════════════════════════════════════════
+             LOTTERY CARDS GRID
+        ══════════════════════════════════════════════════════════ -->
+        <CollectionView Grid.Row="3"
+                        x:Name="LotteryGrid"
+                        Margin="10,10,10,0">
+
+            <CollectionView.ItemsLayout>
+                <GridItemsLayout Orientation="Vertical"
+                                 Span="2"
+                                 HorizontalItemSpacing="8"
+                                 VerticalItemSpacing="8"/>
+            </CollectionView.ItemsLayout>
+
+            <!-- Empty state -->
+            <CollectionView.EmptyView>
+                <VerticalStackLayout HorizontalOptions="Center"
+                                     VerticalOptions="Center"
+                                     Spacing="10" Padding="40,60">
+                    <Label Text="🔍" FontSize="42" HorizontalOptions="Center"/>
+                    <Label Text="No lotteries found"
+                           TextColor="#4A7FA8" FontSize="16"
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+            </CollectionView.EmptyView>
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <!-- ╔══════════ CARD ══════════╗ -->
+                    <Border Padding="0"
+                            StrokeThickness="1.5"
+                            StrokeShape="RoundRectangle 14"
+                            BackgroundColor="{Binding CardBg}">
+
+                        <Border.Triggers>
+                            <DataTrigger TargetType="Border"
+                                         Binding="{Binding HasLottery}" Value="True">
+                                <Setter Property="Stroke" Value="#1E4080"/>
+                            </DataTrigger>
+                            <DataTrigger TargetType="Border"
+                                         Binding="{Binding HasLottery}" Value="False">
+                                <Setter Property="Stroke" Value="#1A1A2A"/>
+                            </DataTrigger>
+                        </Border.Triggers>
+
+                        <!-- Whole card is tappable -->
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnCardTapped"
+                                                  CommandParameter="{Binding WebsiteUrl}"/>
+                        </Border.GestureRecognizers>
+
+                        <Grid ColumnDefinitions="5,*" ColumnSpacing="0">
+
+                            <!-- LEFT ACCENT STRIP (region color) -->
+                            <BoxView Grid.Column="0"
+                                     Color="{Binding RegionAccent}"
+                                     VerticalOptions="Fill"/>
+
+                            <!-- CARD BODY -->
+                            <VerticalStackLayout Grid.Column="1"
+                                                 Padding="10,12,10,12"
+                                                 Spacing="7">
+
+                                <!-- Row 1 : Favicon logo  +  State badge -->
+                                <Grid ColumnDefinitions="*,Auto">
+
+                                    <!-- Logo rounded square -->
+                                    <Border Grid.Column="0"
+                                            BackgroundColor="#091628"
+                                            StrokeShape="RoundRectangle 9"
+                                            StrokeThickness="1"
+                                            Stroke="#1A3050"
+                                            WidthRequest="46" HeightRequest="46"
+                                            HorizontalOptions="Start">
+                                        <Grid>
+                                            <!-- Favicon (active lotteries) -->
+                                            <Image Source="{Binding LogoUrl}"
+                                                   WidthRequest="36" HeightRequest="36"
+                                                   Aspect="AspectFit"
+                                                   IsVisible="{Binding HasLottery}"/>
+                                            <!-- ✕ placeholder (no-lottery states) -->
+                                            <Label Text="✕"
+                                                   TextColor="#2A2A3A"
+                                                   FontSize="24" FontAttributes="Bold"
+                                                   HorizontalOptions="Center"
+                                                   VerticalOptions="Center"
+                                                   IsVisible="{Binding HasNoLottery}"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- State abbreviation badge (circle) -->
+                                    <Border Grid.Column="1"
+                                            BackgroundColor="{Binding BadgeBg}"
+                                            StrokeShape="Ellipse"
+                                            StrokeThickness="0"
+                                            WidthRequest="38" HeightRequest="38"
+                                            HorizontalOptions="End"
+                                            VerticalOptions="Start">
+                                        <Label Text="{Binding Abbr}"
+                                               TextColor="White"
+                                               FontSize="11" FontAttributes="Bold"
+                                               HorizontalOptions="Center"
+                                               VerticalOptions="Center"/>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Row 2 : Lottery name -->
+                                <Label Text="{Binding LotteryName}"
+                                       TextColor="{Binding NameColor}"
+                                       FontSize="12" FontAttributes="Bold"
+                                       LineBreakMode="WordWrap"
+                                       MaxLines="2"/>
+
+                                <!-- Row 3 : State name (secondary) -->
+                                <Label Text="{Binding State}"
+                                       TextColor="#4A7FA8"
+                                       FontSize="10"
+                                       Margin="0,-3,0,0"/>
+
+                                <!-- Row 4 : Website URL (active only) -->
+                                <Label Text="{Binding DisplayUrl}"
+                                       TextColor="{Binding UrlColor}"
+                                       FontSize="9"
+                                       LineBreakMode="TailTruncation"
+                                       IsVisible="{Binding CanVisit}"/>
+
+                                <!-- Row 5 : Visit / N/A button -->
+                                <Button FontSize="11" FontAttributes="Bold"
+                                        HeightRequest="32" CornerRadius="10"
+                                        Padding="0" Margin="0,2,0,0"
+                                        Clicked="OnVisitClicked"
+                                        CommandParameter="{Binding WebsiteUrl}">
+                                    <Button.Triggers>
+                                        <DataTrigger TargetType="Button"
+                                                     Binding="{Binding CanVisit}" Value="True">
+                                            <Setter Property="Text"            Value="Visit Site"/>
+                                            <Setter Property="BackgroundColor" Value="#1A3F8A"/>
+                                            <Setter Property="TextColor"       Value="White"/>
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Button"
+                                                     Binding="{Binding CanVisit}" Value="False">
+                                            <Setter Property="Text"            Value="No Lottery"/>
+                                            <Setter Property="BackgroundColor" Value="#111120"/>
+                                            <Setter Property="TextColor"       Value="#2A2A3A"/>
+                                            <Setter Property="IsEnabled"       Value="False"/>
+                                        </DataTrigger>
+                                    </Button.Triggers>
+                                </Button>
+
+                            </VerticalStackLayout>
+                        </Grid>
+                        <!-- ╚═════════════════════════════╝ -->
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+    </Grid>
+</ContentPage>
