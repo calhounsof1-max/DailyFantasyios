@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DailyFantasyMAUI"
              x:Class="DailyFantasyMAUI.SummaryPage"
              BackgroundColor="#F0F4F8"
              Shell.NavBarIsVisible="False">
@@ -13,24 +14,76 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
+            <GraphicsView Grid.ColumnSpan="3"
+                          Opacity="0.70" HeightRequest="54" WidthRequest="54"
+                          HorizontalOptions="Center" VerticalOptions="Center"
+                          InputTransparent="True">
+                <GraphicsView.Drawable><local:BallWatermark/></GraphicsView.Drawable>
+            </GraphicsView>
             <Button Grid.Column="0" Text="← Back" Clicked="BtnBack_Clicked"
                     BackgroundColor="Transparent" TextColor="White" FontSize="13" Padding="4,0"/>
-            <Label Grid.Column="1" Text="SUMMARY OF WINNINGS"
-                   FontSize="14" FontAttributes="Bold" TextColor="White"
+            <Label Grid.Column="1" Text="Wins &amp; Spending"
+                   FontSize="13" FontAttributes="Bold" TextColor="White"
+                   LineBreakMode="NoWrap"
                    HorizontalOptions="Center" VerticalOptions="Center"/>
-            <Button Grid.Column="2" Text="Clear All" Clicked="BtnClearAll_Clicked"
-                    BackgroundColor="Transparent" TextColor="#FF7043" FontSize="12" Padding="4,0"/>
+            <StackLayout x:Name="normalButtonsStack" Grid.Column="2" Orientation="Horizontal" Spacing="4"
+                         VerticalOptions="Center" Margin="0,0,10,0">
+                <Border BackgroundColor="Transparent" Stroke="#8B9DC3" StrokeThickness="1"
+                        Padding="14,7" VerticalOptions="Center" MinimumHeightRequest="40" MinimumWidthRequest="40">
+                    <Border.StrokeShape><RoundRectangle CornerRadius="8"/></Border.StrokeShape>
+                    <Label Text="⋯" TextColor="#8B9DC3" FontSize="20" FontAttributes="Bold"
+                           HorizontalOptions="Center" VerticalOptions="Center"
+                           HorizontalTextAlignment="Center" VerticalTextAlignment="Center">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="BtnMenu_Clicked"/>
+                        </Label.GestureRecognizers>
+                    </Label>
+                </Border>
+            </StackLayout>
+            <StackLayout x:Name="selectModeStack" Grid.Column="2" Orientation="Horizontal" Spacing="4"
+                         VerticalOptions="Center" IsVisible="False">
+                <Border BackgroundColor="Transparent" Stroke="#8B9DC3" StrokeThickness="1"
+                        Padding="8,5" VerticalOptions="Center" MinimumHeightRequest="32">
+                    <Border.StrokeShape><RoundRectangle CornerRadius="6"/></Border.StrokeShape>
+                    <Label Text="Cancel" TextColor="#8B9DC3" FontSize="11"
+                           VerticalOptions="Center" VerticalTextAlignment="Center">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="BtnCancelSelect_Clicked"/>
+                        </Label.GestureRecognizers>
+                    </Label>
+                </Border>
+                <Border x:Name="deleteSelectedBorder" BackgroundColor="#C62828" Stroke="#C62828" StrokeThickness="1"
+                        Padding="8,5" VerticalOptions="Center" MinimumHeightRequest="32">
+                    <Border.StrokeShape><RoundRectangle CornerRadius="6"/></Border.StrokeShape>
+                    <Label x:Name="deleteSelectedLabel" Text="Delete (0)" TextColor="White" FontSize="11"
+                           VerticalOptions="Center" VerticalTextAlignment="Center">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="BtnDeleteSelected_Clicked"/>
+                        </Label.GestureRecognizers>
+                    </Label>
+                </Border>
+            </StackLayout>
         </Grid>
 
         <!-- Scrollable game sections -->
-        <ScrollView Grid.Row="1">
-            <VerticalStackLayout x:Name="mainContainer" Padding="0,4,0,8" Spacing="0"/>
+        <ScrollView Grid.Row="1" BackgroundColor="#EEF2F6">
+            <VerticalStackLayout x:Name="mainContainer" Padding="0,10,0,10" Spacing="0"/>
         </ScrollView>
 
-        <!-- Grand total footer -->
-        <Grid Grid.Row="2" BackgroundColor="#1E2733" Padding="16,12">
-            <Label x:Name="lblGrandTotal" FontSize="16" FontAttributes="Bold"
-                   TextColor="White" HorizontalOptions="Center"/>
+        <!-- Grand total footer: Spent / Won / Net -->
+        <Grid Grid.Row="2" BackgroundColor="#1E2733" Padding="10,12" ColumnDefinitions="*,*,*" ColumnSpacing="4">
+            <VerticalStackLayout Grid.Column="0" Spacing="1" HorizontalOptions="Center">
+                <Label Text="SPENT" FontSize="9" TextColor="#8B9DC3" HorizontalOptions="Center" CharacterSpacing="0.6"/>
+                <Label x:Name="lblTotalSpent" FontSize="14" FontAttributes="Bold" TextColor="#EF9A9A" HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+            <VerticalStackLayout Grid.Column="1" Spacing="1" HorizontalOptions="Center">
+                <Label Text="WON" FontSize="9" TextColor="#8B9DC3" HorizontalOptions="Center" CharacterSpacing="0.6"/>
+                <Label x:Name="lblTotalWon" FontSize="14" FontAttributes="Bold" TextColor="#66BB6A" HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+            <VerticalStackLayout Grid.Column="2" Spacing="1" HorizontalOptions="Center">
+                <Label Text="NET" FontSize="9" TextColor="#8B9DC3" HorizontalOptions="Center" CharacterSpacing="0.6"/>
+                <Label x:Name="lblNetTotal" FontSize="15" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center"/>
+            </VerticalStackLayout>
         </Grid>
 
     </Grid>
