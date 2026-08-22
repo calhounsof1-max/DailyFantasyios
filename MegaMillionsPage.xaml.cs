@@ -161,6 +161,25 @@ public partial class MegaMillionsPage : ContentPage
         await Shell.Current.GoToAsync(nameof(Daily3Page), false);
     }
 
+    private async void BtnNumIntel_Clicked(object sender, EventArgs e)
+    {
+        string? choice = await DisplayActionSheet("Number Intelligence", "Cancel", null,
+            "Back-Test Numbers", "Hot & Cold Numbers", "Positional Frequency",
+            "Sum Range", "Balance Check", "Pairs & Triplets",
+            "Number Gap Tracker", "Ticket Scorer", "Wheeling System", "Combo Filter");
+        if (choice == null || choice == "Cancel") return;
+        if (choice == "Back-Test Numbers")    { BackTestPage.PresetGame      = "Mega Millions"; await Shell.Current.GoToAsync(nameof(BackTestPage),      false); return; }
+        if (choice == "Hot & Cold Numbers")   { HotColdPage.PresetGame       = "Mega Millions"; await Shell.Current.GoToAsync(nameof(HotColdPage),       false); return; }
+        if (choice == "Positional Frequency") { PositionalFreqPage.PresetGame = "Mega Millions"; await Shell.Current.GoToAsync(nameof(PositionalFreqPage), false); return; }
+        if (choice == "Sum Range")            { SumRangePage.PresetGame      = "Mega Millions"; await Shell.Current.GoToAsync(nameof(SumRangePage),      false); return; }
+        if (choice == "Balance Check")        { BalanceCheckPage.PresetGame  = "Mega Millions"; await Shell.Current.GoToAsync(nameof(BalanceCheckPage),  false); return; }
+        if (choice == "Pairs & Triplets")     { PairsTripletsPage.PresetGame = "Mega Millions"; await Shell.Current.GoToAsync(nameof(PairsTripletsPage), false); return; }
+        if (choice == "Number Gap Tracker")   { GapTrackerPage.PresetGame    = "Mega Millions"; await Shell.Current.GoToAsync(nameof(GapTrackerPage),    false); return; }
+        if (choice == "Ticket Scorer")        { TicketScorerPage.PresetGame  = "Mega Millions"; await Shell.Current.GoToAsync(nameof(TicketScorerPage),  false); return; }
+        if (choice == "Wheeling System")      { WheelingPage.PresetGame      = "Mega Millions"; await Shell.Current.GoToAsync(nameof(WheelingPage),      false); return; }
+        if (choice == "Combo Filter")         { ComboFilterPage.PresetGame   = "Mega Millions"; await Shell.Current.GoToAsync(nameof(ComboFilterPage),   false); return; }
+    }
+
     internal void PrePosition(bool fromRight)
     {
         double w = DeviceDisplay.MainDisplayInfo.Width / DeviceDisplay.MainDisplayInfo.Density;

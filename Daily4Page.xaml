@@ -22,9 +22,9 @@
             <Button Grid.Column="2" Text="Game ▼" FontSize="11" FontAttributes="Bold"
                     BackgroundColor="#2D3D50" TextColor="White" Padding="10,0"
                     HeightRequest="34" CornerRadius="17" Clicked="BtnGameMenu_Clicked" Margin="0,0,6,0"/>
-            <Button Grid.Column="3" Text="DD →" FontSize="12" FontAttributes="Bold"
-                    BackgroundColor="#5D4037" TextColor="White" Padding="10,0"
-                    HeightRequest="34" CornerRadius="17" Clicked="BtnGoDD_Clicked"/>
+            <Button Grid.Column="3" Text="Intelligence ▼" FontSize="10" FontAttributes="Bold"
+                    BackgroundColor="#FFB300" TextColor="#1A1A2E" Padding="10,0"
+                    HeightRequest="34" CornerRadius="17" Clicked="BtnNumIntel_Clicked"/>
         </Grid>
 
         <!-- Row 6: Status bar -->

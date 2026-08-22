@@ -154,6 +154,25 @@ public partial class Daily3Page : ContentPage
         await Shell.Current.GoToAsync(nameof(Daily4Page), false);
     }
 
+    private async void BtnNumIntel_Clicked(object sender, EventArgs e)
+    {
+        string? choice = await DisplayActionSheet("Number Intelligence", "Cancel", null,
+            "Back-Test Numbers", "Hot & Cold Numbers", "Positional Frequency",
+            "Sum Range", "Balance Check", "Pairs & Triplets",
+            "Number Gap Tracker", "Ticket Scorer", "Wheeling System", "Rundown Calculator");
+        if (choice == null || choice == "Cancel") return;
+        if (choice == "Back-Test Numbers")    { BackTestPage.PresetGame      = "Daily 3"; await Shell.Current.GoToAsync(nameof(BackTestPage),      false); return; }
+        if (choice == "Hot & Cold Numbers")   { HotColdPage.PresetGame       = "Daily 3"; await Shell.Current.GoToAsync(nameof(HotColdPage),       false); return; }
+        if (choice == "Positional Frequency") { PositionalFreqPage.PresetGame = "Daily 3"; await Shell.Current.GoToAsync(nameof(PositionalFreqPage), false); return; }
+        if (choice == "Sum Range")            { SumRangePage.PresetGame      = "Daily 3"; await Shell.Current.GoToAsync(nameof(SumRangePage),      false); return; }
+        if (choice == "Balance Check")        { BalanceCheckPage.PresetGame  = "Daily 3"; await Shell.Current.GoToAsync(nameof(BalanceCheckPage),  false); return; }
+        if (choice == "Pairs & Triplets")     { PairsTripletsPage.PresetGame = "Daily 3"; await Shell.Current.GoToAsync(nameof(PairsTripletsPage), false); return; }
+        if (choice == "Number Gap Tracker")   { GapTrackerPage.PresetGame    = "Daily 3"; await Shell.Current.GoToAsync(nameof(GapTrackerPage),    false); return; }
+        if (choice == "Ticket Scorer")        { TicketScorerPage.PresetGame  = "Daily 3"; await Shell.Current.GoToAsync(nameof(TicketScorerPage),  false); return; }
+        if (choice == "Wheeling System")      { WheelingPage.PresetGame      = "Daily 3"; await Shell.Current.GoToAsync(nameof(WheelingPage),      false); return; }
+        if (choice == "Rundown Calculator")   { RundownPage.PresetGame       = "Daily 3"; await Shell.Current.GoToAsync(nameof(RundownPage),       false); return; }
+    }
+
     internal void PrePosition(bool fromRight)
     {
         double w = DeviceDisplay.MainDisplayInfo.Width / DeviceDisplay.MainDisplayInfo.Density;
