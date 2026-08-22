@@ -227,14 +227,6 @@ public partial class MainPage : ContentPage
         navLoadingSpinner.IsRunning = false;
         _initialized = true;
 
-        // TEMP DIAGNOSTIC — timing checkpoints to find what's blocking the UI thread on cold
-        // launch (10-30s freeze reported, reproduces even in Airplane Mode so it's CPU-bound,
-        // not network). Remove once the slow step is identified and fixed.
-        var _diagSw = System.Diagnostics.Stopwatch.StartNew();
-        var _diagLog = new System.Text.StringBuilder();
-        void DiagMark(string label) => _diagLog.AppendLine($"{_diagSw.ElapsedMilliseconds,6}ms  {label}");
-        DiagMark("cold-start branch entered");
-
         // Hot Spot Only mode: skip straight to Hot Spot on cold launch instead of ever
         // showing Home — everything below still runs unchanged afterward, underneath Hot
         // Spot, so Home is still fully initialized for whenever the user taps its ⌂ icon.
@@ -293,27 +285,22 @@ public partial class MainPage : ContentPage
         }
         MaxNum.TextChanged += (_, _) => SavePreferences();
         HowMany.TextChanged += (_, _) => SavePreferences();
-        DiagMark("before RestorePreferences");
         _isRestoring = true;
         RestorePreferences();
         _isRestoring = false;
         MaxNum.TextColor  = Colors.White;
         HowMany.TextColor = Colors.White;
-        DiagMark("before vm.LoadDataAsync");
         await vm.LoadDataAsync();
-        DiagMark("after vm.LoadDataAsync");
         await loadingBar.ProgressTo(1.0, 300, Easing.CubicOut);
         await Task.Delay(200); // brief pause so user sees "Ready!" before overlay hides
         // Pre-warm Results cache in background so Results page loads instantly
         _ = ResultsPageCls.LoadAllDrawsAsync();
-        DiagMark("after ResultsPageCls.LoadAllDrawsAsync fired (not awaited)");
         // Load only the user's previously saved picks (autosave); start empty if none
         if (File.Exists(PicksAutoSavePath))
         {
             var saved = await File.ReadAllLinesAsync(PicksAutoSavePath);
             vm.Picks = new System.Collections.ObjectModel.ObservableCollection<string>(saved);
         }
-        DiagMark("after picks autosave load");
         ReHookPicksAutoSave();
         // Enforce mode-correct PICK/FROM
         if (_mode == 2) { MaxNum.Text = "3"; }
@@ -333,18 +320,15 @@ public partial class MainPage : ContentPage
                                 : _mode == 3 ? "Insert Combos → Powerball"
                                 : _mode == 4 ? "Insert Combos → Mega Millions"
                                 :              "Insert Combos → Daily 3";
-        DiagMark("before UpdateModeButtons/RecurrencePicker");
         UpdateModeButtons();
         UpdateTicketCount();
         UpdateRecurrencePicker(_mode);
         vm.ActiveTab = 0;
-        DiagMark("before Task.Delay(300)");
         await Task.Delay(300);
         foreach (var e in _boxes) e.Unfocus();
         MaxNum.Unfocus();
         HowMany.Unfocus();
         HideKeyboard();
-        DiagMark("before jackpotPanel.Expand/LoadAsync");
         jackpotPanel.IsVisible = Preferences.Get(JackpotDisplay.PrefShowPanel, true);
         if (jackpotPanel.IsVisible)
         {
@@ -352,7 +336,6 @@ public partial class MainPage : ContentPage
             _ = jackpotPanel.LoadAsync();
         }
         SyncListsVisibility();
-        DiagMark("OnAppearing end (jackpotPanel.LoadAsync fired, not awaited)");
 
         // Show in-app alert for advance tickets expiring today or tomorrow (launch only)
         AdvancePlayNotificationService.CheckAndNotify();
@@ -368,9 +351,6 @@ public partial class MainPage : ContentPage
         {
             AdvancePlayNotificationService.ClearLaunchAlert();
         }
-
-        // TEMP DIAGNOSTIC — see the note earlier in this method.
-        try { await DisplayAlert("Startup timing (temp diagnostic)", _diagLog.ToString(), "OK"); } catch { }
     }
 
     protected override void OnDisappearing()

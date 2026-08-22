@@ -1,0 +1,25 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="ball" cx="38%" cy="32%" r="62%">
+      <stop offset="0%"   stop-color="#FFE95A"/>
+      <stop offset="40%"  stop-color="#FFD700"/>
+      <stop offset="78%"  stop-color="#C8A000"/>
+      <stop offset="100%" stop-color="#8B6000"/>
+    </radialGradient>
+    <radialGradient id="shine" cx="35%" cy="28%" r="45%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="60%"  stop-color="#ffffff" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="256" cy="245" r="150" fill="url(#ball)"/>
+  <circle cx="256" cy="245" r="150" fill="url(#shine)"/>
+  <path d="M 108,252 Q 256,284 404,252" fill="none" stroke="#ffffff" stroke-width="3" stroke-opacity="0.2"/>
+  <path d="M 112,234 Q 256,205 400,234" fill="none" stroke="#ffffff" stroke-width="3" stroke-opacity="0.2"/>
+  <text x="256" y="270" font-family="Georgia, serif" font-size="148" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" opacity="0.9">7</text>
+  <text x="256" y="358" font-family="Arial, sans-serif" font-size="44" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" opacity="0.85" letter-spacing="6">LOTTERY</text>
+  <polygon points="128,112 135,133 157,133 140,146 147,168 128,155 109,168 116,146 99,133 121,133" fill="#FFD700"/>
+  <polygon points="384,112 389,129 407,129 393,139 398,156 384,147 370,156 375,139 361,129 379,129" fill="#FFD700"/>
+  <polygon points="384,355 388,368 402,368 392,376 396,389 384,382 372,389 376,376 366,368 380,368" fill="#FFD700"/>
+  <polygon points="128,355 133,372 151,372 137,382 142,399 128,390 114,399 119,382 105,372 123,372" fill="#FFD700"/>
+</svg>
